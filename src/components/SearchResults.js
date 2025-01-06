@@ -13,7 +13,7 @@ const SearchResults = ({ query, movieClick }) => {
 
     try {
       const response = await fetch(
-        `${process.env.REACT_APP_GET_SEARCH_API}${encodeURIComponent(
+        `${process.env.REACT_APP_GET_SEARCH_API}&query=${encodeURIComponent(
           query
         )}&pageNumber=${pageNumber}`
       );
