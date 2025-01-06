@@ -4,7 +4,7 @@ const NavBar = () => {
 
   return (
     <nav className="navbar">
-      <div className="logo">Flyx</div>
+      <div className="logo" onClick={() => {window.location.reload()}}>Flyx</div>
     </nav>
   );
 };
