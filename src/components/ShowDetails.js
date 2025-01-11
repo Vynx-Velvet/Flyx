@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import MediaPlayer from "./MediaPlayer"; // Import the MediaPlayer component
 import "./ShowDetails.css"; // Custom styles for the compact design
 
-const ShowDetails = ({ movieId, backButton }) => {
+
+const ShowDetails = ({ movieId, clearMovie }) => {
   const [movieDetails, setMovieDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedSeason, setSelectedSeason] = useState(0); // Tracks which season is selected
@@ -13,13 +14,13 @@ const ShowDetails = ({ movieId, backButton }) => {
       try {
         if (movieId.media_type === "tv" || !movieId.media_type) {
           const showResponse = await fetch(
-            `${process.env.REACT_APP_GET_SHOW_API}&movieId=${movieId.id}`
+            `https://us-central1-vixen-ai-3086f.cloudfunctions.net/tmdbAPI?action=getShowDetails&movieId=${movieId.id}`
           );
           const showDetailsResponse = await showResponse.json();
           const seasons = await Promise.all(
             showDetailsResponse.seasons.map(async (season) => {
               const seasonResponse = await fetch(
-                `${process.env.REACT_APP_GET_SEASON_API}&movieId=${movieId.id}&seasonId=${season.season_number}`
+                `https://us-central1-vixen-ai-3086f.cloudfunctions.net/tmdbAPI?action=getSeasonDetails&movieId=${movieId.id}&seasonId=${season.season_number}`
               );
               return seasonResponse.json();
             })
@@ -27,7 +28,7 @@ const ShowDetails = ({ movieId, backButton }) => {
           setMovieDetails({ movie: showDetailsResponse, seasons });
         } else {
           const movieResponse = await fetch(
-            `${process.env.REACT_APP_GET_MOVIE_API}${movieId.id}`
+            `https://us-central1-vixen-ai-3086f.cloudfunctions.net/tmdbAPI?action=getMovieDetails&movieId=${movieId.id}`
           );
           const movieDetailsResponse = await movieResponse.json();
           setMovieDetails({ movie: movieDetailsResponse });
@@ -43,7 +44,7 @@ const ShowDetails = ({ movieId, backButton }) => {
   }, [movieId]);
 
   const returnToHome = () => {
-    backButton(null);
+    clearMovie(null);
   };
 
   const handleSeasonChange = (seasonIndex) => {
@@ -70,11 +71,11 @@ const ShowDetails = ({ movieId, backButton }) => {
   };
 
   if (loading) {
-    return <div className="loading">Loading...</div>;
+    return <div className="show-details">Loading...</div>;
   }
 
   if (!movieDetails) {
-    return <div className="error">Error loading details. Please try again later.</div>;
+    return <div className="show-details">Error loading details. Please try again later.</div>;
   }
 
   const { movie, seasons } = movieDetails;
@@ -96,9 +97,9 @@ const ShowDetails = ({ movieId, backButton }) => {
   }
 
   return (
-    <div className="show-details compact">
+    <div className="show-details">
       <button className="back-button" onClick={returnToHome}>
-        Back To Home
+      ◄ Back To Home
       </button>
 
       <div className="movie-header">
@@ -142,7 +143,6 @@ const ShowDetails = ({ movieId, backButton }) => {
 
           {seasons[selectedSeason] && (
             <div className="episodes-container">
-              <h3>{seasons[selectedSeason].name || `Season ${selectedSeason + 1}`}</h3>
               <div className="episodes-grid">
                 {seasons[selectedSeason].episodes.map((episode) =>
                   episode.still_path ? (

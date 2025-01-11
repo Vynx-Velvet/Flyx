@@ -1,0 +1,69 @@
+/* SearchBar Component */  
+.search-bar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 10px;
+	background-color: #141414; /* Netflix-like dark theme */
+	border-radius: 8px; /* Smooth rounded corners */
+	max-width: 500px; /* Restrict width for a clean appearance */
+	margin: 0 auto; /* Center the search bar on the page */
+
+  }
+  
+  .search-bar input {
+	flex: 1;
+	padding: 10px 15px;
+	font-size: 1rem;
+	border: none;
+	outline: none;
+	border-radius: 8px 0 0 8px; /* Rounded corners for left side */
+	background-color: #222; /* Slightly lighter than background */
+	color: #fff; /* White text for contrast */
+	transition: background-color 0.3s ease;
+  }
+  
+  .search-bar input::placeholder {
+	color: #aaa; /* Subtle placeholder text color */
+  }
+  
+  .search-bar input:focus {
+	background-color: #333; /* Darker background when focused */
+  }
+  
+  .search-bar button {
+	padding: 10px 20px;
+	font-size: 1rem;
+	border: none;
+	outline: none;
+	background-color: #e50914; /* Netflix red for action button */
+	color: #fff; /* White text for contrast */
+	border-radius: 0 8px 8px 0; /* Rounded corners for right side */
+	cursor: pointer;
+	transition: background-color 0.3s ease, transform 0.2s ease;
+  }
+  
+  .search-bar button:hover {
+	background-color: #ff6161; /* Slightly lighter red on hover */
+	transform: scale(1.05); /* Subtle scaling effect */
+  }
+  
+  .search-bar button:active {
+	transform: scale(0.95); /* Pressed button effect */
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 768px) {
+	.search-bar {
+	  max-width: 90%; /* Adjust width for smaller screens */
+	}
+  
+	.search-bar input {
+	  font-size: 0.9rem; /* Slightly smaller font for inputs */
+	}
+  
+	.search-bar button {
+	  font-size: 0.9rem; /* Slightly smaller button text */
+	}
+  }
+  

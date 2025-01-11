@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Flag from 'react-world-flags';
+import "./Results.css"
 const Results = ({ category, movieClick }) => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,21 +17,21 @@ const Results = ({ category, movieClick }) => {
         switch (category) {
           case 'Trending Today':
             const trendingResponse = await fetch(
-              process.env.REACT_APP_GET_TRENDING_DAY_API
+              "https://us-central1-vixen-ai-3086f.cloudfunctions.net/tmdbAPI?action=getTrendingNow"
             );
             const trendingResult = await trendingResponse.json();
             moviesData = trendingResult.results;
             break;
           case 'Trending This Week':
             const airingTodayResponse = await fetch(
-              process.env.REACT_APP_GET_TRENDING_WEEK_API
+              "https://us-central1-vixen-ai-3086f.cloudfunctions.net/tmdbAPI?action=getTrendingWeekly"
             );
             const airingTodayResult = await airingTodayResponse.json();
             moviesData = airingTodayResult.results;
             break;
           case 'Popular Anime':
             const popularAnimeResponse = await fetch(
-              process.env.REACT_APP_GET_POPULAR_ANIME_API
+              "https://us-central1-vixen-ai-3086f.cloudfunctions.net/tmdbAPI?action=getPopularAnime"
             );
             const popularAnimeResult = await popularAnimeResponse.json();
             moviesData = popularAnimeResult.results;
@@ -131,68 +132,6 @@ const Results = ({ category, movieClick }) => {
 
         </div>
       )}
-      <style jsx>{`
-        .carousel-container {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-        .movies-carousel {
-          display: flex;
-          overflow-x: auto;
-          scroll-behavior: smooth;
-          gap: 10px;
-        }
-        .movies-carousel::-webkit-scrollbar {
-          display: none;
-        }
-        .movie-card {
-          flex: 0 0 auto;
-          min-width: 200px;
-          position: relative;
-        }
-        .movie-card img {
-          width: 100%;
-          border-radius: 8px;
-          box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
-        }
-        .movie-details {
-          position: absolute;
-          bottom: 10px;
-          left: 50%;
-          transform: translateX(-50%);
-          background-color: rgba(0, 0, 0, 0.8);
-          color: white;
-          padding: 10px;
-          border-radius: 5px;
-          text-align: center;
-          width: 90%;
-          box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
-        }
-        .left-arrow, .right-arrow {
-          position: absolute;
-          top: 50%;
-          transform: translateY(-50%);
-          background-color: rgba(0, 0, 0, 0.5);
-          border: none;
-          color: white;
-          font-size: 24px;
-          padding: 10px;
-          cursor: pointer;
-          z-index: 10;
-          border-radius: 50%;
-          transition: background-color 0.3s ease;
-        }
-        .left-arrow:hover, .right-arrow:hover {
-          background-color: rgba(0, 0, 0, 0.8);
-        }
-        .left-arrow {
-          left: 10px;
-        }
-        .right-arrow {
-          right: 10px;
-        }
-      `}</style>
     </div>
   );
 };

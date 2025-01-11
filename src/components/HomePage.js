@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import NavBar from "./NavBar";
+import "./HomePage.css"
 import Results from "./Results";
 import SearchBar from "./SearchBar";
 import SearchResults from "./SearchResults"; // New component to display search results
@@ -13,7 +13,6 @@ const HomePage = ({ movieClick }) => {
 
   return (
     <div className="home-page">
-      <NavBar />
       <SearchBar onSearch={handleSearch} />
       {searchQuery ? (
         <SearchResults query={searchQuery} movieClick={movieClick} />

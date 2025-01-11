@@ -1,0 +1,9 @@
+/* HomePage Component */  
+.home-page {
+	height: 90dvh;
+	overflow-y: scroll;
+}
+
+.home-page::-webkit-scrollbar {
+	display: none; /* Hide scrollbar */
+  }

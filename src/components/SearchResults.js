@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import "./SearchResults.css"
 
 const SearchResults = ({ query, movieClick }) => {
   const [results, setResults] = useState([]);
@@ -13,7 +14,7 @@ const SearchResults = ({ query, movieClick }) => {
 
     try {
       const response = await fetch(
-        `${process.env.REACT_APP_GET_SEARCH_API}&query=${encodeURIComponent(
+        `https://us-central1-vixen-ai-3086f.cloudfunctions.net/tmdbAPI?action=search&query=${encodeURIComponent(
           query
         )}&pageNumber=${pageNumber}`
       );

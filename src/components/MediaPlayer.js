@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-
+import "./MediaPlayer.css"
 const MediaPlayer = ({
   mediaType,
   movieId,
@@ -42,7 +42,7 @@ const MediaPlayer = ({
   };
 
   return (
-    <>
+    <div className="media-container">
       <div className="media-player">
         <iframe
           src={embedUrl}
@@ -56,13 +56,14 @@ const MediaPlayer = ({
       </div>
       {mediaType === "tv" && (
         <div className="media-controls">
-          <button
+          {episodeId <= 1 ? null : <button
             onClick={handlePreviousEpisode}
             disabled={episodeId <= 1}
             className={`control-button ${episodeId <= 1 ? "disabled" : ""}`}
           >
-            Previous Episode
-          </button>
+            ◄ Previous Episode
+          </button>}
+          
           <button
             onClick={handleNextEpisode}
             disabled={episodeId >= maxEpisodes}
@@ -70,10 +71,11 @@ const MediaPlayer = ({
               episodeId >= maxEpisodes ? "disabled" : ""
             }`}
           >
-            Next Episode
+            Next Episode ►
           </button>
         </div>
       )}
+      <div className="other-options">
       <button onClick={handleBackToShowDetails} className="control-button">
         Back to Show Details
       </button>
@@ -83,8 +85,9 @@ const MediaPlayer = ({
           <option value="Embed.su">Embed.su</option>
           <option value="Vidsrc.xyz">Vidsrc.xyz</option>
         </select>
+        </div>
       </div>
-    </>
+    </div>
   );
 };
 

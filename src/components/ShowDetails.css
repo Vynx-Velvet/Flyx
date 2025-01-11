@@ -1,12 +1,21 @@
+/* ShowDetails Component */  
 .show-details {
+	height: 90dvh;
+	min-height: 90dvh;
+	max-height: 90dvh;
+	overflow-y: scroll;
 	padding: 20px;
 	color: #fff;
 	background-color: #141414;
 	font-family: Arial, sans-serif;
   }
+
+.show-details::-webkit-scrollbar {
+	display: none;
+  }
+
   
-  .compact .back-button {
-	position: absolute;
+.back-button {
 	left: 1rem;
 	background-color: #e50914;
 	color: #fff;
@@ -14,13 +23,19 @@
 	padding: 10px 20px;
 	cursor: pointer;
 	font-size: 16px;
-	margin-bottom: 20px;
+	border-radius: 5rem;
   }
   
+  .movie-poster {
+	left: 0;
+	width: 12rem;
+  }
+
   .movie-header {
 	margin-top: 3rem;
 	text-align: center;
 	margin-bottom: 30px;
+	display: flex;
   }
   
   .movie-header h1 {
@@ -34,6 +49,7 @@
   }
   
   .season-selector-container {
+	text-align: center;
 	margin-top: 20px;
   }
   
