@@ -185,7 +185,7 @@ async function getBrowserConfig(logger) {
       try {
         if (fs.existsSync(path)) {
           chromeExecutable = path;
-          logger.debug('Found Chrome at:', path);
+          logger.debug('Found Chrome at:', { path });
           break;
         }
       } catch (e) {
@@ -244,20 +244,82 @@ async function getBrowserConfig(logger) {
     };
   } else {
     // Production - use @sparticuz/chromium for serverless
-    logger.debug('Using @sparticuz/chromium for serverless environment');
-    return {
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-      args: [
-        ...chromium.args,
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-blink-features=AutomationControlled',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu'
-      ]
-    };
+    logger.info('Using @sparticuz/chromium for serverless environment');
+    
+    try {
+      // Get the executable path from @sparticuz/chromium
+      const executablePath = await chromium.executablePath();
+      logger.info('Chromium executable path resolved', { 
+        executablePath: executablePath ? executablePath.substring(0, 100) : 'null' 
+      });
+      
+      // Verify the executable exists if we have access to fs
+      try {
+        const fs = require('fs');
+        if (executablePath && !fs.existsSync(executablePath)) {
+          logger.warn('Chromium executable path does not exist', { executablePath });
+        }
+      } catch (fsError) {
+        logger.debug('Could not verify executable path (fs not accessible)', { 
+          error: fsError.message 
+        });
+      }
+      
+      const config = {
+        executablePath,
+        headless: chromium.headless,
+        args: [
+          ...chromium.args,
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-blink-features=AutomationControlled',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--single-process', // Important for serverless
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows'
+        ]
+      };
+      
+      logger.info('Browser configuration prepared', {
+        hasExecutablePath: !!config.executablePath,
+        headless: config.headless,
+        argsCount: config.args.length
+      });
+      
+      return config;
+    } catch (chromiumError) {
+      logger.error('Failed to configure Chromium for serverless', chromiumError, {
+        errorName: chromiumError.name,
+        errorMessage: chromiumError.message
+      });
+      
+      // Fallback configuration for serverless without @sparticuz/chromium
+      logger.warn('Falling back to basic serverless configuration');
+      return {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-blink-features=AutomationControlled',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu',
+          '--single-process',
+          '--disable-background-timer-throttling',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows'
+        ]
+      };
+    }
   }
 }
 
@@ -750,17 +812,60 @@ export async function GET(request) {
     const launchStart = Date.now();
     
     const browserConfig = await getBrowserConfig(logger);
-    logger.debug('Browser configuration', browserConfig);
+    logger.debug('Browser configuration', { 
+      hasExecutablePath: !!browserConfig.executablePath,
+      headless: browserConfig.headless,
+      argsCount: browserConfig.args?.length || 0
+    });
     
-         const isDev = process.env.NODE_ENV === 'development';
-     
-     if (isDev) {
-       // Use puppeteer-core for development (with local Chromium)
-       browser = await puppeteer.launch(browserConfig);
-     } else {
-       // Use puppeteer-core with @sparticuz/chromium for production
-       browser = await puppeteer.launch(browserConfig);
-     }
+    const isDev = process.env.NODE_ENV === 'development';
+    
+    try {
+      if (isDev) {
+        // Use puppeteer-core for development (with local Chromium)
+        browser = await puppeteer.launch(browserConfig);
+        logger.info('Development browser launched successfully');
+      } else {
+        // Use puppeteer-core with @sparticuz/chromium for production
+        browser = await puppeteer.launch(browserConfig);
+        logger.info('Production browser launched successfully');
+      }
+    } catch (launchError) {
+      logger.error('Failed to launch browser with primary config', launchError);
+      
+      // Fallback: try launching without executable path for serverless
+      if (!isDev) {
+        logger.warn('Attempting fallback browser launch without executable path');
+        try {
+          const fallbackConfig = {
+            headless: true,
+            args: [
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-dev-shm-usage',
+              '--disable-web-security',
+              '--disable-features=VizDisplayCompositor',
+              '--disable-blink-features=AutomationControlled',
+              '--no-first-run',
+              '--no-zygote',
+              '--disable-gpu',
+              '--single-process',
+              '--disable-background-timer-throttling',
+              '--disable-renderer-backgrounding',
+              '--disable-backgrounding-occluded-windows'
+            ]
+          };
+          
+          browser = await puppeteer.launch(fallbackConfig);
+          logger.info('Fallback browser launched successfully');
+        } catch (fallbackError) {
+          logger.error('Fallback browser launch also failed', fallbackError);
+          throw new Error(`Both primary and fallback browser launch failed. Primary: ${launchError.message}, Fallback: ${fallbackError.message}`);
+        }
+      } else {
+        throw launchError; // Re-throw original error for development
+      }
+    }
     
     logger.timing('Browser launch took', launchStart);
 
