@@ -264,13 +264,13 @@ const MediaPlayer = ({
         
         // Build API parameters
         const params = new URLSearchParams();
-        params.append('mediaType', mediaType);
-        params.append('movieId', movieId.toString());
+          params.append('mediaType', mediaType);
+          params.append('movieId', movieId.toString());
         params.append('server', server === "Vidsrc.xyz" ? "vidsrc.xyz" : "embed.su");
-        
-        if (mediaType === 'tv') {
-          params.append('seasonId', seasonId.toString());
-          params.append('episodeId', episodeId.toString());
+          
+          if (mediaType === 'tv') {
+            params.append('seasonId', seasonId.toString());
+            params.append('episodeId', episodeId.toString());
         }
         
         setExtractionStep("Launching browser automation...");
@@ -507,16 +507,16 @@ const MediaPlayer = ({
                 </>
               ) : (
                                   <>
-                    <p>Extracting stream from {server}...</p>
-                    {extractionStep && (
+              <p>Extracting stream from {server}...</p>
+              {extractionStep && (
                       <p className={styles.loadingStep}>{extractionStep}</p>
-                    )}
+              )}
                     <p className={styles.loadingHint}>This may take 15-30 seconds</p>
-                    {requestId && (
+              {requestId && (
                       <p className={styles.requestId}>Request ID: {requestId}</p>
                     )}
                   </>
-                )}
+              )}
             </div>
           </div>
         )}
@@ -565,17 +565,17 @@ const MediaPlayer = ({
             )}
             
             <div className={styles.videoWrapper}>
-              <video
-                ref={videoRef}
-                controls
-                autoPlay
-                width="100%"
-                height="100%"
+            <video
+              ref={videoRef}
+              controls
+              autoPlay
+              width="100%"
+              height="100%"
                 className={styles.videoElement}
-                onError={handleVideoError}
-                onLoadStart={() => console.log('Video loading started')}
-                onCanPlay={() => console.log('Video can start playing')}
-                onPlaying={() => console.log('Video playback started')}
+              onError={handleVideoError}
+              onLoadStart={() => console.log('Video loading started')}
+              onCanPlay={() => console.log('Video can start playing')}
+              onPlaying={() => console.log('Video playback started')}
                 onLoadedMetadata={(e) => {
                   const duration = e.target.duration;
                   setVideoDuration(duration);
@@ -586,11 +586,11 @@ const MediaPlayer = ({
                   setVideoDuration(duration);
                   console.log(`Video duration updated: ${Math.round(duration / 60)} minutes`);
                 }}
-                crossOrigin="anonymous"
-                preload="metadata"
-              >
-                Your browser does not support the video tag.
-              </video>
+              crossOrigin="anonymous"
+              preload="metadata"
+            >
+              Your browser does not support the video tag.
+            </video>
             </div>
             
             {/* Stream Info */}
@@ -600,7 +600,7 @@ const MediaPlayer = ({
                   {streamType === 'hls' ? '📺 HLS Stream' : '🎥 Direct Stream'}
                 </span>
                 <div className={styles.streamDetails}>
-                  {qualities.length > 0 && (
+                {qualities.length > 0 && (
                     <span className={styles.qualityCount}>
                       {qualities.length} qualities available
                     </span>
@@ -613,8 +613,8 @@ const MediaPlayer = ({
                   {videoDuration > 0 && selectedQuality === -1 && qualities.length > 0 && (
                     <span className={styles.estimatedSize}>
                       Auto Quality (~{Math.round(videoDuration / 60)} min video)
-                    </span>
-                  )}
+                  </span>
+                )}
                 </div>
               </div>
             )}
@@ -648,27 +648,27 @@ const MediaPlayer = ({
       {/* Other Options */}
       <div className={styles.otherOptions}>
         <div className={styles.optionsRow}>
-          <button 
-            onClick={handleBackToShowDetails} 
+        <button 
+          onClick={handleBackToShowDetails} 
             className={styles.controlButton}
             disabled={loading || autoSwitching}
-          >
-            ◄ Back to Show Details
-          </button>
-          
+        >
+          ◄ Back to Show Details
+        </button>
+        
           <div className={styles.serverSelector}>
             <label htmlFor="server" className={styles.serverLabel}>Choose Server: </label>
-            <select 
-              id="server" 
-              value={server} 
-              onChange={handleServerChange}
+          <select 
+            id="server" 
+            value={server} 
+            onChange={handleServerChange}
               disabled={loading || autoSwitching}
-              title="Select streaming server"
+            title="Select streaming server"
               className={styles.serverDropdown}
-            >
+          >
               <option value="Vidsrc.xyz">🎯 Vidsrc.xyz (Primary)</option>
               <option value="Embed.su">🔄 Embed.su (Backup)</option>
-            </select>
+          </select>
           </div>
         </div>
         
