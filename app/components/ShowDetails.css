@@ -1,0 +1,280 @@
+/* ShowDetails Component - Futuristic Design */  
+.show-details {
+	height: 90dvh;
+	min-height: 90dvh;
+	max-height: 90dvh;
+	overflow-y: scroll;
+	padding: 2rem;
+	color: var(--text-primary);
+	background: var(--primary-bg);
+	font-family: var(--font-primary);
+}
+
+.show-details::-webkit-scrollbar {
+	display: none;
+}
+
+.back-button {
+	background: var(--glass-bg);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--border-radius-xl);
+	padding: 12px 24px;
+	color: var(--text-primary);
+	font-size: 0.95rem;
+	font-weight: 600;
+	cursor: pointer;
+	backdrop-filter: blur(20px);
+	transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+	position: relative;
+	overflow: hidden;
+	margin-bottom: 2rem;
+}
+
+.back-button::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: -100%;
+	width: 100%;
+	height: 100%;
+	background: var(--gradient-primary);
+	transition: all 0.5s cubic-bezier(0.23, 1, 0.320, 1);
+	z-index: -1;
+}
+
+.back-button:hover {
+	border-color: var(--neon-cyan);
+	transform: translateY(-2px);
+	box-shadow: 
+		0 8px 25px rgba(0, 0, 0, 0.3),
+		0 0 20px rgba(0, 245, 255, 0.3);
+}
+
+.back-button:hover::before {
+	left: 0;
+}
+
+.back-button:active {
+	transform: translateY(0);
+}
+  
+  .movie-poster {
+	left: 0;
+	width: 12rem;
+  }
+
+  .movie-header {
+	margin-top: 3rem;
+	text-align: center;
+	margin-bottom: 30px;
+	display: flex;
+  }
+  
+  .movie-header h1 {
+	font-size: 28px;
+	margin-bottom: 10px;
+  }
+  
+  .movie-overview {
+	font-size: 16px;
+	line-height: 1.6;
+  }
+  
+  .season-selector-container {
+	text-align: center;
+	margin-top: 20px;
+  }
+  
+  .season-buttons {
+	display: flex;
+	gap: 10px;
+	justify-content: center;
+	margin-bottom: 20px;
+  }
+  
+  .season-button {
+	background: var(--glass-bg);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--border-radius-lg);
+	padding: 12px 20px;
+	color: var(--text-primary);
+	font-size: 0.9rem;
+	font-weight: 500;
+	cursor: pointer;
+	backdrop-filter: blur(20px);
+	transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+	position: relative;
+	overflow: hidden;
+  }
+  
+  .season-button::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: -100%;
+	width: 100%;
+	height: 100%;
+	background: var(--gradient-primary);
+	transition: all 0.5s cubic-bezier(0.23, 1, 0.320, 1);
+	z-index: -1;
+  }
+  
+  .season-button:hover {
+	border-color: var(--neon-purple);
+	transform: translateY(-2px);
+	box-shadow: 
+		0 5px 20px rgba(0, 0, 0, 0.3),
+		0 0 15px rgba(138, 43, 226, 0.3);
+  }
+  
+  .season-button:hover::before {
+	left: 0;
+  }
+  
+  .season-button.active {
+	border-color: var(--neon-cyan);
+	background: var(--gradient-primary);
+	box-shadow: 
+		0 5px 20px rgba(0, 0, 0, 0.4),
+		0 0 20px rgba(0, 245, 255, 0.4);
+  }
+  
+  .season-button.active::before {
+	left: 0;
+	opacity: 0.1;
+  }
+  
+  .episodes-container {
+	margin-top: 20px;
+  }
+  
+  .episodes-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: 15px;
+  }
+  
+  .episode-card {
+	background: var(--glass-bg);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--border-radius-lg);
+	backdrop-filter: blur(20px);
+	overflow: hidden;
+	text-align: center;
+	cursor: pointer;
+	transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+	position: relative;
+	z-index: 1; /* Default z-index */
+  }
+  
+  .episode-card::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: var(--gradient-primary);
+	opacity: 0;
+	transition: all 0.5s cubic-bezier(0.23, 1, 0.320, 1);
+	z-index: 1;
+  }
+  
+  .episode-card:hover {
+	transform: translateY(-5px) scale(1.02);
+	border-color: var(--neon-cyan);
+	box-shadow: 
+		0 10px 30px rgba(0, 0, 0, 0.4),
+		0 0 20px rgba(0, 245, 255, 0.3);
+	z-index: 999; /* Highest z-index on hover to prevent clipping */
+  }
+  
+  .episode-card:hover::before {
+	opacity: 0.1;
+  }
+  
+  .episode-thumbnail {
+	width: 100%;
+	height: auto;
+	display: block;
+	transition: transform 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+	position: relative;
+	z-index: 2;
+  }
+  
+  .episode-card:hover .episode-thumbnail {
+	transform: scale(1.05);
+  }
+  
+  .episode-info {
+	padding: 1rem;
+	position: relative;
+	z-index: 2;
+  }
+  
+  .episode-info h4 {
+	font-size: 0.9rem;
+	margin-bottom: 0.5rem;
+	color: var(--neon-cyan);
+	font-weight: 600;
+  }
+  
+  .episode-info p {
+	font-size: 0.8rem;
+	color: var(--text-secondary);
+	line-height: 1.4;
+  }
+  
+  .loading {
+	text-align: center;
+	color: #fff;
+  }
+  
+  .error {
+	text-align: center;
+	color: red;
+  }
+  
+  .play-movie-button {
+	margin-bottom: 2rem;
+	padding: 16px 32px;
+	background: var(--gradient-primary);
+	border: 1px solid var(--neon-cyan);
+	border-radius: var(--border-radius-lg);
+	color: var(--primary-bg);
+	font-size: 1.1rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+	position: relative;
+	overflow: hidden;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+  }
+  
+  .play-movie-button::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: -100%;
+	width: 100%;
+	height: 100%;
+	background: var(--gradient-secondary);
+	transition: all 0.5s cubic-bezier(0.23, 1, 0.320, 1);
+	z-index: -1;
+  }
+  
+  .play-movie-button:hover {
+	transform: translateY(-3px) scale(1.02);
+	box-shadow: 
+		0 15px 35px rgba(0, 0, 0, 0.4),
+		0 0 30px rgba(0, 245, 255, 0.5);
+  }
+  
+  .play-movie-button:hover::before {
+	left: 0;
+  }
+  
+  .play-movie-button:active {
+	transform: translateY(-1px) scale(1.01);
+  }
