@@ -4,7 +4,7 @@
   "framework": "nextjs",
   "installCommand": "npm install",
   "devCommand": "npm run dev",
-  "regions": ["iad1", "sfo1"],
+  "regions": ["iad1"],
   "functions": {
     "app/api/extract-stream/route.js": {
       "maxDuration": 60
