@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { chromium } from 'playwright';
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
 
 // Utility function for structured logging
 function createLogger(requestId) {
@@ -38,14 +39,14 @@ function generateRequestId() {
   return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Validate request parameters and construct embed.su URLs
+// Validate request parameters and construct URLs
 function validateParameters(searchParams, logger) {
   const url = searchParams.get('url');
   const mediaType = searchParams.get('mediaType');
   const movieId = searchParams.get('movieId');
   const seasonId = searchParams.get('seasonId');
   const episodeId = searchParams.get('episodeId');
-  const server = searchParams.get('server') || 'vidsrc.xyz'; // Default to vidsrc.xyz
+  const server = searchParams.get('server') || 'vidsrc.xyz';
 
   logger.info('Request parameters received', {
     url: url ? url.substring(0, 100) + (url.length > 100 ? '...' : '') : null,
@@ -146,10 +147,9 @@ function validateParameters(searchParams, logger) {
     return { isValid: false, error: 'Invalid URL format' };
   }
 
-  // Log the final URL being used
   logger.info('Final URL validated', {
     originalUrl: url,
-    finalUrl: finalUrl.substring(0, 100) + (finalUrl.length > 100 ? '...' : ''),
+    finalUrl: finalUrl,
     isEmbedSu: finalUrl.includes('embed.su'),
     mediaType
   });
@@ -160,981 +160,1214 @@ function validateParameters(searchParams, logger) {
   };
 }
 
-// Enhanced browser configuration with better stealth
-function getBrowserConfig(logger) {
-  const config = {
+// Get browser configuration for serverless environment
+async function getBrowserConfig(logger) {
+  const isDev = process.env.NODE_ENV === 'development';
+  
+  if (isDev) {
+    // Local development - try to find local Chrome installation
+    logger.debug('Using local Chrome for development');
+    
+    // Try common Chrome/Chromium paths on Windows
+    const chromePaths = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Users\\' + process.env.USERNAME + '\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+    ];
+    
+    const fs = require('fs');
+    let chromeExecutable = null;
+    
+    for (const path of chromePaths) {
+      try {
+        if (fs.existsSync(path)) {
+          chromeExecutable = path;
+          logger.debug('Found Chrome at:', path);
+          break;
+        }
+      } catch (e) {
+        // Continue to next path
+      }
+    }
+    
+    if (!chromeExecutable) {
+      logger.warn('No Chrome executable found, using default system Chrome');
+      // Try to use system default - puppeteer-core might still work
+      chromeExecutable = 'google-chrome';
+    }
+    
+    return {
+      executablePath: chromeExecutable,
       headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
         '--disable-web-security',
         '--disable-features=VizDisplayCompositor',
         '--disable-blink-features=AutomationControlled',
-        '--disable-extensions',
-        '--disable-plugins',
-        '--disable-images',
-        '--disable-default-apps',
-        '--disable-sync',
-        '--disable-translate',
-        '--hide-scrollbars',
-        '--metrics-recording-only',
-        '--mute-audio',
+        '--no-first-run',
         '--no-default-browser-check',
-        '--safebrowsing-disable-auto-update',
-        '--disable-client-side-phishing-detection',
-        '--disable-component-update',
-        '--disable-domain-reliability',
-        '--disable-features=TranslateUI',
+        '--disable-default-apps',
+        '--disable-extensions-file-access-check',
+        '--disable-extensions-http-throttling',
+        '--disable-extensions-https-throttling',
         '--disable-ipc-flooding-protection',
         '--disable-renderer-backgrounding',
         '--disable-backgrounding-occluded-windows',
-        '--disable-client-side-phishing-detection',
         '--disable-component-extensions-with-background-pages',
-        '--disable-default-apps',
-        '--disable-dev-shm-usage',
-        '--disable-hang-monitor',
-        '--disable-popup-blocking',
-        '--disable-prompt-on-repost',
+        '--disable-sync',
+        '--disable-translate',
         '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
-        '--disable-features=VizDisplayCompositor',
-        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        '--disable-features=TranslateUI',
+        '--disable-component-update',
+        '--force-color-profile=srgb',
+        '--metrics-recording-only',
+        '--disable-prompt-on-repost',
+        '--disable-hang-monitor',
+        '--disable-client-side-phishing-detection',
+        '--disable-popup-blocking',
+        '--disable-print-preview',
+        '--disable-component-extensions-with-background-pages',
+        '--enable-automation=false',
+        '--password-store=basic',
+        '--use-mock-keychain',
+        '--hide-scrollbars',
+        '--mute-audio',
+        '--no-zygote'
       ]
-  };
-
-  logger.debug('Browser configuration', config);
-  return config;
-}
-
-// Enhanced context configuration with server-specific optimizations
-function getContextConfig(logger, targetUrl = '') {
-  const isEmbedSu = targetUrl.includes('embed.su');
-  const isVidsrc = targetUrl.includes('vidsrc.xyz');
-  
-  const config = {
-      viewport: { width: 1920, height: 1080 },
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      locale: 'en-US',
-      timezoneId: 'America/New_York',
-    javaScriptEnabled: true,
-      extraHTTPHeaders: {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': isEmbedSu ? 'same-site' : 'none',
-      ...(isEmbedSu && {
-        'Referer': 'https://embed.su/',
-        'Origin': 'https://embed.su'
-      }),
-      ...(isVidsrc && {
-        'Referer': 'https://vidsrc.xyz/',
-        'Origin': 'https://vidsrc.xyz'
-      })
-    }
-  };
-
-  logger.debug('Context configuration', { 
-    ...config, 
-    isEmbedSu,
-    isVidsrc,
-    targetDomain: targetUrl ? new URL(targetUrl).hostname : 'unknown'
-  });
-  return config;
-}
-
-// Setup stealth measures
-async function setupStealthMeasures(page, logger) {
-  const startTime = Date.now();
-  logger.info('Setting up stealth measures');
-
-  try {
-    await page.addInitScript(() => {
-      // Remove webdriver property completely
-      delete navigator.__proto__.webdriver;
-      delete window.navigator.webdriver;
-      
-      // Override webdriver detection
-      Object.defineProperty(navigator, 'webdriver', {
-        get: () => false,
-        configurable: true
-      });
-
-      // Remove automation flags and detection properties
-      ['__webdriver_evaluate', '__selenium_evaluate', '__webdriver_script_function', 
-       '__webdriver_script_func', '__webdriver_script_fn', '__fxdriver_evaluate', 
-       '__driver_unwrapped', '__webdriver_unwrapped', '__driver_evaluate', 
-       '__selenium_unwrapped', '__fxdriver_unwrapped', '__webdriver_undefix',
-       '__webdriver_undefined', '__selenium_undefined', '__fxdriver_undefined',
-       'webdriver', 'domAutomation', 'domAutomationController'].forEach(prop => {
-        delete window[prop];
-      });
-
-      // Remove more detection properties
-      ['_phantom', '__phantom', '_selenium', '__selenium', 'callPhantom', 'callSelenium',
-       'selenium', 'webdriver', 'driver'].forEach(prop => {
-        if (prop in window) {
-          delete window[prop];
-        }
-        if (prop in navigator) {
-          delete navigator[prop];
-        }
-      });
-
-      // Mock chrome object more realistically
-      window.chrome = window.chrome || {
-        runtime: {
-          onConnect: undefined,
-          onMessage: undefined
-        },
-        app: {
-          isInstalled: false,
-        },
-      };
-
-      // Mock plugins more realistically
-      Object.defineProperty(navigator, 'plugins', {
-        get: () => {
-          return [
-            {
-              0: {type: "application/x-google-chrome-pdf", suffixes: "pdf", description: "Portable Document Format"},
-              description: "Portable Document Format", 
-              filename: "internal-pdf-viewer", 
-              length: 1, 
-              name: "Chrome PDF Plugin"
-            },
-            {
-              0: {type: "application/pdf", suffixes: "pdf", description: ""},
-              description: "", 
-              filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai", 
-              length: 1, 
-              name: "Chrome PDF Viewer"
-            }
-          ];
-        },
-        configurable: true
-      });
-
-      // Mock languages
-      Object.defineProperty(navigator, 'languages', {
-        get: () => ['en-US', 'en'],
-        configurable: true
-      });
-
-      // Mock more realistic user agent data
-      if (navigator.userAgentData) {
-        Object.defineProperty(navigator, 'userAgentData', {
-          get: () => ({
-            brands: [
-              { brand: "Not_A Brand", version: "8" },
-              { brand: "Chromium", version: "120" }, 
-              { brand: "Google Chrome", version: "120" }
-            ],
-            mobile: false,
-            platform: "Windows"
-          }),
-          configurable: true
-        });
-      }
-
-      // Override permissions
-      if (window.navigator.permissions && window.navigator.permissions.query) {
-        const originalQuery = window.navigator.permissions.query;
-        window.navigator.permissions.query = (parameters) => (
-          parameters.name === 'notifications' ?
-            Promise.resolve({ state: 'granted' }) :
-            originalQuery(parameters)
-        );
-      }
-
-      // Mock realistic screen properties
-      Object.defineProperty(screen, 'availWidth', {get: () => 1920, configurable: true});
-      Object.defineProperty(screen, 'availHeight', {get: () => 1040, configurable: true});
-      Object.defineProperty(screen, 'width', {get: () => 1920, configurable: true});
-      Object.defineProperty(screen, 'height', {get: () => 1080, configurable: true});
-
-      // Override WebGL rendering context
-      if (window.WebGLRenderingContext) {
-        const getParameter = WebGLRenderingContext.prototype.getParameter;
-        WebGLRenderingContext.prototype.getParameter = function(parameter) {
-          if (parameter === 37445) {
-            return 'Intel Inc.';
-          }
-          if (parameter === 37446) {
-            return 'Intel Iris OpenGL Engine';
-          }
-          return getParameter.call(this, parameter);
-        };
-      }
-
-      // Add performance marker
-      if (window.performance && window.performance.mark) {
-        window.performance.mark('stealth-setup-complete');
-      }
-
-      // Override toString methods that might reveal automation
-      if (window.navigator.permissions && window.navigator.permissions.query) {
-        window.navigator.permissions.query.toString = () => 'function query() { [native code] }';
-      }
-
-      // Mock battery API to avoid detection
-      if ('getBattery' in navigator) {
-        navigator.getBattery = () => Promise.resolve({
-          charging: true,
-          chargingTime: 0,
-          dischargingTime: Infinity,
-          level: 1
-        });
-      }
-
-      // Override connection API
-      if ('connection' in navigator) {
-        Object.defineProperty(navigator, 'connection', {
-          get: () => ({
-            downlink: 10,
-            effectiveType: '4g',
-            rtt: 50,
-            saveData: false
-          }),
-          configurable: true
-        });
-      }
-
-      // Mock more realistic timing
-      const originalNow = performance.now;
-      performance.now = () => originalNow.call(performance) + Math.random() * 0.1;
-
-      // Override console methods to avoid detection via console monitoring
-      const originalLog = console.log;
-      console.log = (...args) => {
-        if (!args.some(arg => typeof arg === 'string' && arg.includes('webdriver'))) {
-          originalLog.apply(console, args);
-        }
-      };
-
-      // Mock iframe detection
-      if (window.top !== window.self) {
-        Object.defineProperty(window, 'top', {
-          get: () => window,
-          configurable: true
-        });
-      }
-    });
-
-    // Add realistic human-like mouse movements with curves
-    const startX = Math.random() * 100 + 50;
-    const startY = Math.random() * 100 + 50;
-    const endX = Math.random() * 200 + 100;
-    const endY = Math.random() * 150 + 100;
-    
-    // Simulate curved mouse movement
-    const steps = 5 + Math.floor(Math.random() * 5);
-    for (let i = 0; i <= steps; i++) {
-      const progress = i / steps;
-      const currentX = startX + (endX - startX) * progress + (Math.random() - 0.5) * 10;
-      const currentY = startY + (endY - startY) * progress + (Math.random() - 0.5) * 10;
-      await page.mouse.move(currentX, currentY);
-      await page.waitForTimeout(20 + Math.random() * 30);
-    }
-    
-    // Random pause like a human would
-    await page.waitForTimeout(200 + Math.random() * 300);
-
-    logger.timing('Stealth measures setup', startTime);
-    logger.info('Stealth measures configured successfully');
-  } catch (error) {
-    logger.error('Failed to setup stealth measures', error);
-    throw error;
+    };
+  } else {
+    // Production - use @sparticuz/chromium for serverless
+    logger.debug('Using @sparticuz/chromium for serverless environment');
+    return {
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      args: [
+        ...chromium.args,
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--disable-blink-features=AutomationControlled',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
+    };
   }
 }
 
-// Enhanced stream URL detection
+// Setup stream interception to capture m3u8 URLs
 function setupStreamInterception(page, logger, targetUrl = '') {
-    const streamUrls = [];
-  const capturedHeaders = new Map(); // Store headers for different domains/CDNs
-  let interceptedRequests = 0;
-  let interceptedResponses = 0;
-  const isVidsrc = targetUrl.includes('vidsrc.xyz');
+  const streamUrls = [];
+  let responseCount = 0;
 
-  logger.info('Setting up stream URL interception with header monitoring', {
-    isVidsrc,
-    targetDomain: targetUrl ? new URL(targetUrl).hostname : 'unknown'
-  });
-
-  // Intercept requests - Monitor headers for video segments and CDN requests (silent monitoring)
-  page.on('request', async (request) => {
-    interceptedRequests++;
-    const url = request.url();
-    const headers = request.headers();
-    const method = request.method();
-    
-    try {
-      const parsedUrl = new URL(url);
-      const domain = parsedUrl.hostname;
-      
-      // Silently monitor M3U8 playlist requests
-      if (url.includes('.m3u8') || url.includes('playlist') || url.includes('manifest')) {
-        // Store headers for this domain
-        capturedHeaders.set(`${domain}_m3u8`, {
-          referer: headers.referer,
-          origin: headers.origin,
-          userAgent: headers['user-agent'],
-          timestamp: Date.now(),
-          url: url.substring(0, 100)
-        });
-      }
-      
-      // Silently monitor video segment requests (especially from CDNs like viper.congacdn.cc)
-      else if (url.includes('.ts') || url.includes('.mp4') || url.includes('.webm') || 
-               domain.includes('cdn') || domain.includes('viper') || domain.includes('conga')) {
-        // Store headers for this CDN domain
-        capturedHeaders.set(`${domain}_segments`, {
-          referer: headers.referer,
-          origin: headers.origin,
-          userAgent: headers['user-agent'],
-          range: headers.range,
-          timestamp: Date.now(),
-          url: url.substring(0, 100)
-        });
-      }
-      
-      // Silently monitor any CDN or streaming-related requests
-      else if (domain.includes('embed') || domain.includes('stream') || 
-               domain.includes('video') || domain.includes('play') ||
-               url.includes('stream') || url.includes('video')) {
-        // Store headers for analysis
-        if (headers.referer || headers.origin) {
-          capturedHeaders.set(`${domain}_general`, {
-            referer: headers.referer,
-            origin: headers.origin,
-            userAgent: headers['user-agent'],
-            timestamp: Date.now(),
-            url: url.substring(0, 100)
-          });
-        }
-      }
-      
-    } catch (error) {
-      // Silently handle URL parsing errors
-    }
-  });
-
-  // Intercept responses - only log actual stream findings
+  // Intercept network responses
   page.on('response', async (response) => {
-    interceptedResponses++;
+    responseCount++;
     const responseUrl = response.url();
     const contentType = response.headers()['content-type'] || '';
     const status = response.status();
-    
-    // Log all shadowlandschronicles responses for debugging, highlighting master URLs
-    if (responseUrl.includes('shadowlandschronicles')) {
-      const isMaster = responseUrl.includes('master');
-      logger.info(isMaster ? '🎯 SHADOWLANDSCHRONICLES MASTER URL DETECTED' : '🔍 SHADOWLANDSCHRONICLES RESPONSE DETECTED', {
-        url: responseUrl,
-        status,
-        contentType,
-        isMaster,
-        headers: response.headers()
-      });
-    }
-      
+
     try {
-      // Primary target: M3U8 playlist files (enhanced detection for shadowlandschronicles)
-      const isM3U8 = responseUrl.includes('.m3u8') || 
-          responseUrl.includes('playlist') ||
-          responseUrl.includes('manifest') ||
-          contentType.includes('application/vnd.apple.mpegurl') ||
-          contentType.includes('application/x-mpegURL') ||
-          contentType.includes('vnd.apple.mpegurl') ||
-          contentType.includes('text/plain') || // Sometimes M3U8 is served as text/plain
-          (responseUrl.includes('shadowlandschronicles') && contentType.includes('text/')) || // Shadowlandschronicles might use text content-type
-          responseUrl.includes('master') || // Master playlist detection
-          responseUrl.includes('index.m3u8');
-      
-      // Accept M3U8 responses (200 OK or 403 for shadowlandschronicles master playlists)
-      if (isM3U8 && (status === 200 || (status === 403 && responseUrl.includes('shadowlandschronicles') && responseUrl.includes('master')))) {
-        // For vidsrc, prioritize shadowlandschronicles master URLs (including subdomains)
-        const isShadowlands = responseUrl.includes('shadowlandschronicles') && responseUrl.includes('master');
-        
-                  if (isVidsrc) {
-            if (isShadowlands) {
-              // This is what we want for vidsrc - shadowlandschronicles master playlist
-              logger.info('🎯 FOUND SHADOWLANDSCHRONICLES MASTER M3U8 for vidsrc', {
-                url: responseUrl,
-                status,
-                domain: new URL(responseUrl).hostname,
-                note: status === 403 ? 'Got 403 - will use clean headers in proxy' : 'Got 200 - ready to use',
-                isMaster: true
-              });
-            } else {
-              // Log other M3U8s but they're lower priority
-              logger.debug('Found non-shadowlandschronicles M3U8 for vidsrc', {
-                url: responseUrl.substring(0, 100),
-                domain: new URL(responseUrl).hostname,
-                status,
-                isMaster: responseUrl.includes('master')
-              });
-            }
-          }
-        
-        // Only log when we actually find relevant M3U8 streams
-        logger.info('🎯 FOUND M3U8 PLAYLIST', {
-          url: responseUrl,
+      // Log all responses for debugging
+      if (responseCount <= 50) { // Limit logging to prevent spam
+        logger.debug('Network response intercepted', {
+          url: responseUrl.substring(0, 150),
           status,
-          isShadowlands,
-          isVidsrc,
-          headers: {
-            'content-type': contentType,
-            'content-length': response.headers()['content-length'],
-            'referer': response.request().headers()['referer'],
-            'origin': response.request().headers()['origin']
-          }
-        });
-
-        streamUrls.push({
-          url: responseUrl,
-          headers: response.headers(),
-          type: 'm3u8',
-          status: status,
-          timestamp: Date.now(),
-          priority: isShadowlands ? 0 : (responseUrl.includes('master') ? 1 : 2), // Shadowlandschronicles master = 0, other masters = 1, others = 2
-          isShadowlands,
-          source: isVidsrc ? 'vidsrc' : 'embed.su',
-          needsCleanHeaders: status === 403 && isShadowlands // Flag for proxy to use clean headers
+          contentType,
+          responseCount
         });
       }
+
+      // Check for shadowlandschronicles URLs with master playlists
+      const isShadowlandschronicles = responseUrl.includes('shadowlandschronicles') && responseUrl.includes('master');
       
-      // Secondary target: Direct video URLs
-      const isDirectVideo = (responseUrl.includes('.mp4') || 
-          responseUrl.includes('.webm') ||
-          responseUrl.includes('.mkv') ||
-          responseUrl.includes('.ts') ||
-          contentType.includes('video/')) && status === 200;
-      
-      if (isDirectVideo) {
-        // Only log when we actually find video streams
-        logger.info('📹 FOUND VIDEO STREAM', {
-          url: responseUrl,
-          headers: {
-            'content-type': contentType,
-            'content-length': response.headers()['content-length'],
-            'referer': response.request().headers()['referer'],
-            'origin': response.request().headers()['origin']
-          }
+      // Check for general M3U8 content
+      const isM3U8Response = 
+        contentType.includes('mpegurl') ||
+        contentType.includes('m3u8') ||
+        contentType.includes('vnd.apple.mpegurl') ||
+        contentType.includes('text/plain') ||
+        responseUrl.includes('.m3u8') ||
+        responseUrl.includes('master') ||
+        responseUrl.includes('index');
+
+      // Priority for shadowlandschronicles master playlists
+      if (isShadowlandschronicles || (isM3U8Response && (status === 200 || (isShadowlandschronicles && status === 403)))) {
+        logger.info('Potential stream URL detected', {
+          url: responseUrl.substring(0, 150),
+          contentType,
+          status,
+          isShadowlandschronicles,
+          isM3U8Response,
+          priority: isShadowlandschronicles ? 0 : isM3U8Response ? 1 : 2
         });
 
-        streamUrls.push({
-          url: responseUrl,
-          headers: response.headers(),
-          type: 'direct',
-          status: status,
-          timestamp: Date.now(),
-          priority: 2
-        });
-      }
-      
-      // For shadowlandschronicles master playlists, also check any response that might contain playlist content (even 403s)
-      if (responseUrl.includes('shadowlandschronicles') && responseUrl.includes('master') && (status === 200 || status === 403) && !isM3U8 && !isDirectVideo) {
-        try {
-          // Try to read the response text to see if it contains M3U8 content
-          const responseText = await response.text();
-                      if (responseText.includes('#EXTM3U') || responseText.includes('#EXT-X-')) {
-              logger.info('🎯 FOUND M3U8 CONTENT in shadowlandschronicles master response (detected by content)', {
+        // For shadowlandschronicles URLs or successful M3U8 responses, try to read content
+        if (status === 200 || (isShadowlandschronicles && status === 403)) {
+          try {
+            let responseText = '';
+            if (status === 200) {
+              responseText = await response.text();
+            }
+
+            // Check if it's actually M3U8 content
+            const isActualM3U8 = responseText.includes('#EXTM3U') || responseUrl.includes('.m3u8') || isShadowlandschronicles;
+
+            if (isActualM3U8) {
+              // Determine stream source
+              let source = 'unknown';
+              if (responseUrl.includes('shadowlandschronicles')) {
+                source = 'shadowlandschronicles';
+              } else if (targetUrl.includes('vidsrc')) {
+                source = 'vidsrc';
+              } else if (targetUrl.includes('embed.su')) {
+                source = 'embed.su';
+              }
+
+              streamUrls.push({
                 url: responseUrl,
                 contentType,
-                contentPreview: responseText.substring(0, 200),
-                isMaster: true
+                status,
+                source,
+                priority: isShadowlandschronicles ? 0 : 1,
+                isMaster: responseUrl.includes('master'),
+                needsCleanHeaders: isShadowlandschronicles || status === 403
               });
 
-                          streamUrls.push({
-                url: responseUrl,
-                headers: response.headers(),
-                type: 'm3u8',
-                status: status,
-                timestamp: Date.now(),
-                priority: 0, // Highest priority for shadowlandschronicles master
-                isShadowlands: true,
-                source: 'vidsrc',
-                detectedBy: 'content',
-                isMaster: true
+              logger.info('Valid M3U8 stream found', {
+                url: responseUrl.substring(0, 150),
+                source,
+                priority: isShadowlandschronicles ? 0 : 1,
+                isMaster: responseUrl.includes('master'),
+                contentLength: responseText.length,
+                needsCleanHeaders: isShadowlandschronicles || status === 403
               });
+            }
+          } catch (contentError) {
+            logger.warn('Could not read response content', {
+              url: responseUrl.substring(0, 100),
+              error: contentError.message
+            });
           }
-        } catch (textError) {
-          // Ignore errors reading response text
         }
       }
-      
     } catch (error) {
-      // Silently handle response processing errors
+      logger.warn('Error processing response', {
+        url: responseUrl.substring(0, 100),
+        error: error.message
+      });
     }
   });
 
-  // No periodic stats logging - only log final results
-
-  return {
-    streamUrls,
-    capturedHeaders,
-    cleanup: () => {
-      logger.info('Stream interception cleanup completed', {
-        totalRequests: interceptedRequests,
-        totalResponses: interceptedResponses,
-        totalStreamsFound: streamUrls.length,
-        headersCaptured: capturedHeaders.size,
-        capturedDomains: Array.from(capturedHeaders.keys()).map(key => key.split('_')[0])
-      });
-    }
-  };
+  return { streamUrls };
 }
 
-// Enhanced page interaction - click center of screen approach
+// Interact with the page to trigger stream loading with realistic human behavior
 async function interactWithPage(page, logger) {
-  const startTime = Date.now();
-  logger.info('Starting page interactions');
-
-  // Wait for page to fully load
-  try {
-    await page.waitForLoadState('networkidle', { timeout: 15000 });
-  } catch (timeoutError) {
-    // Proceed anyway if network idle times out
-  }
-
-  // Additional wait to ensure all dynamic content is loaded
-  await page.waitForTimeout(5000);
-
-  // Get viewport dimensions and calculate center
-  const viewport = page.viewportSize();
-  const centerX = Math.floor(viewport.width / 2);
-  const centerY = Math.floor(viewport.height / 2);
-
-  // More realistic interaction approach
-  try {
-    // Simulate human-like exploration of the page first
-    const explorationMoves = 3 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < explorationMoves; i++) {
-      const randomX = Math.random() * viewport.width;
-      const randomY = Math.random() * viewport.height;
-      await page.mouse.move(randomX, randomY);
-      await page.waitForTimeout(100 + Math.random() * 200);
-    }
-    
-    // Move toward center in a curved path
-    const currentPos = await page.evaluate(() => ({ x: 0, y: 0 }));
-    const steps = 8 + Math.floor(Math.random() * 5);
-    for (let i = 0; i <= steps; i++) {
-      const progress = i / steps;
-      const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease out cubic
-      const currentX = currentPos.x + (centerX - currentPos.x) * easeProgress + (Math.random() - 0.5) * 15;
-      const currentY = currentPos.y + (centerY - currentPos.y) * easeProgress + (Math.random() - 0.5) * 15;
-      await page.mouse.move(currentX, currentY);
-      await page.waitForTimeout(30 + Math.random() * 40);
-    }
-    
-    // Pause before clicking (like humans do)
-    await page.waitForTimeout(300 + Math.random() * 400);
-    
-    // Single click with realistic timing
-    await page.mouse.click(centerX, centerY);
-    await page.waitForTimeout(800 + Math.random() * 400);
-    
-    // Only double-click if first click didn't work (check for changes)
-    const hasVideoStarted = await page.evaluate(() => {
-      const videos = document.querySelectorAll('video');
-      return Array.from(videos).some(v => !v.paused);
-    });
-    
-    if (!hasVideoStarted) {
-      await page.mouse.click(centerX, centerY);
-    }
-    
-  } catch (clickError) {
-    // Ignore click errors
-  }
-
-  // Wait for stream requests after click
-  await page.waitForTimeout(4000);
+  const interactionStart = Date.now();
   
-  // Try additional interaction methods
   try {
-    await page.keyboard.press('Space');
-    await page.waitForTimeout(1000);
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(1000);
-  } catch (keyError) {
-    // Ignore keyboard errors
-  }
-
-  // Final wait for stream URL extraction
-  await page.waitForTimeout(6000);
-
-  // Log page state for debugging
-  try {
-    const pageInfo = await page.evaluate(() => {
-      return {
-        url: window.location.href,
-        title: document.title,
-        readyState: document.readyState,
-        videoElements: document.querySelectorAll('video').length,
-        hasPlayButton: !!(document.querySelector('[class*="play"]') || document.querySelector('[id*="play"]')),
-        bodyClasses: document.body.className,
-        isErrorPage: window.location.href.includes('/error'),
-        pageText: document.body.innerText.substring(0, 500) // First 500 chars for debugging
-      };
+    // Wait for page to be ready with realistic timing
+    await page.waitForSelector('body', { timeout: 15000 });
+    
+    // Simulate human-like page reading time
+    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
+    
+    // Simulate mouse movement and scrolling
+    await page.evaluate(() => {
+      // Generate some mouse events
+      const events = ['mousemove', 'mousedown', 'mouseup'];
+      events.forEach(eventType => {
+        const event = new MouseEvent(eventType, {
+          bubbles: true,
+          cancelable: true,
+          clientX: Math.random() * window.innerWidth,
+          clientY: Math.random() * window.innerHeight
+        });
+        document.dispatchEvent(event);
+      });
+      
+      // Simulate scroll
+      window.scrollTo(0, Math.random() * 200);
     });
     
-    logger.debug('Final page state', pageInfo);
+    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
     
-    // If we're on an error page, log more details
-    if (pageInfo.isErrorPage) {
-      logger.warn('Detected error page after interaction', {
-        url: pageInfo.url,
-        pageText: pageInfo.pageText,
-        suggestion: 'embed.su may be blocking automation or content is not available'
-      });
-    }
-  } catch (evalError) {
-    logger.debug('Could not evaluate page state', { error: evalError.message });
-  }
+    // Look for iframes first (common on vidsrc)
+    const iframes = await page.$$('iframe');
+    if (iframes.length > 0) {
+      logger.info('Found iframes, attempting to interact', { count: iframes.length });
+      
+      for (let i = 0; i < Math.min(iframes.length, 3); i++) {
+        try {
+          const iframe = iframes[i];
+          const src = await iframe.evaluate(el => el.src);
+          
+          if (src && (src.includes('player') || src.includes('embed') || src.includes('video'))) {
+            logger.info('Found video iframe', { src: src.substring(0, 100) });
+            
+                         // Try to access iframe content
+             try {
+               const frame = await iframe.contentFrame();
+               if (frame) {
+                 await new Promise(resolve => setTimeout(resolve, 2000));
+                 
+                 // Debug: Scan iframe for elements
+                 const iframeElements = await frame.evaluate(() => {
+                   const elements = [];
+                   const selectors = ['#pl_but', '.fas.fa-play', 'i.fas.fa-play', '[id*="play"]', '[class*="play"]'];
+                   
+                   selectors.forEach(selector => {
+                     try {
+                       const found = document.querySelectorAll(selector);
+                       found.forEach((el, index) => {
+                         elements.push({
+                           selector,
+                           index,
+                           tagName: el.tagName,
+                           id: el.id,
+                           className: el.className,
+                           innerText: el.innerText?.substring(0, 50),
+                           visible: el.offsetParent !== null,
+                           disabled: el.disabled
+                         });
+                       });
+                     } catch (e) {
+                       // Continue
+                     }
+                   });
+                   
+                   return elements;
+                 });
+                 
+                 logger.info('Elements found in iframe', { iframeIndex: i, elements: iframeElements });
+                 
+                 // Look for play buttons in iframe (prioritizing vidsrc.xyz specific)
+                 const playSelectors = [
+                   '#pl_but',                           // Specific vidsrc.xyz play button ID
+                   '.fas.fa-play',                     // Specific vidsrc.xyz play button class
+                   'button#pl_but',                    // More specific vidsrc button selector
+                   '[id="pl_but"]',                    // Alternative ID selector
+                   'button.fas.fa-play',               // Alternative class selector
+                   'i.fas.fa-play',                    // Icon element with play class
+                   'button[class*="play"]',
+                   'div[class*="play"]',
+                   '[data-testid*="play"]',
+                   '.play-button',
+                   '.video-play-button',
+                   'button[aria-label*="play" i]',
+                   'button[title*="play" i]',
+                   '.play',
+                   '.btn-play',
+                   '#play-btn',
+                   '.play-icon'
+                 ];
+                
+                for (const selector of playSelectors) {
+                  try {
+                    const playButton = await frame.$(selector);
+                    if (playButton) {
+                      logger.info('Found play button in iframe', { selector });
+                      await playButton.click();
+                      await new Promise(resolve => setTimeout(resolve, 2000));
+                      break;
+                    }
+                  } catch (e) {
+                    // Continue
+                  }
+                }
+                
+                // Try clicking on video elements in iframe
+                const videoElements = await frame.$$('video, .video, .player');
+                if (videoElements.length > 0) {
+                  try {
+                    await videoElements[0].click();
+                    logger.info('Clicked video element in iframe');
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                  } catch (e) {
+                    // Continue
+                  }
+                }
+              }
+            } catch (e) {
+              logger.debug('Could not access iframe content (CORS)');
+            }
+            
+            // Click on the iframe itself
+            try {
+              await iframe.click();
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (e) {
+              // Continue
+            }
+          }
+        } catch (e) {
+          logger.debug('Error interacting with iframe', { index: i, error: e.message });
+        }
+      }
+         }
+     
+     // Debug: Scan for all potential play elements on the page
+     const allPlayElements = await page.evaluate(() => {
+       const elements = [];
+       const selectors = ['#pl_but', '.fas.fa-play', 'i.fas.fa-play', '[id*="play"]', '[class*="play"]'];
+       
+       selectors.forEach(selector => {
+         try {
+           const found = document.querySelectorAll(selector);
+           found.forEach((el, index) => {
+             elements.push({
+               selector,
+               index,
+               tagName: el.tagName,
+               id: el.id,
+               className: el.className,
+               innerText: el.innerText?.substring(0, 50),
+               visible: el.offsetParent !== null,
+               disabled: el.disabled,
+               src: el.src
+             });
+           });
+         } catch (e) {
+           // Continue
+         }
+       });
+       
+       return elements;
+     });
+     
+     logger.info('All potential play elements found on page', allPlayElements);
+     
+     // Look for and click play buttons in main page (prioritizing vidsrc.xyz specific button)
+     const playSelectors = [
+       '#pl_but',                                    // Specific vidsrc.xyz play button ID
+       '.fas.fa-play',                              // Specific vidsrc.xyz play button class
+       'button#pl_but',                             // More specific vidsrc button selector
+       '[id="pl_but"]',                             // Alternative ID selector
+       'button.fas.fa-play',                        // Alternative class selector
+       'i.fas.fa-play',                             // Icon element with play class
+       'button[class*="play"]',
+       'div[class*="play"]',
+       '[data-testid*="play"]',
+       '.play-button',
+       '.video-play-button', 
+       '[data-testid="play-button"]',
+       'button[aria-label*="play" i]',
+       'button[title*="play" i]',
+       '.play',
+       '.btn-play',
+       '#play-btn',
+       '.play-icon',
+       '[class*="play"][role="button"]',
+       '[id*="play"]',
+       '.vjs-big-play-button',
+       '.plyr__control--overlaid'
+     ];
 
-  logger.timing('Page interactions', startTime);
+    let playButtonFound = false;
+    for (const selector of playSelectors) {
+      try {
+        const elements = await page.$$(selector);
+        if (elements.length > 0) {
+          logger.info('Found play button', { selector, count: elements.length });
+          
+          // Special handling for vidsrc.xyz play button
+          if (selector === '#pl_but' || selector === '.fas.fa-play') {
+            logger.info('Found vidsrc.xyz specific play button', { selector });
+            
+            // Get button properties for debugging
+            const buttonInfo = await elements[0].evaluate(el => ({
+              id: el.id,
+              className: el.className,
+              tagName: el.tagName,
+              visible: el.offsetParent !== null,
+              disabled: el.disabled,
+              innerText: el.innerText
+            }));
+            
+            logger.info('vidsrc.xyz play button properties', buttonInfo);
+          }
+          
+          // Human-like interaction - hover first, then click
+          await elements[0].hover();
+          await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 200));
+          await elements[0].click();
+          playButtonFound = true;
+          
+          // Extra wait for vidsrc.xyz button to ensure it processes
+          if (selector === '#pl_but' || selector === '.fas.fa-play') {
+            logger.info('Clicked vidsrc.xyz play button, waiting for stream initialization...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          } else {
+            await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1000));
+          }
+          break;
+        }
+      } catch (e) {
+        logger.debug('Error with play button selector', { selector, error: e.message });
+      }
+    }
+
+    if (!playButtonFound) {
+      logger.info('No play button found, attempting hover and click interactions');
+      
+      // Try clicking on potential video areas
+      const videoSelectors = [
+        'video',
+        '.video-container',
+        '.player',
+        '.video-player',
+        '#player',
+        '.video-wrapper',
+        '.player-container',
+        '[class*="video"]',
+        '[class*="player"]'
+      ];
+
+      for (const selector of videoSelectors) {
+        try {
+          const element = await page.$(selector);
+          if (element) {
+            logger.info('Interacting with video container', { selector });
+            
+            // Simulate human-like interaction
+            await element.hover();
+            await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 300));
+            
+            // Try multiple click types
+            try {
+              await element.click();
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (e) {
+              // Try clicking at center
+              const box = await element.boundingBox();
+              if (box) {
+                await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            }
+            break;
+          }
+        } catch (e) {
+          logger.debug('Error interacting with video selector', { selector, error: e.message });
+        }
+      }
+    }
+    
+    // Simulate additional user behavior
+    await page.evaluate(() => {
+      // Trigger some events that might initiate video loading
+      window.dispatchEvent(new Event('focus'));
+      window.dispatchEvent(new Event('click'));
+      document.dispatchEvent(new Event('visibilitychange'));
+      
+      // Try to trigger any lazy loading
+      if (window.IntersectionObserver) {
+        const videos = document.querySelectorAll('video, iframe');
+        videos.forEach(video => {
+          const event = new Event('intersect');
+          video.dispatchEvent(event);
+        });
+      }
+    });
+
+    // Additional realistic wait for streams to load
+    await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 2000));
+    
+    // Final attempt - trigger more events
+    await page.evaluate(() => {
+      // Try to simulate user interactions that might trigger video loading
+      const allElements = document.querySelectorAll('*');
+      let attempts = 0;
+      
+      for (const element of allElements) {
+        if (attempts >= 10) break;
+        
+        if (element.tagName === 'VIDEO' || 
+            element.className.toLowerCase().includes('play') ||
+            element.className.toLowerCase().includes('video') ||
+            element.id.toLowerCase().includes('play') ||
+            element.id.toLowerCase().includes('video')) {
+          
+          try {
+            element.dispatchEvent(new Event('click', { bubbles: true }));
+            element.dispatchEvent(new Event('mouseenter', { bubbles: true }));
+            attempts++;
+          } catch (e) {
+            // Continue
+          }
+        }
+      }
+    });
+
+    logger.timing('Page interaction completed', interactionStart);
+    
+  } catch (error) {
+    logger.warn('Page interaction error', { error: error.message });
+  }
 }
 
 export async function GET(request) {
+  const requestStart = Date.now();
   const requestId = generateRequestId();
   const logger = createLogger(requestId);
-  const requestStartTime = Date.now();
-
+  
   logger.info('Stream extraction request started', {
     timestamp: new Date().toISOString(),
     userAgent: request.headers.get('user-agent'),
     referer: request.headers.get('referer')
   });
 
-  const { searchParams } = new URL(request.url);
+  let browser = null;
+  let url, mediaType, movieId, seasonId, episodeId, server;
   
-  // Validate parameters
-  const validation = validateParameters(searchParams, logger);
-  if (!validation.isValid) {
-    logger.error('Parameter validation failed', null, { error: validation.error });
-    return NextResponse.json({ 
-      success: false,
-      error: validation.error,
-      requestId 
-    }, { status: 400 });
-  }
-
-  const { url, mediaType, movieId, seasonId, episodeId, server } = validation.params;
-
-  let browser;
-  let context;
-  let page;
-  let streamInterception;
-
   try {
-    // Launch browser
-    const browserStartTime = Date.now();
-    logger.info('Launching Playwright browser');
+    // Parse and validate parameters
+    const { searchParams } = new URL(request.url);
+    const validation = validateParameters(searchParams, logger);
     
-    browser = await chromium.launch(getBrowserConfig(logger));
-    logger.timing('Browser launch', browserStartTime);
-
-    // Create context
-    const contextStartTime = Date.now();
-    context = await browser.newContext(getContextConfig(logger, url));
-    logger.timing('Context creation', contextStartTime);
-
-    // Create page
-    const pageStartTime = Date.now();
-    page = await context.newPage();
-    logger.timing('Page creation', pageStartTime);
-
-    // Setup stealth measures
-    await setupStealthMeasures(page, logger);
-
-    // Setup stream interception
-          streamInterception = setupStreamInterception(page, logger, url);
-
-    // Navigate to URL
-    const navigationStartTime = Date.now();
-    logger.info('Navigating to target URL', { 
-      url: url.substring(0, 100) + (url.length > 100 ? '...' : '')
-    });
-
-    const response = await page.goto(url, { 
-      waitUntil: 'networkidle',
-      timeout: 30000 
-    });
-
-    const navigationStatus = response?.status();
-    const finalUrl = response?.url();
-    
-    logger.info('Navigation completed', {
-      status: navigationStatus,
-      url: finalUrl,
-      timing: Date.now() - navigationStartTime
-    });
-
-    // Handle 404 responses - the content might not exist on this server
-    if (navigationStatus === 404) {
-      logger.warn('Embed URL returned 404 - content not found', {
-        requestedUrl: url,
-        finalUrl,
-        suggestion: 'Content may not be available on embed.su, consider trying Vidsrc.xyz'
-      });
-      
-      // Don't immediately fail, but note this for later
-      // Some embed sites still load content dynamically even on 404 pages
+    if (!validation.isValid) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: validation.error,
+          requestId 
+        },
+        { status: 400 }
+      );
     }
 
-    // Check if we already have streams from initial page load (avoid interaction if possible)
-    const { streamUrls: initialStreams } = streamInterception;
-    if (initialStreams.length > 0) {
-      logger.info('Streams already found during page load, skipping interaction to avoid detection', {
-        streamsFound: initialStreams.length,
-        streamTypes: initialStreams.map(s => s.type)
+    ({ url, mediaType, movieId, seasonId, episodeId, server } = validation.params);
+
+    // Launch browser
+    logger.info('Launching Puppeteer browser');
+    const launchStart = Date.now();
+    
+    const browserConfig = await getBrowserConfig(logger);
+    logger.debug('Browser configuration', browserConfig);
+    
+         const isDev = process.env.NODE_ENV === 'development';
+     
+     if (isDev) {
+       // Use puppeteer-core for development (with local Chromium)
+       browser = await puppeteer.launch(browserConfig);
+     } else {
+       // Use puppeteer-core with @sparticuz/chromium for production
+       browser = await puppeteer.launch(browserConfig);
+     }
+    
+    logger.timing('Browser launch took', launchStart);
+
+         // Create new page with enhanced stealth settings
+     const page = await browser.newPage();
+     
+     // Set realistic viewport and user agent
+     await page.setViewport({ 
+       width: 1920, 
+       height: 1080, 
+       deviceScaleFactor: 1,
+       hasTouch: false,
+       isLandscape: true,
+       isMobile: false
+     });
+     
+     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+     
+     // Set extra HTTP headers to mimic real browser
+     await page.setExtraHTTPHeaders({
+       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+       'Accept-Language': 'en-US,en;q=0.9',
+       'Accept-Encoding': 'gzip, deflate, br',
+       'Cache-Control': 'no-cache',
+       'Pragma': 'no-cache',
+       'Sec-Fetch-Dest': 'document',
+       'Sec-Fetch-Mode': 'navigate',
+       'Sec-Fetch-Site': 'none',
+       'Sec-Fetch-User': '?1',
+       'Upgrade-Insecure-Requests': '1'
+     });
+     
+     // Advanced stealth measures - equivalent to puppeteer-extra-plugin-stealth
+     await page.evaluateOnNewDocument(() => {
+       // === WEBDRIVER PROPERTY REMOVAL ===
+       // Remove all possible webdriver traces
+       Object.defineProperty(navigator, 'webdriver', {
+         get: () => undefined,
+         configurable: true
+       });
+       
+       delete navigator.__proto__.webdriver;
+       delete navigator.webdriver;
+       delete window.navigator.webdriver;
+       
+       // Remove automation flags
+       ['__nightmare', '__phantomas', '__fxdriver_unwrapped', '__driver_evaluate', '__webdriver_evaluate', '__selenium_evaluate', '__fxdriver_evaluate', '__driver_unwrapped', '__webdriver_unwrapped', '__selenium_unwrapped', '__fxdriver_unwrapped', '_phantom', '__phantom', '_selenium', 'callPhantom', 'callSelenium', '_Selenium_IDE_Recorder'].forEach(prop => {
+         delete window[prop];
+       });
+       
+       // === CHROME OBJECT MOCKING ===
+       Object.defineProperty(window, 'chrome', {
+         value: {
+           app: {
+             isInstalled: false,
+             InstallState: {
+               DISABLED: 'disabled',
+               INSTALLED: 'installed',
+               NOT_INSTALLED: 'not_installed'
+             },
+             RunningState: {
+               CANNOT_RUN: 'cannot_run',
+               READY_TO_RUN: 'ready_to_run',
+               RUNNING: 'running'
+             }
+           },
+           runtime: {
+             onConnect: null,
+             onMessage: null,
+             PlatformOs: {
+               ANDROID: 'android',
+               CROS: 'cros', 
+               LINUX: 'linux',
+               MAC: 'mac',
+               OPENBSD: 'openbsd',
+               WIN: 'win'
+             }
+           },
+           csi: function() {},
+           loadTimes: function() {
+             return {
+               requestTime: Date.now() / 1000 - Math.random() * 2,
+               startLoadTime: Date.now() / 1000 - Math.random() * 1.5,
+               commitLoadTime: Date.now() / 1000 - Math.random() * 1,
+               finishDocumentLoadTime: Date.now() / 1000 - Math.random() * 0.5,
+               finishLoadTime: Date.now() / 1000 - Math.random() * 0.2,
+               firstPaintTime: Date.now() / 1000 - Math.random() * 0.1,
+               firstPaintAfterLoadTime: 0,
+               navigationType: 'Other'
+             };
+           }
+         },
+         configurable: true,
+         writable: true
+       });
+       
+       // === PLUGIN AND MIMETYPE MOCKING ===
+       const mockPlugins = [
+         {
+           0: { type: 'application/x-google-chrome-pdf', suffixes: 'pdf', enabledPlugin: null },
+           description: 'Portable Document Format',
+           filename: 'internal-pdf-viewer',
+           length: 1,
+           name: 'Chrome PDF Plugin'
+         },
+         {
+           0: { type: 'application/x-nacl', suffixes: '', enabledPlugin: null },
+           1: { type: 'application/x-pnacl', suffixes: '', enabledPlugin: null },
+           description: '',
+           filename: 'internal-nacl-plugin',
+           length: 2,
+           name: 'Native Client'
+         }
+       ];
+       
+       const mockMimeTypes = [
+         { type: 'application/pdf', suffixes: 'pdf', enabledPlugin: mockPlugins[0] },
+         { type: 'application/x-google-chrome-pdf', suffixes: 'pdf', enabledPlugin: mockPlugins[0] },
+         { type: 'application/x-nacl', suffixes: '', enabledPlugin: mockPlugins[1] },
+         { type: 'application/x-pnacl', suffixes: '', enabledPlugin: mockPlugins[1] }
+       ];
+       
+       Object.defineProperty(navigator, 'plugins', {
+         get: () => mockPlugins,
+         configurable: true
+       });
+       
+       Object.defineProperty(navigator, 'mimeTypes', {
+         get: () => mockMimeTypes,
+         configurable: true
+       });
+       
+       // === NAVIGATOR PROPERTY MOCKING ===
+       Object.defineProperty(navigator, 'languages', {
+         get: () => ['en-US', 'en'],
+         configurable: true
+       });
+       
+       Object.defineProperty(navigator, 'language', {
+         get: () => 'en-US',
+         configurable: true
+       });
+       
+       Object.defineProperty(navigator, 'platform', {
+         get: () => 'Win32',
+         configurable: true
+       });
+       
+       Object.defineProperty(navigator, 'hardwareConcurrency', {
+         get: () => 8,
+         configurable: true
+       });
+       
+       Object.defineProperty(navigator, 'deviceMemory', {
+         get: () => 8,
+         configurable: true
+       });
+       
+       Object.defineProperty(navigator, 'doNotTrack', {
+         get: () => null,
+         configurable: true
+       });
+       
+       Object.defineProperty(navigator, 'connection', {
+         get: () => ({
+           effectiveType: '4g',
+           rtt: 100,
+           downlink: 10,
+           saveData: false
+         }),
+         configurable: true
+       });
+       
+       // === PERMISSIONS API MOCKING ===
+       const originalQuery = navigator.permissions && navigator.permissions.query;
+       if (navigator.permissions) {
+         navigator.permissions.query = function(parameters) {
+           return parameters.name === 'notifications' 
+             ? Promise.resolve({ state: 'default' })
+             : originalQuery ? originalQuery.call(this, parameters) : Promise.reject(new Error('Permission API not available'));
+         };
+       }
+       
+       // === CANVAS FINGERPRINT PROTECTION ===
+       const originalGetContext = HTMLCanvasElement.prototype.getContext;
+       HTMLCanvasElement.prototype.getContext = function(type, attributes) {
+         if (type === '2d') {
+           const context = originalGetContext.call(this, type, attributes);
+           const originalFillText = context.fillText;
+           const originalStrokeText = context.strokeText;
+           const originalGetImageData = context.getImageData;
+           
+           context.fillText = function() {
+             const args = Array.prototype.slice.call(arguments);
+             return originalFillText.apply(this, args);
+           };
+           
+           context.strokeText = function() {
+             const args = Array.prototype.slice.call(arguments);
+             return originalStrokeText.apply(this, args);
+           };
+           
+           context.getImageData = function() {
+             const imageData = originalGetImageData.apply(this, arguments);
+             for (let i = 0; i < imageData.data.length; i += 4) {
+               imageData.data[i] = Math.min(255, imageData.data[i] + Math.floor(Math.random() * 3) - 1);
+               imageData.data[i + 1] = Math.min(255, imageData.data[i + 1] + Math.floor(Math.random() * 3) - 1);
+               imageData.data[i + 2] = Math.min(255, imageData.data[i + 2] + Math.floor(Math.random() * 3) - 1);
+             }
+             return imageData;
+           };
+           
+           return context;
+         }
+         return originalGetContext.call(this, type, attributes);
+       };
+       
+       // === WEBGL FINGERPRINT PROTECTION ===
+       const originalGetParameter = WebGLRenderingContext.prototype.getParameter;
+       WebGLRenderingContext.prototype.getParameter = function(parameter) {
+         if (parameter === 37445) { // UNMASKED_VENDOR_WEBGL
+           return 'Intel Inc.';
+         }
+         if (parameter === 37446) { // UNMASKED_RENDERER_WEBGL
+           return 'Intel Iris OpenGL Engine';
+         }
+         return originalGetParameter.call(this, parameter);
+       };
+       
+       // === SCREEN PROPERTIES ===
+       Object.defineProperty(screen, 'colorDepth', {
+         get: () => 24,
+         configurable: true
+       });
+       
+       Object.defineProperty(screen, 'pixelDepth', {
+         get: () => 24,
+         configurable: true
+       });
+       
+       // === IFRAME CONTENT WINDOW PROTECTION ===
+       const originalContentWindow = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
+       if (originalContentWindow) {
+         Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+           get: function() {
+             const win = originalContentWindow.get.call(this);
+             if (win) {
+               try {
+                 win.navigator.webdriver = undefined;
+                 delete win.navigator.webdriver;
+               } catch (e) {}
+             }
+             return win;
+           },
+           configurable: true
+         });
+       }
+       
+       // === FUNCTION PROTOTYPE TOSTRING OVERRIDE ===
+       const originalToString = Function.prototype.toString;
+       const proxyToString = new Proxy(originalToString, {
+         apply: function(target, thisArg, argumentsList) {
+           if (thisArg === Function.prototype.toString) {
+             return 'function toString() { [native code] }';
+           }
+           if (thisArg === originalToString) {
+             return 'function toString() { [native code] }';
+           }
+           return target.apply(thisArg, argumentsList);
+         }
+       });
+       
+       Function.prototype.toString = proxyToString;
+       
+       // === TIMING ATTACKS PROTECTION ===
+       const originalPerformanceNow = performance.now;
+       let performanceOffset = Math.random() * 100;
+       performance.now = new Proxy(originalPerformanceNow, {
+         apply: function(target, thisArg, argumentsList) {
+           return target.apply(thisArg, argumentsList) + performanceOffset + (Math.random() - 0.5) * 0.1;
+         }
+       });
+       
+       // === DATE TIMEZONE PROTECTION ===
+       const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
+       Date.prototype.getTimezoneOffset = function() {
+         return 300; // EST timezone
+       };
+       
+       // === BATTERY API MOCKING ===
+       if ('getBattery' in navigator) {
+         navigator.getBattery = () => Promise.resolve({
+           charging: true,
+           chargingTime: Infinity,
+           dischargingTime: Infinity,
+           level: 0.95
+         });
+       }
+       
+       // === NOTIFICATION PERMISSIONS ===
+       if ('Notification' in window) {
+         Object.defineProperty(Notification, 'permission', {
+           get: () => 'default',
+           configurable: true
+         });
+       }
+       
+       // === REMOVE AUTOMATION INDICATORS ===
+       delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+       delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+       delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+       delete window.cdc_adoQpoasnfa76pfcZLmcfl_JSON;
+       delete window.cdc_adoQpoasnfa76pfcZLmcfl_Object;
+       delete window.cdc_adoQpoasnfa76pfcZLmcfl_Proxy;
+       
+       // === MEDIA DEVICES MOCKING ===
+       if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+         const originalEnumerateDevices = navigator.mediaDevices.enumerateDevices;
+         navigator.mediaDevices.enumerateDevices = function() {
+           return originalEnumerateDevices.call(this).then(devices => {
+             return devices.map(device => ({
+               ...device,
+               label: device.label || 'Default Device'
+             }));
+           });
+         };
+       }
+       
+       // === ERROR STACK TRACE CLEANING ===
+       const originalError = window.Error;
+       window.Error = function(...args) {
+         const error = new originalError(...args);
+         if (error.stack) {
+           error.stack = error.stack.replace(/\s+at (chrome-extension|moz-extension|webkit-extension):\/\/[^\s]+/g, '');
+         }
+         return error;
+       };
+       
+       // === GEOLOCATION MOCKING ===
+       if (navigator.geolocation) {
+         const originalGetCurrentPosition = navigator.geolocation.getCurrentPosition;
+         navigator.geolocation.getCurrentPosition = function(success, error, options) {
+           const mockPosition = {
+             coords: {
+               latitude: 40.7128,
+               longitude: -74.0060,
+               accuracy: 20000,
+               altitude: null,
+               altitudeAccuracy: null,
+               heading: null,
+               speed: null
+             },
+             timestamp: Date.now()
+           };
+           if (success) success(mockPosition);
+         };
+       }
+     });
+    
+    // Enable request interception for header modification
+    await page.setRequestInterception(true);
+    
+    // Intercept and modify requests for better stealth
+    page.on('request', request => {
+      const headers = {
+        ...request.headers(),
+        'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': request.resourceType() === 'document' ? 'document' : request.resourceType(),
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'none',
+        'sec-fetch-user': '?1'
+      };
+      
+      // Remove automation headers
+      delete headers['x-devtools-emulation-enabled'];
+      delete headers['x-client-data'];
+      
+      request.continue({ headers });
+    });
+    
+    // Setup stream interception
+    const { streamUrls } = setupStreamInterception(page, logger, url);
+
+    // Navigate to the page
+    logger.info('Navigating to target URL');
+    const navigationStart = Date.now();
+    
+    try {
+             const response = await page.goto(url, { 
+         waitUntil: 'domcontentloaded',
+         timeout: 30000 
+       });
+      
+      const navigationStatus = response?.status() || 'unknown';
+      logger.info('Page navigation completed', { 
+        status: navigationStatus,
+        url: url.substring(0, 100)
       });
       
-      // Wait a bit more for any additional streams, then proceed without interaction
-      await page.waitForTimeout(3000);
-    } else {
-      // Check for error page before interaction
-      const currentUrl = page.url();
-      if (currentUrl.includes('/error')) {
-        logger.warn('Page redirected to error page, attempting to handle', {
-          currentUrl,
-          errorDetected: true
+      // Check for 404 error (for auto-switching)
+      if (navigationStatus === 404) {
+        logger.warn('404 error detected - page not found', { 
+          status: navigationStatus,
+          server 
         });
         
-        // Try to navigate back or handle the error
-        try {
-          await page.goBack({ waitUntil: 'networkidle', timeout: 10000 });
-          await page.waitForTimeout(2000);
-        } catch (backError) {
-          logger.debug('Could not navigate back from error page', { error: backError.message });
-        }
-      }
-
-      // Only interact if no streams found yet
-      await interactWithPage(page, logger);
-    }
-
-    // Get results
-    const { streamUrls, capturedHeaders } = streamInterception;
-    streamInterception.cleanup();
-
-    // Analyze captured headers for CDN insights
-    const headerAnalysis = {
-      domains: [],
-      refererHeaders: new Set(),
-      originHeaders: new Set(),
-      totalHeaderSets: capturedHeaders.size
-    };
-
-    for (const [key, headerData] of capturedHeaders.entries()) {
-      const domain = key.split('_')[0];
-      if (!headerAnalysis.domains.includes(domain)) {
-        headerAnalysis.domains.push(domain);
+        return NextResponse.json({
+          success: false,
+          error: `Content not found on ${server}`,
+          debug: {
+            navigationStatus: 404,
+            wasNavigationError: true,
+            server,
+            suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
+          },
+          requestId
+        }, { status: 404 });
       }
       
-      if (headerData.referer) {
-        headerAnalysis.refererHeaders.add(headerData.referer);
+    } catch (navigationError) {
+      logger.error('Navigation failed', navigationError, { url });
+      
+      // Check if it's a 404 specifically
+      if (navigationError.message?.includes('404') || navigationError.message?.includes('ERR_FAILED')) {
+        return NextResponse.json({
+          success: false,
+          error: `Content not found on ${server}`,
+          debug: {
+            wasNavigationError: true,
+            navigationStatus: 404,
+            server,
+            suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
+          },
+          requestId
+        }, { status: 404 });
       }
       
-      if (headerData.origin) {
-        headerAnalysis.originHeaders.add(headerData.origin);
+      throw navigationError;
+    }
+    
+    logger.timing('Navigation took', navigationStart);
+
+    // Interact with page to trigger stream loading
+    await interactWithPage(page, logger);
+
+    // Wait additional time for streams to be captured with progressive checking
+    let checkCount = 0;
+    const maxChecks = 8;
+    
+    while (checkCount < maxChecks && streamUrls.length === 0) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      checkCount++;
+      
+      if (checkCount % 2 === 0) {
+                 // Trigger additional interactions every 4 seconds
+         await page.evaluate(() => {
+           // Trigger events that might load delayed content
+           window.dispatchEvent(new Event('scroll'));
+           window.dispatchEvent(new Event('resize'));
+           document.dispatchEvent(new Event('visibilitychange'));
+           
+           // Try clicking specific vidsrc.xyz play button first
+           const vidsrcPlayButton = document.querySelector('#pl_but') || document.querySelector('.fas.fa-play');
+           if (vidsrcPlayButton) {
+             try {
+               vidsrcPlayButton.click();
+               vidsrcPlayButton.dispatchEvent(new Event('mouseenter'));
+               vidsrcPlayButton.dispatchEvent(new Event('focus'));
+             } catch (e) {
+               // Continue
+             }
+           }
+           
+           // Try clicking any remaining play buttons or video elements
+           const elements = document.querySelectorAll('video, iframe, [class*="play"], [id*="play"]');
+           elements.forEach((element, index) => {
+             if (index < 3) { // Limit to first 3 elements
+               try {
+                 element.click();
+                 element.dispatchEvent(new Event('mouseenter'));
+               } catch (e) {
+                 // Continue
+               }
+             }
+           });
+         });
+        
+        logger.info(`Progressive check ${checkCount}/${maxChecks}`, { 
+          currentStreams: streamUrls.length 
+        });
       }
     }
+    
+    logger.info('Stream detection completed after progressive checks', {
+      totalChecks: checkCount,
+      finalStreamCount: streamUrls.length
+    });
 
-    // Convert Sets to Arrays for JSON serialization
-    headerAnalysis.refererHeaders = Array.from(headerAnalysis.refererHeaders);
-    headerAnalysis.originHeaders = Array.from(headerAnalysis.originHeaders);
+    // Sort and filter streams
+    const m3u8Streams = streamUrls.filter(stream => 
+      stream.url && (
+        stream.url.includes('.m3u8') || 
+        stream.contentType?.includes('mpegurl') ||
+        stream.source === 'shadowlandschronicles'
+      )
+    );
 
-    logger.info('Header analysis completed', {
-      domainsDetected: headerAnalysis.domains,
-      refererHeaders: headerAnalysis.refererHeaders,
-      originHeaders: headerAnalysis.originHeaders,
-      totalHeaderSets: headerAnalysis.totalHeaderSets
+    // Sort by priority: shadowlandschronicles master (0) > other masters (1) > regular m3u8 (2)
+    m3u8Streams.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      if (a.isMaster !== b.isMaster) return b.isMaster - a.isMaster; // Masters first
+      return 0;
     });
 
     logger.info('Stream extraction completed', {
-      totalStreamsFound: streamUrls.length,
-      streamTypes: streamUrls.map(s => s.type),
-      requestDuration: Date.now() - requestStartTime
+      totalFound: streamUrls.length,
+      m3u8Count: m3u8Streams.length,
+      streams: m3u8Streams.slice(0, 3).map(s => ({
+        url: s.url.substring(0, 100),
+        source: s.source,
+        priority: s.priority,
+        isMaster: s.isMaster
+      }))
     });
 
-    // Close browser
-    await browser.close();
-    logger.info('Browser closed successfully');
-
-    // Process results - prioritize shadowlandschronicles M3U8 playlists
-    if (streamUrls.length > 0) {
-      // Sort by priority (0 = highest for shadowlandschronicles, 1 = M3U8, 2 = direct video)
-      const sortedStreams = streamUrls.sort((a, b) => (a.priority || 99) - (b.priority || 99));
-      
-      // Prefer shadowlandschronicles M3U8 playlists, then other M3U8, then direct video
-      const m3u8Streams = sortedStreams.filter(s => s.type === 'm3u8');
-      const shadowlandsStreams = m3u8Streams.filter(s => s.isShadowlands);
-      const selectedStream = m3u8Streams.length > 0 ? m3u8Streams[0] : sortedStreams[0];
-
-      logger.info('🎉 Stream extraction successful', {
-        selectedStreamType: selectedStream.type,
-        selectedStreamUrl: selectedStream.url.substring(0, 100) + (selectedStream.url.length > 100 ? '...' : ''),
-        isShadowlands: selectedStream.isShadowlands || false,
-        source: selectedStream.source || 'unknown',
-        totalOptions: streamUrls.length,
-        m3u8Count: m3u8Streams.length,
-        shadowlandsCount: shadowlandsStreams.length,
-        directVideoCount: sortedStreams.filter(s => s.type === 'direct').length,
-        selectionReason: selectedStream.isShadowlands ? 'Shadowlandschronicles M3U8 found' : 
-                        m3u8Streams.length > 0 ? 'M3U8 playlist found' : 'Direct video fallback'
+    if (m3u8Streams.length === 0) {
+      logger.warn('No streams found', {
+        totalResponses: streamUrls.length,
+        server
       });
-
-      return NextResponse.json({ 
-        success: true, 
-        streamUrl: selectedStream.url,
-        type: selectedStream.type,
-        server: server, // Include the server used for extraction
-        totalFound: streamUrls.length,
-        m3u8Count: m3u8Streams.length,
-        requestId,
-        timing: {
-          totalDuration: Date.now() - requestStartTime,
-          timestamp: new Date().toISOString()
-        },
-        headers: {
-          analysis: headerAnalysis,
-          captured: Object.fromEntries(
-            Array.from(capturedHeaders.entries()).map(([key, value]) => [
-              key, 
-              {
-                ...value,
-                url: value.url // Keep shortened URL for logging
-              }
-            ])
-          )
-        },
+      
+      return NextResponse.json({
+        success: false,
+        error: `No streams found on ${server}. Try switching servers.`,
         debug: {
-          allStreams: streamUrls.map(s => ({
-            type: s.type,
-            url: s.url.substring(0, 100) + (s.url.length > 100 ? '...' : ''),
-            priority: s.priority,
-            isShadowlands: s.isShadowlands || false,
-            source: s.source || 'unknown'
-          })),
-          cdnDomains: headerAnalysis.domains,
-          requiredHeaders: {
-            referer: headerAnalysis.refererHeaders,
-            origin: headerAnalysis.originHeaders
-          }
-        }
-      });
-    } else {
-      const wasNavigationError = navigationStatus === 404;
-      
-      logger.warn('No stream URLs found', {
-        originalUrl: url,
-        mediaType,
-        navigationStatus,
-        wasNavigationError,
-        requestDuration: Date.now() - requestStartTime
-      });
-
-      let errorMessage = 'No stream URL found';
-      let suggestions = [];
-      
-      if (wasNavigationError) {
-        const isVidsrcUrl = url.includes('vidsrc.xyz');
-        errorMessage = isVidsrcUrl ? 'Content not available on vidsrc.xyz' : 'Content not available on embed.su';
-        const backupServer = isVidsrcUrl ? 'Embed.su' : 'Vidsrc.xyz';
-        suggestions.push(`Try switching to ${backupServer} server`);
-        suggestions.push('Content may not be available for this episode');
-      } else {
-        suggestions.push('Try refreshing or switching servers');
-        suggestions.push('Content may still be loading');
-      }
-
-      return NextResponse.json({ 
-        success: false, 
-        error: errorMessage,
-        suggestions,
-        requestId,
-        headers: {
-          analysis: headerAnalysis,
-          captured: Object.fromEntries(
-            Array.from(capturedHeaders.entries()).map(([key, value]) => [
-              key, 
-              {
-                ...value,
-                url: value.url // Keep shortened URL for logging
-              }
-            ])
-          )
+          totalFound: streamUrls.length,
+          m3u8Count: 0,
+          server,
+          suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
         },
-        debug: {
-          originalUrl: url,
-          mediaType,
-          movieId,
-          seasonId,
-          episodeId,
-          navigationStatus,
-          streamsFound: 0,
-          wasNavigationError,
-          cdnDomains: headerAnalysis.domains,
-          requiredHeaders: {
-            referer: headerAnalysis.refererHeaders,
-            origin: headerAnalysis.originHeaders
-          },
-          timing: {
-            totalDuration: Date.now() - requestStartTime,
-            timestamp: new Date().toISOString()
-          }
-        }
-      }, { status: wasNavigationError ? 404 : 400 });
+        requestId
+      }, { status: 404 });
     }
+
+    // Select the best stream (highest priority, preferring masters)
+    const selectedStream = m3u8Streams[0];
+    
+    logger.info('Selected optimal stream', {
+      url: selectedStream.url.substring(0, 150),
+      source: selectedStream.source,
+      priority: selectedStream.priority,
+      isMaster: selectedStream.isMaster,
+      needsCleanHeaders: selectedStream.needsCleanHeaders
+    });
+
+    const totalDuration = logger.timing('Total request duration', requestStart);
+
+    // Return successful response
+    return NextResponse.json({ 
+      success: true, 
+      streamUrl: selectedStream.url,
+      type: 'hls',
+      server: server,
+      totalFound: streamUrls.length,
+      m3u8Count: m3u8Streams.length,
+      requestId,
+      debug: {
+        selectedStream: {
+          source: selectedStream.source,
+          priority: selectedStream.priority,
+          isMaster: selectedStream.isMaster,
+          needsCleanHeaders: selectedStream.needsCleanHeaders
+        },
+        totalDuration,
+        server
+      }
+    });
 
   } catch (error) {
+    const totalDuration = Date.now() - requestStart;
     logger.error('Stream extraction failed', error, {
-      url,
-      mediaType,
-      requestDuration: Date.now() - requestStartTime
+      url: url || 'unknown',
+      mediaType: mediaType || 'unknown',
+      requestDuration: totalDuration
     });
-    
-    // Cleanup resources
-    try {
-      if (streamInterception) {
-        streamInterception.cleanup();
-      }
-      if (page) {
-        await page.close();
-      }
-      if (context) {
-        await context.close();
-      }
+
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: error.message || 'Unknown error occurred',
+        requestId,
+        debug: {
+          requestDuration: totalDuration
+        }
+      },
+      { status: 500 }
+    );
+  } finally {
     if (browser) {
+      try {
         await browser.close();
+        logger.debug('Browser closed successfully');
+      } catch (closeError) {
+        logger.warn('Error closing browser', { error: closeError.message });
       }
-      logger.info('Resource cleanup completed');
-    } catch (cleanupError) {
-      logger.error('Error during resource cleanup', cleanupError);
     }
-    
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Failed to extract stream URL',
-      details: error.message,
-      requestId,
-      timing: {
-        totalDuration: Date.now() - requestStartTime,
-        timestamp: new Date().toISOString()
-      }
-    }, { status: 500 });
   }
 } 
