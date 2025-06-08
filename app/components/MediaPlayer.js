@@ -275,41 +275,20 @@ const MediaPlayer = ({
         
         setExtractionStep("Launching browser automation...");
         
-        // Use external extract service or fallback to local API
-        const extractServiceUrl = process.env.NEXT_PUBLIC_EXTRACT_SERVICE_URL || 'http://35.188.123.210:3001';
-        const isExternalService = !extractServiceUrl.includes('localhost') && !extractServiceUrl.startsWith('/');
-        const fullUrl = isExternalService ? `${extractServiceUrl}/extract?${params}` : `/api/extract-stream?${params}`;
+        // Use the serverless function which will proxy to the VM extractor
+        const fullUrl = `/api/extract-stream?${params}`;
         
-        console.log('🌐 Calling extract service:', {
-          extractServiceUrl,
-          isExternalService,
+        console.log('🌐 Calling serverless extract proxy:', {
           fullUrl,
           params: params.toString()
         });
         
-        let extractResponse;
-        try {
-          extractResponse = await fetch(fullUrl, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-        } catch (fetchError) {
-          console.error('❌ Fetch failed:', fetchError.message);
-          if (isExternalService) {
-            console.log('🔄 External service failed, trying local API...');
-            setExtractionStep("External service failed, trying local API...");
-            extractResponse = await fetch(`/api/extract-stream?${params}`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
-          } else {
-            throw fetchError;
-          }
-        }
+        const extractResponse = await fetch(fullUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
         
         console.log('📡 Extract service response:', {
           status: extractResponse.status,
