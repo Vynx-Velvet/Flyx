@@ -6,12 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "setup-chromium": "node scripts/setup-chromium.js"
   },
   "dependencies": {
     "next": "^14.2.0",
-    "@sparticuz/chromium": "^126.0.0",
-    "puppeteer-core": "^22.0.0",
+    "@sparticuz/chromium": "^131.0.1",
+    "puppeteer-core": "^23.5.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-world-flags": "^1.6.0"

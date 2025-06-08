@@ -7,8 +7,6 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@sparticuz/chromium'],
   },
-  // Ensure these packages are not externalized in the serverless bundle
-  serverExternalPackages: ['@sparticuz/chromium'],
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     if (isServer) {
       // Ensure @sparticuz/chromium is bundled, not externalized

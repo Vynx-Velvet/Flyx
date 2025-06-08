@@ -247,6 +247,10 @@ async function getBrowserConfig(logger) {
     logger.info('Using @sparticuz/chromium for serverless environment');
     
     try {
+      // Set required environment variables for @sparticuz/chromium
+      process.env.FONTCONFIG_PATH = '/tmp';
+      process.env.LD_LIBRARY_PATH = '/tmp:' + (process.env.LD_LIBRARY_PATH || '');
+      
       // Get the executable path from @sparticuz/chromium
       const executablePath = await chromium.executablePath();
       logger.info('Chromium executable path resolved', { 
@@ -258,6 +262,21 @@ async function getBrowserConfig(logger) {
         const fs = require('fs');
         if (executablePath && !fs.existsSync(executablePath)) {
           logger.warn('Chromium executable path does not exist', { executablePath });
+        } else if (executablePath) {
+          // Check if executable has proper permissions
+          try {
+            fs.accessSync(executablePath, fs.constants.X_OK);
+            logger.info('Chromium executable permissions verified');
+          } catch (permError) {
+            logger.warn('Chromium executable permission issue', { error: permError.message });
+            // Try to fix permissions
+            try {
+              fs.chmodSync(executablePath, '755');
+              logger.info('Fixed Chromium executable permissions');
+            } catch (chmodError) {
+              logger.warn('Could not fix permissions', { error: chmodError.message });
+            }
+          }
         }
       } catch (fsError) {
         logger.debug('Could not verify executable path (fs not accessible)', { 
@@ -282,7 +301,31 @@ async function getBrowserConfig(logger) {
           '--single-process', // Important for serverless
           '--disable-background-timer-throttling',
           '--disable-renderer-backgrounding',
-          '--disable-backgrounding-occluded-windows'
+          '--disable-backgrounding-occluded-windows',
+          // Additional flags for shared library compatibility
+          '--disable-software-rasterizer',
+          '--disable-background-networking',
+          '--disable-default-apps',
+          '--disable-extensions',
+          '--disable-sync',
+          '--disable-translate',
+          '--hide-scrollbars',
+          '--metrics-recording-only',
+          '--mute-audio',
+          '--no-default-browser-check',
+          '--no-first-run',
+          '--disable-cloud-import',
+          '--disable-gesture-typing',
+          '--disable-offer-store-unmasked-wallet-cards',
+          '--disable-offer-upload-credit-cards',
+          '--disable-print-preview',
+          '--disable-voice-input',
+          '--disable-wake-on-wifi',
+          '--enable-async-dns',
+          '--enable-simple-cache-backend',
+          '--enable-tcp-fast-open',
+          '--memory-pressure-off',
+          '--max_old_space_size=4096'
         ]
       };
       
@@ -299,10 +342,46 @@ async function getBrowserConfig(logger) {
         errorMessage: chromiumError.message
       });
       
-      // Fallback configuration for serverless without @sparticuz/chromium
+      // Enhanced fallback configuration for serverless without @sparticuz/chromium
       logger.warn('Falling back to basic serverless configuration');
+      
+      // Try bundled chromium first
+      const path = require('path');
+      const bundledChromiumPath = path.join(process.cwd(), 'bin', 'chromium');
+      
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(bundledChromiumPath)) {
+          logger.info('Found bundled Chromium executable', { path: bundledChromiumPath });
+          return {
+            executablePath: bundledChromiumPath,
+            headless: true,
+            args: [
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-dev-shm-usage',
+              '--disable-web-security',
+              '--disable-features=VizDisplayCompositor',
+              '--disable-blink-features=AutomationControlled',
+              '--no-first-run',
+              '--no-zygote',
+              '--disable-gpu',
+              '--single-process',
+              '--disable-background-timer-throttling',
+              '--disable-renderer-backgrounding',
+              '--disable-backgrounding-occluded-windows'
+            ]
+          };
+        }
+      } catch (bundledError) {
+        logger.debug('Bundled chromium not available', { error: bundledError.message });
+      }
+      
+      // Final fallback - try system chromium
       return {
         headless: true,
+        // Try to use system chromium as fallback
+        executablePath: '/usr/bin/chromium-browser',
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
