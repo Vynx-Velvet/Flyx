@@ -970,7 +970,7 @@ export async function GET(request) {
     logger.timing('Browser launch took', launchStart);
 
          // Create new page with enhanced stealth settings
-     const page = await browser.newPage();
+     let page = await browser.newPage();
      
      // Set realistic viewport and user agent
      await page.setViewport({ 
