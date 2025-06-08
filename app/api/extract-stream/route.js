@@ -947,28 +947,30 @@ async function interactWithPage(page, logger) {
       try {
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // Try basic page interactions without frame access
-        await page.evaluate(() => {
-          // Trigger click events on common player elements
-          const clickTargets = [
-            'video', '.video', '#video', 
-            '.player', '#player', '.video-player',
-            '.play-button', '.btn-play', '#play-btn',
-            'iframe[src*="player"]', 'iframe[src*="embed"]'
-          ];
-          
-          clickTargets.forEach(selector => {
-            try {
-              const elements = document.querySelectorAll(selector);
-              elements.forEach(el => {
-                el.click();
-                el.dispatchEvent(new Event('click', { bubbles: true }));
-              });
-            } catch (e) {
-              // Continue
+        // Try basic page interactions using direct Puppeteer selectors (no frame evaluation)
+        const directClickTargets = [
+          'video', '.video', '#video', 
+          '.player', '#player', '.video-player',
+          '.play-button', '.btn-play', '#play-btn',
+          'iframe[src*="player"]', 'iframe[src*="embed"]'
+        ];
+        
+        for (const selector of directClickTargets) {
+          try {
+            const elements = await page.$$(selector);
+            for (const element of elements) {
+              try {
+                await element.click();
+                logger.info('Recovery: clicked element', { selector });
+                await new Promise(resolve => setTimeout(resolve, 500));
+              } catch (clickError) {
+                // Continue to next element
+              }
             }
-          });
-        });
+          } catch (selectorError) {
+            // Continue to next selector
+          }
+        }
         
         logger.info('Completed recovery interaction after frame detachment');
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -1596,7 +1598,23 @@ export async function GET(request) {
     logger.timing('Navigation took', navigationStart);
 
     // Interact with page to trigger stream loading
-    await interactWithPage(page, logger);
+    let pageInteractionFailed = false;
+    try {
+      await interactWithPage(page, logger);
+    } catch (interactionError) {
+      if (interactionError.message.includes('detached Frame')) {
+        logger.warn('Page interaction failed due to frame detachment, switching to passive mode', {
+          error: interactionError.message
+        });
+        pageInteractionFailed = true;
+        
+        // Passive mode: just wait for any additional network responses without interaction
+        logger.info('Entering passive mode - waiting for network responses without page interaction');
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Initial wait
+      } else {
+        throw interactionError; // Re-throw if it's not a frame detachment issue
+      }
+    }
 
     // Wait additional time for streams to be captured with progressive checking
     let checkCount = 0;
@@ -1607,41 +1625,58 @@ export async function GET(request) {
       checkCount++;
       
       if (checkCount % 2 === 0) {
-                 // Trigger additional interactions every 4 seconds
-         await page.evaluate(() => {
-           // Trigger events that might load delayed content
-           window.dispatchEvent(new Event('scroll'));
-           window.dispatchEvent(new Event('resize'));
-           document.dispatchEvent(new Event('visibilitychange'));
-           
-           // Try clicking specific vidsrc.xyz play button first
-           const vidsrcPlayButton = document.querySelector('#pl_but') || document.querySelector('.fas.fa-play');
-           if (vidsrcPlayButton) {
-             try {
-               vidsrcPlayButton.click();
-               vidsrcPlayButton.dispatchEvent(new Event('mouseenter'));
-               vidsrcPlayButton.dispatchEvent(new Event('focus'));
-             } catch (e) {
-               // Continue
-             }
-           }
-           
-           // Try clicking any remaining play buttons or video elements
-           const elements = document.querySelectorAll('video, iframe, [class*="play"], [id*="play"]');
-           elements.forEach((element, index) => {
-             if (index < 3) { // Limit to first 3 elements
-               try {
-                 element.click();
-                 element.dispatchEvent(new Event('mouseenter'));
-               } catch (e) {
-                 // Continue
-               }
-             }
-           });
-         });
+        if (!pageInteractionFailed) {
+          // Trigger additional interactions every 4 seconds (only if not in passive mode)
+          try {
+            await page.evaluate(() => {
+              // Trigger events that might load delayed content
+              window.dispatchEvent(new Event('scroll'));
+              window.dispatchEvent(new Event('resize'));
+              document.dispatchEvent(new Event('visibilitychange'));
+              
+              // Try clicking specific vidsrc.xyz play button first
+              const vidsrcPlayButton = document.querySelector('#pl_but') || document.querySelector('.fas.fa-play');
+              if (vidsrcPlayButton) {
+                try {
+                  vidsrcPlayButton.click();
+                  vidsrcPlayButton.dispatchEvent(new Event('mouseenter'));
+                  vidsrcPlayButton.dispatchEvent(new Event('focus'));
+                } catch (e) {
+                  // Continue
+                }
+              }
+              
+              // Try clicking any remaining play buttons or video elements
+              const elements = document.querySelectorAll('video, iframe, [class*="play"], [id*="play"]');
+              elements.forEach((element, index) => {
+                if (index < 3) { // Limit to first 3 elements
+                  try {
+                    element.click();
+                    element.dispatchEvent(new Event('mouseenter'));
+                  } catch (e) {
+                    // Continue
+                  }
+                }
+              });
+            });
+          } catch (evalError) {
+            if (evalError.message.includes('detached Frame')) {
+              logger.warn('Progressive check evaluation failed due to frame detachment, continuing in passive mode');
+              pageInteractionFailed = true; // Switch to passive mode permanently
+            } else {
+              logger.debug('Progressive check evaluation error', { error: evalError.message });
+            }
+          }
+        } else {
+          // In passive mode - just wait and let network interception do its work
+          logger.info(`Passive mode check ${checkCount}/${maxChecks} - waiting for network responses`, {
+            currentStreams: streamUrls.length
+          });
+        }
         
         logger.info(`Progressive check ${checkCount}/${maxChecks}`, { 
-          currentStreams: streamUrls.length 
+          currentStreams: streamUrls.length,
+          mode: pageInteractionFailed ? 'passive' : 'active'
         });
       }
     }
