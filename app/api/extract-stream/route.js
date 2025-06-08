@@ -599,9 +599,9 @@ async function interactWithPage(page, logger) {
              try {
                const frame = await iframe.contentFrame();
                if (frame) {
-                 // Wait MUCH longer for frame to be fully loaded and stable
-                 logger.info('Waiting for iframe content to fully stabilize...', { iframeIndex: i });
-                 await new Promise(resolve => setTimeout(resolve, 6000)); // Increased from 3s to 6s
+                 // Wait for frame to be stable but not too long to miss stream loading
+                 logger.info('Waiting for iframe content to stabilize...', { iframeIndex: i });
+                 await new Promise(resolve => setTimeout(resolve, 3000)); // Balanced wait time
                  
                  // Debug: Scan iframe for elements (with detached frame handling)
                  let iframeElements = [];
@@ -1437,12 +1437,12 @@ export async function GET(request) {
        // === FRAME DETACHMENT PREVENTION ===
        // Prevent common causes of frame detachment
        
-       // 1. Block iframe removal/replacement
+       // 1. Monitor iframe removal/replacement but allow legitimate changes
        const originalRemoveChild = Node.prototype.removeChild;
        Node.prototype.removeChild = function(child) {
          if (child && child.tagName === 'IFRAME') {
-           console.log('Prevented iframe removal');
-           return child; // Don't actually remove
+           console.log('Detected iframe removal - monitoring for stability');
+           // Allow removal but log it (some legitimate updates may need this)
          }
          return originalRemoveChild.call(this, child);
        };
@@ -1450,8 +1450,8 @@ export async function GET(request) {
        const originalReplaceChild = Node.prototype.replaceChild;
        Node.prototype.replaceChild = function(newChild, oldChild) {
          if (oldChild && oldChild.tagName === 'IFRAME') {
-           console.log('Prevented iframe replacement');
-           return oldChild; // Don't actually replace
+           console.log('Detected iframe replacement - monitoring for stability');
+           // Allow replacement but log it (some legitimate updates may need this)
          }
          return originalReplaceChild.call(this, newChild, oldChild);
        };
@@ -1480,34 +1480,35 @@ export async function GET(request) {
          return '';
        }, true);
        
-       // 5. Stabilize iframes after they load
-       const stabilizeIframes = () => {
+       // 5. Monitor iframe changes but don't prevent all legitimate updates
+       const monitorIframes = () => {
          const iframes = document.querySelectorAll('iframe');
          iframes.forEach((iframe, index) => {
            try {
-             // Store original src
-             const originalSrc = iframe.src;
+             // Just log iframe presence and src for monitoring
+             const currentSrc = iframe.src;
+             console.log(`Monitoring iframe ${index}:`, currentSrc.substring(0, 50));
              
-             // Prevent src changes
+             // Light protection - only prevent obvious detachment patterns
+             const originalSrcSetter = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'src').set;
              Object.defineProperty(iframe, 'src', {
-               get: () => originalSrc,
-               set: () => {
-                 console.log('Prevented iframe src change that could cause detachment');
+               get: () => iframe.getAttribute('src'),
+               set: function(newSrc) {
+                 // Allow legitimate src changes but log them
+                 console.log('Iframe src change detected:', newSrc.substring(0, 50));
+                 return originalSrcSetter.call(this, newSrc);
                },
-               configurable: false
+               configurable: true
              });
-             
-             console.log(`Stabilized iframe ${index}:`, originalSrc.substring(0, 50));
            } catch (e) {
-             // Continue if can't stabilize this iframe
+             // Continue if can't monitor this iframe
            }
          });
        };
        
-       // Run iframe stabilization multiple times
-       setTimeout(stabilizeIframes, 1000);
-       setTimeout(stabilizeIframes, 3000);
-       setTimeout(stabilizeIframes, 5000);
+       // Run iframe monitoring less frequently and less aggressively
+       setTimeout(monitorIframes, 2000);
+       setTimeout(monitorIframes, 4000);
        
        // 6. Prevent DOM mutations that could affect iframes
        if (window.MutationObserver) {
@@ -1552,37 +1553,43 @@ export async function GET(request) {
       delete headers['x-devtools-emulation-enabled'];
       delete headers['x-client-data'];
       
-      // PREVENT FRAME DETACHMENT: Block problematic scripts that might reload/replace frames
-      if (request.resourceType() === 'script') {
-        // Block scripts that commonly cause frame detachment
-        const problematicScripts = [
-          'anti-bot', 'bot-detection', 'security', 'protection',
-          'reload', 'refresh', 'navigator', 'detector',
-          'fingerprint', 'validate', 'check', 'verify'
-        ];
-        
-        const shouldBlock = problematicScripts.some(keyword => 
-          url.toLowerCase().includes(keyword)
-        );
-        
-        if (shouldBlock) {
-          logger.debug('Blocking potentially problematic script', { url: url.substring(0, 100) });
-          request.abort('blockedbyclient');
-          return;
-        }
-      }
-      
-      // PREVENT NAVIGATION: Block any navigation requests after initial page load
-      if (request.resourceType() === 'document' && request.isNavigationRequest()) {
-        const isInitialNavigation = !request.redirectChain().length && request.frame() === page.mainFrame();
-        if (!isInitialNavigation) {
-          logger.debug('Blocking navigation request to prevent frame detachment', { 
-            url: url.substring(0, 100) 
-          });
-          request.abort('blockedbyclient');
-          return;
-        }
-      }
+             // SELECTIVE BLOCKING: Only block very specific problematic requests
+       if (request.resourceType() === 'script') {
+         // Only block very specific anti-automation scripts, not general ones
+         const veryProblematicScripts = [
+           'anti-automation', 'bot-detector.js', 'antibot.js', 
+           'captcha', 'recaptcha', 'cloudflare-challenge'
+         ];
+         
+         const shouldBlock = veryProblematicScripts.some(keyword => 
+           url.toLowerCase().includes(keyword)
+         );
+         
+         if (shouldBlock) {
+           logger.debug('Blocking specific anti-automation script', { url: url.substring(0, 100) });
+           request.abort('blockedbyclient');
+           return;
+         }
+       }
+       
+       // SELECTIVE NAVIGATION BLOCKING: Only block obvious page redirects, not iframe navigation
+       if (request.resourceType() === 'document' && request.isNavigationRequest()) {
+         const isInitialNavigation = !request.redirectChain().length && request.frame() === page.mainFrame();
+         const isIframeNavigation = request.frame() !== page.mainFrame();
+         
+         // Don't block iframe navigation (needed for streams) or initial navigation
+         if (!isInitialNavigation && !isIframeNavigation) {
+           // Only block main frame redirects that look like captcha/security checks
+           const isSecurityRedirect = url.includes('captcha') || url.includes('challenge') || 
+                                      url.includes('security') || url.includes('blocked');
+           
+           if (isSecurityRedirect) {
+             logger.debug('Blocking security/captcha redirect', { url: url.substring(0, 100) });
+             request.abort('blockedbyclient');
+             return;
+           }
+         }
+       }
       
       request.continue({ headers });
     });
@@ -1728,9 +1735,9 @@ export async function GET(request) {
     
     logger.timing('Navigation took', navigationStart);
 
-    // CRITICAL: Wait for page and frames to fully stabilize before ANY interaction
+    // Balanced stabilization wait - enough to prevent detachment but not too long to miss streams
     logger.info('Waiting for page and frames to stabilize before interaction...');
-    await new Promise(resolve => setTimeout(resolve, 8000)); // 8 second stabilization wait
+    await new Promise(resolve => setTimeout(resolve, 4000)); // Reduced from 8s to 4s
     
     // Additional frame stability check
     try {
@@ -1740,10 +1747,10 @@ export async function GET(request) {
       });
       logger.info('Frame stability check completed', { frameCount });
       
-      // Give frames extra time to load their content
+      // Give frames extra time to load their content but not too much
       if (frameCount > 0) {
         logger.info('Detected iframes, giving additional stabilization time...');
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Additional 5 seconds for iframe content
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Reduced from 5s to 2s
       }
     } catch (e) {
       logger.debug('Frame stability check failed, proceeding anyway', { error: e.message });
