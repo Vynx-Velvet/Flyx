@@ -566,6 +566,26 @@ async function interactWithPage(page, logger) {
     if (iframes.length > 0) {
       logger.info('Found iframes, attempting to interact', { count: iframes.length });
       
+      // First, try to interact with iframes immediately before they can detach
+      try {
+        for (let i = 0; i < Math.min(iframes.length, 3); i++) {
+          const iframe = iframes[i];
+          try {
+            // Click iframe immediately to trigger any loading
+            await iframe.click();
+            logger.info('Clicked iframe for immediate interaction', { iframeIndex: i });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } catch (e) {
+            logger.debug('Could not click iframe immediately', { iframeIndex: i, error: e.message });
+          }
+        }
+        
+        // Wait for any triggered loading to complete
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (e) {
+        logger.debug('Error during immediate iframe interaction', { error: e.message });
+      }
+      
       for (let i = 0; i < Math.min(iframes.length, 3); i++) {
         try {
           const iframe = iframes[i];
@@ -574,91 +594,137 @@ async function interactWithPage(page, logger) {
           if (src && (src.includes('player') || src.includes('embed') || src.includes('video'))) {
             logger.info('Found video iframe', { src: src.substring(0, 100) });
             
-                         // Try to access iframe content
+                         // Try to access iframe content with robust error handling
              try {
                const frame = await iframe.contentFrame();
                if (frame) {
-                 await new Promise(resolve => setTimeout(resolve, 2000));
+                 // Wait for frame to be fully loaded and stable
+                 await new Promise(resolve => setTimeout(resolve, 3000));
                  
-                 // Debug: Scan iframe for elements
-                 const iframeElements = await frame.evaluate(() => {
-                   const elements = [];
-                   const selectors = ['#pl_but', '.fas.fa-play', 'i.fas.fa-play', '[id*="play"]', '[class*="play"]'];
-                   
-                   selectors.forEach(selector => {
-                     try {
-                       const found = document.querySelectorAll(selector);
-                       found.forEach((el, index) => {
-                         elements.push({
-                           selector,
-                           index,
-                           tagName: el.tagName,
-                           id: el.id,
-                           className: el.className,
-                           innerText: el.innerText?.substring(0, 50),
-                           visible: el.offsetParent !== null,
-                           disabled: el.disabled
+                 // Debug: Scan iframe for elements (with detached frame handling)
+                 let iframeElements = [];
+                 try {
+                   iframeElements = await frame.evaluate(() => {
+                     const elements = [];
+                     const selectors = ['#pl_but', '.fas.fa-play', 'i.fas.fa-play', '[id*="play"]', '[class*="play"]'];
+                     
+                     selectors.forEach(selector => {
+                       try {
+                         const found = document.querySelectorAll(selector);
+                         found.forEach((el, index) => {
+                           elements.push({
+                             selector,
+                             index,
+                             tagName: el.tagName,
+                             id: el.id,
+                             className: el.className,
+                             innerText: el.innerText?.substring(0, 50),
+                             visible: el.offsetParent !== null,
+                             disabled: el.disabled
+                           });
                          });
-                       });
-                     } catch (e) {
-                       // Continue
-                     }
+                       } catch (e) {
+                         // Continue
+                       }
+                     });
+                     
+                     return elements;
                    });
-                   
-                   return elements;
-                 });
+                 } catch (frameError) {
+                   if (frameError.message.includes('detached Frame')) {
+                     logger.warn('Frame detached during element scanning, skipping iframe interaction', { 
+                       iframeIndex: i,
+                       src: src.substring(0, 100) 
+                     });
+                     continue; // Skip this iframe and try the next one
+                   }
+                   throw frameError; // Re-throw if it's a different error
+                 }
                  
                  logger.info('Elements found in iframe', { iframeIndex: i, elements: iframeElements });
                  
                  // Look for play buttons in iframe (prioritizing vidsrc.xyz specific)
-                 const playSelectors = [
-                   '#pl_but',                           // Specific vidsrc.xyz play button ID
-                   '.fas.fa-play',                     // Specific vidsrc.xyz play button class
-                   'button#pl_but',                    // More specific vidsrc button selector
-                   '[id="pl_but"]',                    // Alternative ID selector
-                   'button.fas.fa-play',               // Alternative class selector
-                   'i.fas.fa-play',                    // Icon element with play class
-                   'button[class*="play"]',
-                   'div[class*="play"]',
-                   '[data-testid*="play"]',
-                   '.play-button',
-                   '.video-play-button',
-                   'button[aria-label*="play" i]',
-                   'button[title*="play" i]',
-                   '.play',
-                   '.btn-play',
-                   '#play-btn',
-                   '.play-icon'
-                 ];
-                
-                for (const selector of playSelectors) {
-                  try {
-                    const playButton = await frame.$(selector);
-                    if (playButton) {
-                      logger.info('Found play button in iframe', { selector });
-                      await playButton.click();
-                      await new Promise(resolve => setTimeout(resolve, 2000));
-                      break;
+                 try {
+                   const playSelectors = [
+                     '#pl_but',                           // Specific vidsrc.xyz play button ID
+                     '.fas.fa-play',                     // Specific vidsrc.xyz play button class
+                     'button#pl_but',                    // More specific vidsrc button selector
+                     '[id="pl_but"]',                    // Alternative ID selector
+                     'button.fas.fa-play',               // Alternative class selector
+                     'i.fas.fa-play',                    // Icon element with play class
+                     'button[class*="play"]',
+                     'div[class*="play"]',
+                     '[data-testid*="play"]',
+                     '.play-button',
+                     '.video-play-button',
+                     'button[aria-label*="play" i]',
+                     'button[title*="play" i]',
+                     '.play',
+                     '.btn-play',
+                     '#play-btn',
+                     '.play-icon'
+                   ];
+                  
+                  for (const selector of playSelectors) {
+                    try {
+                      const playButton = await frame.$(selector);
+                      if (playButton) {
+                        logger.info('Found play button in iframe', { selector });
+                        await playButton.click();
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        break;
+                      }
+                    } catch (e) {
+                      if (e.message.includes('detached Frame')) {
+                        logger.warn('Frame detached during play button search', { selector });
+                        break; // Exit the loop and skip this iframe
+                      }
+                      // Continue for other errors
                     }
-                  } catch (e) {
-                    // Continue
                   }
-                }
-                
-                // Try clicking on video elements in iframe
-                const videoElements = await frame.$$('video, .video, .player');
-                if (videoElements.length > 0) {
-                  try {
-                    await videoElements[0].click();
-                    logger.info('Clicked video element in iframe');
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                  } catch (e) {
-                    // Continue
+                  
+                  // Try clicking on video elements in iframe
+                  const videoElements = await frame.$$('video, .video, .player');
+                  if (videoElements.length > 0) {
+                    try {
+                      await videoElements[0].click();
+                      logger.info('Clicked video element in iframe');
+                      await new Promise(resolve => setTimeout(resolve, 2000));
+                    } catch (e) {
+                      if (e.message.includes('detached Frame')) {
+                        logger.warn('Frame detached during video element click');
+                      }
+                      // Continue for other errors
+                    }
                   }
+                } catch (frameError) {
+                  if (frameError.message.includes('detached Frame')) {
+                    logger.warn('Frame detached during iframe interaction, skipping to next iframe', { 
+                      iframeIndex: i 
+                    });
+                    continue; // Skip this iframe and try the next one
+                  }
+                  // Log other errors but continue
+                  logger.debug('Error during iframe interaction', { error: frameError.message });
                 }
               }
             } catch (e) {
-              logger.debug('Could not access iframe content (CORS)');
+              if (e.message.includes('detached Frame')) {
+                logger.warn('Frame detached immediately after access, iframe content changed too quickly', {
+                  iframeIndex: i,
+                  src: src.substring(0, 100)
+                });
+                // Try clicking the iframe itself as fallback
+                try {
+                  await iframe.click();
+                  logger.info('Clicked iframe as fallback for detached frame');
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                } catch (clickError) {
+                  logger.debug('Could not click iframe either', { error: clickError.message });
+                }
+              } else {
+                logger.debug('Could not access iframe content (CORS or other)', { error: e.message });
+              }
             }
             
             // Click on the iframe itself
@@ -871,7 +937,47 @@ async function interactWithPage(page, logger) {
     logger.timing('Page interaction completed', interactionStart);
     
   } catch (error) {
-    logger.warn('Page interaction error', { error: error.message });
+    if (error.message.includes('detached Frame')) {
+      logger.warn('Main page interaction failed due to frame detachment, attempting recovery', { 
+        error: error.message 
+      });
+      
+      // If we get frame detachment in main interaction, the page might be changing
+      // Wait a bit and try simpler interactions
+      try {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Try basic page interactions without frame access
+        await page.evaluate(() => {
+          // Trigger click events on common player elements
+          const clickTargets = [
+            'video', '.video', '#video', 
+            '.player', '#player', '.video-player',
+            '.play-button', '.btn-play', '#play-btn',
+            'iframe[src*="player"]', 'iframe[src*="embed"]'
+          ];
+          
+          clickTargets.forEach(selector => {
+            try {
+              const elements = document.querySelectorAll(selector);
+              elements.forEach(el => {
+                el.click();
+                el.dispatchEvent(new Event('click', { bubbles: true }));
+              });
+            } catch (e) {
+              // Continue
+            }
+          });
+        });
+        
+        logger.info('Completed recovery interaction after frame detachment');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (recoveryError) {
+        logger.warn('Recovery interaction also failed', { error: recoveryError.message });
+      }
+    } else {
+      logger.warn('Page interaction error', { error: error.message });
+    }
   }
 }
 
