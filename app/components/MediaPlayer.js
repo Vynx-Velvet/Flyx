@@ -24,65 +24,84 @@ const MediaPlayer = ({
   const [selectedQuality, setSelectedQuality] = useState(-1); // -1 = auto
   const [autoSwitching, setAutoSwitching] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0); // Video duration in seconds
-  const [extractionProgress, setExtractionProgress] = useState(0);
-  const [extractionStartTime, setExtractionStartTime] = useState(null);
-  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(null);
-  const [currentPhase, setCurrentPhase] = useState("");
-  const [phaseDetails, setPhaseDetails] = useState("");
-  const [successfulSteps, setSuccessfulSteps] = useState([]);
+  
+  // Enhanced loading state with real-time progress
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingPhase, setLoadingPhase] = useState('initializing');
+  const [timeElapsed, setTimeElapsed] = useState(0);
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(20);
+  const [loadingStartTime, setLoadingStartTime] = useState(null);
+  const [currentFactIndex, setCurrentFactIndex] = useState(0);
+  const [progressEventSource, setProgressEventSource] = useState(null);
+  const [extractionCompleted, setExtractionCompleted] = useState(false);
+  
   const videoRef = useRef(null);
 
-  // Extraction phases for better progress tracking
-  const extractionPhases = [
-    { name: "Initializing", description: "Setting up extraction environment", duration: 2 },
-    { name: "Connecting", description: "Establishing connection to extraction service", duration: 3 },
-    { name: "Browser Launch", description: "Starting automated browser session", duration: 5 },
-    { name: "Navigation", description: "Navigating to content source", duration: 4 },
-    { name: "Content Analysis", description: "Analyzing page structure and content", duration: 6 },
-    { name: "Stream Detection", description: "Detecting available stream sources", duration: 8 },
-    { name: "Quality Check", description: "Validating stream quality and format", duration: 4 },
-    { name: "URL Extraction", description: "Extracting clean stream URL", duration: 3 },
-    { name: "Verification", description: "Verifying stream accessibility", duration: 2 },
-    { name: "Finalizing", description: "Preparing stream for playback", duration: 1 }
+  // Fun facts to rotate through during loading
+  const funFacts = [
+    "💡 We're using advanced browser automation to extract your stream securely!",
+    "🔒 Your privacy is protected - all extraction happens on our secure servers.",
+    "🎬 Did you know? We support multiple streaming sources for maximum reliability.",
+    "⚡ Our service processes over 10,000 stream requests daily!",
+    "🛡️ Advanced anti-bot measures help us bypass streaming restrictions.",
+    "🌐 Stream extraction typically takes 15-25 seconds for the best quality.",
+    "🎯 We automatically detect the highest quality stream available.",
+    "🔄 If one server fails, we'll automatically try backup sources.",
+    "📺 HLS streams provide adaptive quality based on your connection.",
+    "🚀 Our VM service ensures consistent performance and reliability."
   ];
 
-  // Calculate estimated time remaining based on current progress
-  const updateTimeEstimate = (currentStepIndex, stepStartTime) => {
-    if (!extractionStartTime) return;
-    
-    const elapsed = Date.now() - extractionStartTime;
-    const totalSteps = extractionPhases.length;
-    const completedSteps = currentStepIndex;
-    const avgTimePerStep = elapsed / Math.max(completedSteps, 1);
-    const remainingSteps = totalSteps - completedSteps;
-    const estimated = Math.max(0, remainingSteps * avgTimePerStep);
-    
-    setEstimatedTimeRemaining(Math.round(estimated / 1000));
+  // Loading phases with estimated durations
+  const loadingPhases = {
+    initializing: { label: 'Initializing extraction service', progress: 5 },
+    connecting: { label: 'Connecting to streaming server', progress: 15 },
+    navigating: { label: 'Setting up browser environment', progress: 35 },
+    bypassing: { label: 'Bypassing security measures', progress: 50 },
+    extracting: { label: 'Extracting stream URLs', progress: 80 },
+    validating: { label: 'Validating stream quality', progress: 90 },
+    finalizing: { label: 'Preparing playback', progress: 95 },
+    complete: { label: 'Stream ready!', progress: 100 }
   };
 
-  // Enhanced step tracking with progress updates
-  const updateExtractionStep = (step, details = "", progressPercent = null) => {
-    setExtractionStep(step);
-    setPhaseDetails(details);
-    
-    // Find current phase
-    const phaseIndex = extractionPhases.findIndex(phase => 
-      step.toLowerCase().includes(phase.name.toLowerCase()) ||
-      phase.description.toLowerCase().includes(step.toLowerCase())
-    );
-    
-    if (phaseIndex >= 0) {
-      setCurrentPhase(extractionPhases[phaseIndex].name);
-      const calculatedProgress = Math.round(((phaseIndex + 1) / extractionPhases.length) * 100);
-      setExtractionProgress(progressPercent || calculatedProgress);
-      updateTimeEstimate(phaseIndex + 1, Date.now());
-      
-      // Add to successful steps
-      if (!successfulSteps.includes(extractionPhases[phaseIndex].name)) {
-        setSuccessfulSteps(prev => [...prev, extractionPhases[phaseIndex].name]);
-      }
+  // Timer for elapsed time tracking only (no progress simulation)
+  useEffect(() => {
+    if (loading && !loadingStartTime) {
+      setLoadingStartTime(Date.now());
     }
-  };
+    
+    if (loading && loadingStartTime) {
+      const timer = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - loadingStartTime) / 1000);
+        setTimeElapsed(elapsed);
+        
+        // Calculate estimated time remaining based on current progress
+        if (loadingProgress > 0) {
+          const progressPercentage = loadingProgress / 100;
+          const estimatedTotal = elapsed / progressPercentage;
+          const remaining = Math.max(0, Math.round(estimatedTotal - elapsed));
+          setEstimatedTimeRemaining(remaining);
+        } else {
+          // Initial estimate before progress starts
+          setEstimatedTimeRemaining(20);
+        }
+      }, 1000);
+      
+      return () => clearInterval(timer);
+    }
+  }, [loading, loadingStartTime, loadingProgress]);
+
+  // Timer for rotating fun facts
+  useEffect(() => {
+    if (loading) {
+      const factTimer = setInterval(() => {
+        setCurrentFactIndex(prev => (prev + 1) % funFacts.length);
+      }, 4000); // Change fact every 4 seconds
+      
+      return () => clearInterval(factTimer);
+    }
+  }, [loading, funFacts.length]);
+
+  // Remove conflicting progress updates that cause flickering
 
   // Helper function to format bitrate for display
   const formatBitrate = (bitrate) => {
@@ -213,7 +232,6 @@ const MediaPlayer = ({
       // Event listeners
       hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         console.log('HLS manifest parsed, levels:', data.levels);
-        updateExtractionStep("Stream manifest loaded successfully!");
         
         // Extract quality levels
         const qualityLevels = data.levels.map((level, index) => ({
@@ -225,7 +243,6 @@ const MediaPlayer = ({
         }));
         
         setQualities(qualityLevels);
-        setStreamType('hls');
         
         // Auto-play if possible
         if (videoRef.current) {
@@ -309,13 +326,20 @@ const MediaPlayer = ({
       setQualities([]);
       setSelectedQuality(-1);
       setAutoSwitching(false);
-      setExtractionProgress(0);
-      setExtractionStartTime(Date.now());
-      setEstimatedTimeRemaining(null);
-      setCurrentPhase("");
-      setPhaseDetails("");
-      setSuccessfulSteps([]);
-      updateExtractionStep("Initializing...", "Setting up extraction environment");
+      setExtractionStep("Initializing...");
+      
+      // Reset enhanced loading states
+      setLoadingProgress(0);
+      setLoadingPhase('initializing');
+      setTimeElapsed(0);
+      setEstimatedTimeRemaining(20);
+      setLoadingStartTime(null); // Will be set when timer starts
+      setCurrentFactIndex(0);
+      setExtractionCompleted(false);
+      
+      // Local tracking variables to avoid race conditions
+      let localExtractionCompleted = false;
+      let localProgress = 0;
       
       // Clean up existing HLS instance
       if (hlsInstance) {
@@ -323,178 +347,224 @@ const MediaPlayer = ({
         setHlsInstance(null);
       }
       
+      // Close existing progress stream
+      if (progressEventSource) {
+        progressEventSource.close();
+        setProgressEventSource(null);
+      }
+      
       try {
-        updateExtractionStep("Connecting to extraction service...", "Establishing secure connection to VM extractor");
-        
-        // Build API parameters
+        // Build API parameters for progress stream
         const params = new URLSearchParams();
-          params.append('mediaType', mediaType);
-          params.append('movieId', movieId.toString());
+        params.append('mediaType', mediaType);
+        params.append('movieId', movieId.toString());
         params.append('server', server === "Vidsrc.xyz" ? "vidsrc.xyz" : "embed.su");
-          
-          if (mediaType === 'tv') {
-            params.append('seasonId', seasonId.toString());
-            params.append('episodeId', episodeId.toString());
+        
+        if (mediaType === 'tv') {
+          params.append('seasonId', seasonId.toString());
+          params.append('episodeId', episodeId.toString());
         }
         
-        updateExtractionStep("Launching browser automation...", "Starting stealth browser session on VM");
+        // Create Server-Sent Events connection for real-time progress
+        const progressUrl = `/api/extract-stream-progress?${params}`;
+        console.log('🌐 Starting real-time progress stream:', progressUrl);
         
-        // Use the serverless function which will proxy to the VM extractor
-        const fullUrl = `/api/extract-stream?${params}`;
+        const eventSource = new EventSource(progressUrl);
+        setProgressEventSource(eventSource);
         
-        console.log('🌐 Calling serverless extract proxy:', {
-          fullUrl,
-          params: params.toString()
-        });
+        console.log('🔌 EventSource created:', progressUrl);
+        console.log('🔌 EventSource readyState:', eventSource.readyState);
         
-        updateExtractionStep("Navigation", "Navigating to content source");
-        
-        const extractResponse = await fetch(fullUrl, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
-        
-        console.log('📡 Extract service response:', {
-          status: extractResponse.status,
-          statusText: extractResponse.statusText,
-          ok: extractResponse.ok,
-          headers: Object.fromEntries(extractResponse.headers.entries())
-        });
-        
-        updateExtractionStep("Content Analysis", "Analyzing page structure and content");
-        
-        if (!extractResponse.ok) {
-          const errorText = await extractResponse.text();
-          console.error('❌ Extract service error:', {
-            status: extractResponse.status,
-            statusText: extractResponse.statusText,
-            responseText: errorText
-          });
-          throw new Error(`Extract service error: ${extractResponse.status} ${extractResponse.statusText}`);
-        }
-        
-        updateExtractionStep("Stream Detection", "Detecting available stream sources");
-        const extractData = await extractResponse.json();
-        
-        if (extractData.success && extractData.streamUrl) {
-          setRequestId(extractData.requestId);
-          updateExtractionStep("Quality Check", "Validating stream quality and format");
-          
-          // Small delay to show quality check phase
-          await new Promise(resolve => setTimeout(resolve, 800));
-          
-          updateExtractionStep("URL Extraction", "Extracting clean stream URL");
-          
-          // Determine proxy vs direct access based on URL and server
-          const isVidsrc = extractData.server === 'vidsrc.xyz';
-          const isShadowlandschronicles = extractData.streamUrl.includes('shadowlandschronicles');
-          let finalStreamUrl;
-          
-          if (isVidsrc && !isShadowlandschronicles) {
-              // For non-shadowlandschronicles vidsrc URLs, use direct access
-              finalStreamUrl = extractData.streamUrl;
-              console.log('Using direct access for vidsrc.xyz URL - no proxy needed');
-              updateExtractionStep("Verification", "Verifying direct stream accessibility");
-          } else if (isVidsrc && isShadowlandschronicles) {
-              // For shadowlandschronicles URLs from vidsrc, use proxy with clean headers
-              finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=vidsrc`;
-              console.log('Using proxy for shadowlandschronicles URL - clean headers needed for CORS');
-              updateExtractionStep("Verification", "Setting up proxy for shadowlandschronicles stream");
-          } else {
-              // For embed.su URLs, use proxy with header masking
-              finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=embed.su`;
-              console.log('Using proxy for embed.su URL - masking headers');
-              updateExtractionStep("Verification", "Setting up proxy for embed.su stream");
+        // Set a timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+          if (localProgress < 100 && !localExtractionCompleted) {
+            console.error('❌ Extraction timeout after 90 seconds');
+            setError('Extraction timeout - please try again or switch servers');
+            setLoading(false);
+            eventSource.close();
+            setProgressEventSource(null);
           }
-          
-          // Small delay to show verification phase
-          await new Promise(resolve => setTimeout(resolve, 600));
-          
-          setStreamUrl(finalStreamUrl);
-          
-          console.log('Stream extraction successful:', {
-            server,
-            originalUrl: extractData.streamUrl,
-            finalUrl: finalStreamUrl,
-            isDirect: isVidsrc && !isShadowlandschronicles,
-            isShadowlandschronicles,
-            routingReason: isVidsrc && !isShadowlandschronicles ? 'direct access' : 
-                         isVidsrc && isShadowlandschronicles ? 'proxy for CORS' : 'proxy for embed.su',
-            requestId: extractData.requestId
-          });
-          
-          // Determine if this is an HLS stream
-          const isHLS = extractData.streamUrl.includes('.m3u8') || extractData.type === 'hls';
-          
-          updateExtractionStep("Finalizing", "Preparing stream for playback");
-          
-          // Small delay to show finalization
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          if (isHLS) {
-            setStreamType('hls');
-            setExtractionProgress(100);
-            // Small delay to show completion before transitioning
-            setTimeout(() => setLoading(false), 800);
-          } else {
-            // Direct video stream (MP4, etc.)
-            setStreamType('mp4');
-            setExtractionProgress(100);
-            // Small delay to show completion before transitioning
-            setTimeout(() => setLoading(false), 800);
-          }
-          
-        } else {
-          const errorMsg = extractData.error || 'Failed to extract stream URL';
-          const debug = extractData.debug || {};
-          
-          console.error('Stream extraction failed:', {
-            error: errorMsg,
-            requestId: extractData.requestId,
-            server,
-            mediaType,
-            movieId,
-            debug
-          });
-          
-          // Check if this was a 404 from vidsrc.xyz and auto-retry with embed.su
-          if (server === "Vidsrc.xyz" && debug.wasNavigationError && debug.navigationStatus === 404) {
-            console.log('vidsrc.xyz returned 404, automatically switching to Embed.su...');
-            setAutoSwitching(true);
-            updateExtractionStep("Content not found on vidsrc.xyz, switching to Embed.su...");
+        }, 90000); // 90 second timeout
+        
+        eventSource.onopen = () => {
+          console.log('🟢 EventSource connection opened');
+        };
+
+        eventSource.onmessage = (event) => {
+          try {
+            console.log('📨 Raw EventSource message received:', event.data);
+            const data = JSON.parse(event.data);
+            console.log('📡 VM Progress update:', data);
             
-            // Give user time to see the message, then switch servers
-            setTimeout(() => {
-              setAutoSwitching(false);
-              setServer("Embed.su");
-            }, 2000);
-            return; // Exit without setting error - this will trigger useEffect again with new server
+            // Update local tracking variables immediately
+            if (typeof data.progress === 'number') {
+              localProgress = data.progress;
+            }
+            
+            // Update UI based on real-time VM progress
+            if (data.phase) setLoadingPhase(data.phase);
+            if (typeof data.progress === 'number') setLoadingProgress(data.progress);
+            if (data.message) setExtractionStep(data.message);
+            
+            // Time remaining is calculated by the timer useEffect, no need to duplicate here
+            
+            // Handle completion
+            if (data.phase === 'complete') {
+              console.log('🎯 Completion phase detected!', data);
+              
+              // Mark completion immediately in local variable
+              localExtractionCompleted = true;
+              localProgress = 100;
+              
+              if (!data.result) {
+                console.error('❌ No result data in completion event:', data);
+                setError('Completion event missing result data');
+                clearTimeout(timeoutId);
+                setLoading(false);
+                eventSource.close();
+                setProgressEventSource(null);
+                return;
+              }
+              
+              console.log('🎉 Processing completion data:', data.result);
+              
+              const extractData = data.result;
+              
+              // Validate essential data
+              if (!extractData.success || !extractData.streamUrl) {
+                console.error('❌ Invalid completion data:', extractData);
+                setError('Invalid stream data received from extraction service');
+                setLoading(false);
+                eventSource.close();
+                setProgressEventSource(null);
+                return;
+              }
+              
+              setRequestId(extractData.requestId);
+              
+              // Process stream URL
+              const isVidsrc = extractData.server === 'vidsrc.xyz';
+              const isShadowlandschronicles = extractData.streamUrl.includes('shadowlandschronicles');
+              let finalStreamUrl;
+              
+              if (isVidsrc && !isShadowlandschronicles) {
+                finalStreamUrl = extractData.streamUrl;
+                console.log('Using direct access for vidsrc.xyz URL');
+              } else if (isVidsrc && isShadowlandschronicles) {
+                finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=vidsrc`;
+                console.log('Using proxy for shadowlandschronicles URL');
+              } else {
+                finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=embed.su`;
+                console.log('Using proxy for embed.su URL');
+              }
+              
+              console.log('🔗 Setting stream URL:', finalStreamUrl.substring(0, 100) + '...');
+              setStreamUrl(finalStreamUrl);
+              
+              // Determine stream type
+              const isHLS = extractData.streamUrl.includes('.m3u8') || extractData.type === 'hls';
+              console.log('🎥 Setting stream type:', isHLS ? 'hls' : 'mp4');
+              setStreamType(isHLS ? 'hls' : 'mp4');
+              
+              console.log('✅ Stream extraction completed successfully:', {
+                server,
+                originalUrl: extractData.streamUrl,
+                finalUrl: finalStreamUrl,
+                streamType: isHLS ? 'hls' : 'mp4',
+                requestId: extractData.requestId,
+                totalFound: extractData.totalFound,
+                m3u8Count: extractData.m3u8Count
+              });
+              
+              // Mark extraction as completed
+              setExtractionCompleted(true);
+              
+              // Complete loading after brief delay
+              setTimeout(() => {
+                clearTimeout(timeoutId);
+                setLoading(false);
+                eventSource.close();
+                setProgressEventSource(null);
+              }, 800);
+              
+              return; // Exit handler after successful completion
+            }
+            
+            // Handle auto-switch scenario
+            if (data.phase === 'autoswitch') {
+              console.log('🔄 Auto-switching server:', data);
+              setAutoSwitching(true);
+              setExtractionStep(data.message);
+              
+              // Switch to embed.su after brief delay
+              setTimeout(() => {
+                clearTimeout(timeoutId);
+                setAutoSwitching(false);
+                setServer("Embed.su");
+                eventSource.close();
+                setProgressEventSource(null);
+              }, 2000);
+              return;
+            }
+            
+            // Handle errors
+            if (data.error) {
+              console.error('❌ Real-time progress error:', data);
+              clearTimeout(timeoutId);
+              setError(data.message || 'Stream extraction failed');
+              setLoading(false);
+              eventSource.close();
+              setProgressEventSource(null);
+            }
+            
+          } catch (parseError) {
+            console.error('❌ Error parsing progress data:', parseError);
+            console.error('Raw event data:', event.data);
+            clearTimeout(timeoutId);
+            setError('Failed to process extraction progress data');
+            setLoading(false);
+            eventSource.close();
+            setProgressEventSource(null);
+          }
+        };
+        
+        eventSource.onerror = (error) => {
+          console.log('🔔 EventSource error event:', error);
+          console.log('EventSource readyState:', eventSource.readyState);
+          console.log('Current loading progress (state):', loadingProgress);
+          console.log('Current loading progress (local):', localProgress);
+          console.log('Current loading phase:', loadingPhase);
+          console.log('Extraction completed (state):', extractionCompleted);
+          console.log('Extraction completed (local):', localExtractionCompleted);
+          
+          // Check the readyState to understand what happened
+          if (eventSource.readyState === EventSource.CLOSED) {
+            console.log('🔴 EventSource was closed by server (normal after completion)');
+            
+            // If extraction completed (using local variable for immediate check), this is expected
+            if (localExtractionCompleted || localProgress >= 100 || extractionCompleted || loadingProgress >= 100) {
+              console.log('✅ Server closed connection after successful completion - this is normal');
+              return; // Don't treat this as an error
+            }
           }
           
-          setError(errorMsg);
-          setLoading(false);
-        }
+          // Only treat as actual error if extraction hasn't completed and progress is low
+          if (!localExtractionCompleted && localProgress < 90 && !extractionCompleted && loadingProgress < 90) {
+            console.error('❌ Genuine connection error occurred');
+            clearTimeout(timeoutId);
+            setError(`Connection lost during extraction (progress: ${localProgress || loadingProgress}%)`);
+            setLoading(false);
+          } else {
+            console.log('✅ Ignoring error - extraction was successful or nearly complete');
+          }
+          
+          eventSource.close();
+          setProgressEventSource(null);
+        };
+        
       } catch (err) {
-        console.error('Stream extraction error:', {
-          error: err.message,
-          server,
-          mediaType,
-          movieId,
-          step: extractionStep
-        });
-        
-        let errorMessage = 'Failed to load stream';
-        if (err.name === 'AbortError') {
-          errorMessage = 'Stream extraction timeout - please try again';
-        } else if (err.message.includes('HTTP')) {
-          errorMessage = `Server error: ${err.message}`;
-        } else if (err.message.includes('network')) {
-          errorMessage = 'Network error - check your connection';
-        }
-        
-        setError(errorMessage);
+        console.error('Stream extraction setup error:', err);
+        setError('Failed to initialize stream extraction');
         setLoading(false);
       }
     };
@@ -506,6 +576,14 @@ const MediaPlayer = ({
 
   // Initialize HLS when video element becomes available
   useEffect(() => {
+    console.log('🎬 HLS initialization useEffect triggered:', {
+      streamUrl: streamUrl ? streamUrl.substring(0, 100) + '...' : null,
+      streamType,
+      videoRefCurrent: !!videoRef.current,
+      hlsInstance: !!hlsInstance,
+      shouldInitialize: streamUrl && streamType === 'hls' && videoRef.current && !hlsInstance
+    });
+    
     if (streamUrl && streamType === 'hls' && videoRef.current && !hlsInstance) {
       console.log('Video element ready, initializing HLS...');
       initializeHlsPlayer(streamUrl);
@@ -514,6 +592,13 @@ const MediaPlayer = ({
 
   // Initialize direct video streams
   useEffect(() => {
+    console.log('🎬 Direct video initialization useEffect triggered:', {
+      streamUrl: streamUrl ? streamUrl.substring(0, 100) + '...' : null,
+      streamType,
+      videoRefCurrent: !!videoRef.current,
+      shouldInitialize: streamUrl && streamType === 'mp4' && videoRef.current
+    });
+    
     if (streamUrl && streamType === 'mp4' && videoRef.current) {
       console.log('Setting up direct video stream...');
       videoRef.current.src = streamUrl;
@@ -527,8 +612,11 @@ const MediaPlayer = ({
       if (hlsInstance) {
         hlsInstance.destroy();
       }
+      if (progressEventSource) {
+        progressEventSource.close();
+      }
     };
-  }, []);
+  }, [hlsInstance, progressEventSource]);
 
   const handleServerChange = (event) => {
     const newServer = event.target.value;
@@ -600,90 +688,122 @@ const MediaPlayer = ({
       <div className={styles.mediaPlayer}>
         {(loading || autoSwitching) && (
           <div className={styles.loadingContainer}>
-            {autoSwitching ? (
-              <div className={styles.switchingContainer}>
+            <div className={styles.enhancedLoadingInterface}>
+              {/* Main spinner with progress ring */}
+              <div className={styles.progressSpinnerContainer}>
                 <div className={styles.loadingSpinner}></div>
-                <div className={styles.loadingText}>
-                  <p>🔄 Switching to Embed.su...</p>
-                  <p className={styles.loadingStep}>Content not found on vidsrc.xyz</p>
-                  <p className={styles.loadingHint}>Trying backup server automatically</p>
+                <svg className={styles.progressRing} width="120" height="120">
+                  <circle
+                    className={styles.progressRingBackground}
+                    cx="60"
+                    cy="60"
+                    r="50"
+                    fill="none"
+                    stroke="rgba(59, 130, 246, 0.2)"
+                    strokeWidth="3"
+                  />
+                  <circle
+                    className={styles.progressRingProgress}
+                    cx="60"
+                    cy="60"
+                    r="50"
+                    fill="none"
+                    stroke="url(#progressGradient)"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(loadingProgress / 100) * 314} 314`}
+                    transform="rotate(-90 60 60)"
+                    data-complete={loadingProgress >= 100}
+                  />
+                  <defs>
+                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#3b82f6" />
+                      <stop offset="50%" stopColor="#a855f7" />
+                      <stop offset="100%" stopColor="#ec4899" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                
+                {/* Progress percentage */}
+                <div 
+                  className={styles.progressPercentage}
+                  data-complete={loadingProgress >= 100}
+                >
+                  {Math.round(loadingProgress)}%
                 </div>
               </div>
-            ) : (
-              <div className={styles.enhancedLoadingContainer}>
-                {/* Progress Ring */}
-                <div className={styles.progressRing}>
-                  <svg className={styles.progressSvg} viewBox="0 0 120 120">
-                    <circle
-                      className={styles.progressTrack}
-                      cx="60"
-                      cy="60"
-                      r="54"
-                      fill="none"
-                      strokeWidth="8"
-                    />
-                    <circle
-                      className={styles.progressBar}
-                      cx="60"
-                      cy="60"
-                      r="54"
-                      fill="none"
-                      strokeWidth="8"
-                      strokeDasharray={`${2 * Math.PI * 54}`}
-                      strokeDashoffset={`${2 * Math.PI * 54 * (1 - extractionProgress / 100)}`}
-                    />
-                  </svg>
-                  <div className={styles.progressText}>
-                    <span className={styles.progressPercent}>{extractionProgress}%</span>
-                    <span className={styles.progressLabel}>Complete</span>
-                  </div>
-                </div>
 
-                {/* Current Phase */}
-                <div className={styles.phaseInfo}>
-                  <h3 className={styles.currentPhase}>{currentPhase || extractionStep}</h3>
-                  <p className={styles.phaseDescription}>{phaseDetails}</p>
-                  
-                  {/* Time Estimate */}
-                  {estimatedTimeRemaining !== null && (
-                    <div className={styles.timeEstimate}>
-                      <span className={styles.timeIcon}>⏱️</span>
-                      <span>~{estimatedTimeRemaining}s remaining</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Phase Progress */}
-                <div className={styles.phaseProgress}>
-                  {extractionPhases.map((phase, index) => (
-                    <div 
-                      key={phase.name}
-                      className={`${styles.phaseStep} ${
-                        successfulSteps.includes(phase.name) ? styles.completed :
-                        currentPhase === phase.name ? styles.active : styles.pending
-                      }`}
-                    >
-                      <div className={styles.stepIcon}>
-                        {successfulSteps.includes(phase.name) ? '✓' : 
-                         currentPhase === phase.name ? '⟳' : '○'}
+              {/* Status information */}
+              <div className={styles.loadingStatus}>
+                {autoSwitching ? (
+                  <>
+                    <h3 className={styles.loadingTitle}>🔄 Switching Server</h3>
+                    <p className={styles.loadingPhase}>Content not found on vidsrc.xyz</p>
+                    <p className={styles.loadingStep}>Trying backup server automatically</p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className={styles.loadingTitle}>
+                      {loadingProgress >= 100 ? '✅ Extraction Complete!' : `🎯 Extracting from ${server}`}
+                    </h3>
+                    <p className={styles.loadingPhase}>
+                      {loadingProgress >= 100 ? 'Starting video playback...' : (loadingPhases[loadingPhase]?.label || 'Processing...')}
+                    </p>
+                    {extractionStep && (
+                      <p className={styles.loadingStep}>{extractionStep}</p>
+                    )}
+                    
+                    {/* Time information */}
+                    <div className={styles.timeInfo}>
+                      <div className={styles.timeItem}>
+                        <span className={styles.timeLabel}>Elapsed:</span>
+                        <span className={styles.timeValue}>{timeElapsed}s</span>
                       </div>
-                      <span className={styles.stepName}>{phase.name}</span>
+                      <div className={styles.timeItem}>
+                        <span className={styles.timeLabel}>Remaining:</span>
+                        <span className={styles.timeValue}>~{estimatedTimeRemaining}s</span>
+                      </div>
                     </div>
-                  ))}
-                </div>
 
-                {/* Server Info */}
-                <div className={styles.extractionInfo}>
-                  <p className={styles.serverInfo}>
-                    <span className={styles.serverIcon}>🎬</span>
-                    Extracting from {server}
-                  </p>
-                  {requestId && (
-                    <p className={styles.requestId}>Request ID: {requestId}</p>
-                  )}
-                </div>
+                    {/* Phase progress indicators */}
+                    <div className={styles.phaseIndicators}>
+                      {Object.entries(loadingPhases).map(([phase, info], index) => {
+                        // Use loadingProgress to determine status instead of phase comparison
+                        const isCompleted = loadingProgress > info.progress;
+                        const isActive = loadingPhase === phase && loadingProgress <= info.progress;
+                        
+                        return (
+                          <div 
+                            key={phase}
+                            className={`${styles.phaseIndicator} ${
+                              isActive ? styles.active : 
+                              isCompleted ? styles.completed : ''
+                            }`}
+                          >
+                            <div className={styles.phaseIcon}>
+                              {isCompleted ? '✓' : 
+                               isActive ? '⟳' : '·'}
+                            </div>
+                            <span className={styles.phaseLabel}>{info.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Fun facts to keep user engaged */}
+                    <div className={styles.funFacts}>
+                      <p className={styles.funFact} key={currentFactIndex}>
+                        {funFacts[currentFactIndex]}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {requestId && (
+                  <p className={styles.requestId}>Request ID: {requestId}</p>
+                )}
               </div>
-            )}
+            </div>
           </div>
         )}
         
@@ -709,39 +829,19 @@ const MediaPlayer = ({
         )}
         
         {streamUrl && !loading && !error && !autoSwitching && (
-          <div className={styles.videoContainer}>
-            {/* Quality Selector for HLS streams */}
-            {streamType === 'hls' && qualities.length > 0 && (
-              <div className={styles.qualitySelector}>
-                <label htmlFor="quality" className={styles.qualityLabel}>Quality: </label>
-                <select 
-                  id="quality" 
-                  value={selectedQuality} 
-                  onChange={(e) => handleQualityChange(parseInt(e.target.value))}
-                  className={styles.qualityDropdown}
-                >
-                  <option value={-1}>Auto</option>
-                  {qualities.map((quality, index) => (
-                    <option key={index} value={index}>
-                      {formatQualityLabel(quality)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            
+          <div className={styles.videoContainer}>            
             <div className={styles.videoWrapper}>
-            <video
-              ref={videoRef}
-              controls
-              autoPlay
-              width="100%"
-              height="100%"
+              <video
+                ref={videoRef}
+                controls
+                autoPlay
+                width="100%"
+                height="100%"
                 className={styles.videoElement}
-              onError={handleVideoError}
-              onLoadStart={() => console.log('Video loading started')}
-              onCanPlay={() => console.log('Video can start playing')}
-              onPlaying={() => console.log('Video playback started')}
+                onError={handleVideoError}
+                onLoadStart={() => console.log('Video loading started')}
+                onCanPlay={() => console.log('Video can start playing')}
+                onPlaying={() => console.log('Video playback started')}
                 onLoadedMetadata={(e) => {
                   const duration = e.target.duration;
                   setVideoDuration(duration);
@@ -752,102 +852,102 @@ const MediaPlayer = ({
                   setVideoDuration(duration);
                   console.log(`Video duration updated: ${Math.round(duration / 60)} minutes`);
                 }}
-              crossOrigin="anonymous"
-              preload="metadata"
-            >
-              Your browser does not support the video tag.
-            </video>
-            </div>
-            
-            {/* Stream Info */}
-            {streamType && (
-              <div className={styles.streamInfo}>
-                <span className={styles.streamType}>
-                  {streamType === 'hls' ? '📺 HLS Stream' : '🎥 Direct Stream'}
-                </span>
-                <div className={styles.streamDetails}>
-                {qualities.length > 0 && (
-                    <span className={styles.qualityCount}>
-                      {qualities.length} qualities available
-                    </span>
-                  )}
-                  {videoDuration > 0 && selectedQuality >= 0 && qualities[selectedQuality] && (
-                    <span className={styles.estimatedSize}>
-                      Current: ~{calculateFileSize(qualities[selectedQuality].bitrate, videoDuration)}
-                    </span>
-                  )}
-                  {videoDuration > 0 && selectedQuality === -1 && qualities.length > 0 && (
-                    <span className={styles.estimatedSize}>
-                      Auto Quality (~{Math.round(videoDuration / 60)} min video)
-                  </span>
+                crossOrigin="anonymous"
+                preload="metadata"
+              >
+                Your browser does not support the video tag.
+              </video>
+
+              {/* Overlay Controls */}
+              <div className={styles.videoOverlay}>
+                {/* Quality Selector for HLS streams */}
+                {streamType === 'hls' && qualities.length > 0 && (
+                  <div className={styles.qualitySelector}>
+                    <select 
+                      id="quality" 
+                      value={selectedQuality} 
+                      onChange={(e) => handleQualityChange(parseInt(e.target.value))}
+                      className={styles.qualityDropdown}
+                    >
+                      <option value={-1}>Auto</option>
+                      {qualities.map((quality, index) => (
+                        <option key={index} value={index}>
+                          {formatQualityLabel(quality)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
+
+                {/* Server Selector */}
+                <div className={styles.serverSelector}>
+                  <select 
+                    id="server" 
+                    value={server} 
+                    onChange={handleServerChange}
+                    disabled={loading || autoSwitching}
+                    title="Select streaming server"
+                    className={styles.serverDropdown}
+                  >
+                    <option value="Vidsrc.xyz">🎯 Vidsrc.xyz</option>
+                    <option value="Embed.su">🔄 Embed.su</option>
+                  </select>
                 </div>
+
+                {/* Compact Stream Info */}
+                {streamType && (
+                  <div className={styles.streamInfo}>
+                    <span className={styles.streamType}>
+                      {streamType === 'hls' ? '📺 HLS' : '🎥 Direct'}
+                    </span>
+                    {qualities.length > 0 && (
+                      <span className={styles.qualityCount}>
+                        {qualities.length} qualities
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
       
-      {/* Media Controls */}
-      {mediaType === "tv" && (
-        <div className={styles.mediaControls}>
-          <button
-            onClick={handlePreviousEpisode}
-            disabled={episodeId <= 1 || loading || autoSwitching}
-            className={`${styles.controlButton} ${episodeId <= 1 ? styles.disabled : ""}`}
-            title={episodeId <= 1 ? "No previous episode" : `Go to Episode ${episodeId - 1}`}
-          >
-            ◄ Previous Episode
-          </button>
-          
-          <button
-            onClick={handleNextEpisode}
-            disabled={episodeId >= maxEpisodes || loading || autoSwitching}
-            className={`${styles.controlButton} ${episodeId >= maxEpisodes ? styles.disabled : ""}`}
-            title={episodeId >= maxEpisodes ? "No next episode" : `Go to Episode ${episodeId + 1}`}
-          >
-            Next Episode ►
-          </button>
-        </div>
-      )}
-      
-      {/* Other Options */}
-      <div className={styles.otherOptions}>
-        <div className={styles.optionsRow}>
+      {/* Compact Controls Bar */}
+      <div className={styles.compactControls}>
         <button 
           onClick={handleBackToShowDetails} 
-            className={styles.controlButton}
-            disabled={loading || autoSwitching}
+          className={styles.compactButton}
+          disabled={loading || autoSwitching}
         >
-          ◄ Back to Show Details
+          ◄ Back
         </button>
         
-          <div className={styles.serverSelector}>
-            <label htmlFor="server" className={styles.serverLabel}>Choose Server: </label>
-          <select 
-            id="server" 
-            value={server} 
-            onChange={handleServerChange}
-              disabled={loading || autoSwitching}
-            title="Select streaming server"
-              className={styles.serverDropdown}
-          >
-              <option value="Vidsrc.xyz">🎯 Vidsrc.xyz (Primary)</option>
-              <option value="Embed.su">🔄 Embed.su (Backup)</option>
-          </select>
+        {mediaType === "tv" && (
+          <div className={styles.episodeControls}>
+            <button
+              onClick={handlePreviousEpisode}
+              disabled={episodeId <= 1 || loading || autoSwitching}
+              className={`${styles.compactButton} ${episodeId <= 1 ? styles.disabled : ""}`}
+              title={episodeId <= 1 ? "No previous episode" : `Previous Episode`}
+            >
+              ◄
+            </button>
+            <span className={styles.episodeInfo}>S{seasonId}E{episodeId}</span>
+            <button
+              onClick={handleNextEpisode}
+              disabled={episodeId >= maxEpisodes || loading || autoSwitching}
+              className={`${styles.compactButton} ${episodeId >= maxEpisodes ? styles.disabled : ""}`}
+              title={episodeId >= maxEpisodes ? "No next episode" : `Next Episode`}
+            >
+              ►
+            </button>
           </div>
-        </div>
-        
-        {/* Debug Info */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className={styles.debugInfo}>
-            <p>Media: {mediaType === 'tv' ? `S${seasonId}E${episodeId}` : 'Movie'}</p>
-            <p>ID: {movieId}</p>
-            <p>Server: {server}</p>
-            {requestId && <p>Request: {requestId}</p>}
-            {streamType && <p>Type: {streamType}</p>}
-            {hlsInstance && <p>HLS: Active</p>}
-          </div>
+        )}
+
+        {/* Debug Info - Minimal */}
+        {process.env.NODE_ENV === 'development' && requestId && (
+          <span className={styles.debugId}>ID: {requestId.slice(-8)}</span>
         )}
       </div>
     </div>
