@@ -538,8 +538,9 @@ async function interactWithPage(page, logger) {
     // Wait for page to be ready with realistic timing
     await page.waitForSelector('body', { timeout: 15000 });
     
-    // Simulate human-like page reading time
-    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
+    // LONGER stabilization wait to prevent frame detachment
+    logger.info('Additional page stabilization wait in interaction...');
+    await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 2000));
     
     // Simulate mouse movement and scrolling
     await page.evaluate(() => {
@@ -598,8 +599,9 @@ async function interactWithPage(page, logger) {
              try {
                const frame = await iframe.contentFrame();
                if (frame) {
-                 // Wait for frame to be fully loaded and stable
-                 await new Promise(resolve => setTimeout(resolve, 3000));
+                 // Wait MUCH longer for frame to be fully loaded and stable
+                 logger.info('Waiting for iframe content to fully stabilize...', { iframeIndex: i });
+                 await new Promise(resolve => setTimeout(resolve, 6000)); // Increased from 3s to 6s
                  
                  // Debug: Scan iframe for elements (with detached frame handling)
                  let iframeElements = [];
@@ -1431,13 +1433,110 @@ export async function GET(request) {
            if (success) success(mockPosition);
          };
        }
+       
+       // === FRAME DETACHMENT PREVENTION ===
+       // Prevent common causes of frame detachment
+       
+       // 1. Block iframe removal/replacement
+       const originalRemoveChild = Node.prototype.removeChild;
+       Node.prototype.removeChild = function(child) {
+         if (child && child.tagName === 'IFRAME') {
+           console.log('Prevented iframe removal');
+           return child; // Don't actually remove
+         }
+         return originalRemoveChild.call(this, child);
+       };
+       
+       const originalReplaceChild = Node.prototype.replaceChild;
+       Node.prototype.replaceChild = function(newChild, oldChild) {
+         if (oldChild && oldChild.tagName === 'IFRAME') {
+           console.log('Prevented iframe replacement');
+           return oldChild; // Don't actually replace
+         }
+         return originalReplaceChild.call(this, newChild, oldChild);
+       };
+       
+       // 2. Block location changes that could reload the page
+       try {
+         const originalLocationReload = location.reload;
+         location.reload = function(forceReload) {
+           console.log('Blocked location.reload');
+           return; // Block the reload
+         };
+       } catch (e) {}
+       
+       // 3. Block document.write that could clear the page
+       const originalDocumentWrite = document.write;
+       document.write = function(content) {
+         console.log('Blocked document.write that could detach frames');
+         return; // Block document writes
+       };
+       
+       // 4. Monitor and prevent page unload
+       window.addEventListener('beforeunload', function(e) {
+         console.log('Preventing page unload that could detach frames');
+         e.preventDefault();
+         e.returnValue = '';
+         return '';
+       }, true);
+       
+       // 5. Stabilize iframes after they load
+       const stabilizeIframes = () => {
+         const iframes = document.querySelectorAll('iframe');
+         iframes.forEach((iframe, index) => {
+           try {
+             // Store original src
+             const originalSrc = iframe.src;
+             
+             // Prevent src changes
+             Object.defineProperty(iframe, 'src', {
+               get: () => originalSrc,
+               set: () => {
+                 console.log('Prevented iframe src change that could cause detachment');
+               },
+               configurable: false
+             });
+             
+             console.log(`Stabilized iframe ${index}:`, originalSrc.substring(0, 50));
+           } catch (e) {
+             // Continue if can't stabilize this iframe
+           }
+         });
+       };
+       
+       // Run iframe stabilization multiple times
+       setTimeout(stabilizeIframes, 1000);
+       setTimeout(stabilizeIframes, 3000);
+       setTimeout(stabilizeIframes, 5000);
+       
+       // 6. Prevent DOM mutations that could affect iframes
+       if (window.MutationObserver) {
+         const observer = new MutationObserver(function(mutations) {
+           mutations.forEach(function(mutation) {
+             if (mutation.type === 'childList') {
+               mutation.removedNodes.forEach(function(node) {
+                 if (node.tagName === 'IFRAME') {
+                   console.log('Detected iframe removal attempt - this could cause detachment');
+                   // We already blocked it above, but log it
+                 }
+               });
+             }
+           });
+         });
+         
+         observer.observe(document.body || document.documentElement, {
+           childList: true,
+           subtree: true
+         });
+       }
      });
     
-    // Enable request interception for header modification
+    // Enable request interception for header modification and frame detachment prevention
     await page.setRequestInterception(true);
     
-    // Intercept and modify requests for better stealth
+    // Intercept and modify requests for better stealth + prevent frame detachment
     page.on('request', request => {
+      const url = request.url();
       const headers = {
         ...request.headers(),
         'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
@@ -1452,6 +1551,38 @@ export async function GET(request) {
       // Remove automation headers
       delete headers['x-devtools-emulation-enabled'];
       delete headers['x-client-data'];
+      
+      // PREVENT FRAME DETACHMENT: Block problematic scripts that might reload/replace frames
+      if (request.resourceType() === 'script') {
+        // Block scripts that commonly cause frame detachment
+        const problematicScripts = [
+          'anti-bot', 'bot-detection', 'security', 'protection',
+          'reload', 'refresh', 'navigator', 'detector',
+          'fingerprint', 'validate', 'check', 'verify'
+        ];
+        
+        const shouldBlock = problematicScripts.some(keyword => 
+          url.toLowerCase().includes(keyword)
+        );
+        
+        if (shouldBlock) {
+          logger.debug('Blocking potentially problematic script', { url: url.substring(0, 100) });
+          request.abort('blockedbyclient');
+          return;
+        }
+      }
+      
+      // PREVENT NAVIGATION: Block any navigation requests after initial page load
+      if (request.resourceType() === 'document' && request.isNavigationRequest()) {
+        const isInitialNavigation = !request.redirectChain().length && request.frame() === page.mainFrame();
+        if (!isInitialNavigation) {
+          logger.debug('Blocking navigation request to prevent frame detachment', { 
+            url: url.substring(0, 100) 
+          });
+          request.abort('blockedbyclient');
+          return;
+        }
+      }
       
       request.continue({ headers });
     });
@@ -1596,6 +1727,27 @@ export async function GET(request) {
     }
     
     logger.timing('Navigation took', navigationStart);
+
+    // CRITICAL: Wait for page and frames to fully stabilize before ANY interaction
+    logger.info('Waiting for page and frames to stabilize before interaction...');
+    await new Promise(resolve => setTimeout(resolve, 8000)); // 8 second stabilization wait
+    
+    // Additional frame stability check
+    try {
+      const frameCount = await page.evaluate(() => {
+        const iframes = document.querySelectorAll('iframe');
+        return iframes.length;
+      });
+      logger.info('Frame stability check completed', { frameCount });
+      
+      // Give frames extra time to load their content
+      if (frameCount > 0) {
+        logger.info('Detected iframes, giving additional stabilization time...');
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Additional 5 seconds for iframe content
+      }
+    } catch (e) {
+      logger.debug('Frame stability check failed, proceeding anyway', { error: e.message });
+    }
 
     // Interact with page to trigger stream loading
     let pageInteractionFailed = false;
