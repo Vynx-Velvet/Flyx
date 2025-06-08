@@ -585,10 +585,18 @@ const MediaPlayer = ({
     });
     
     if (streamUrl && streamType === 'hls' && videoRef.current && !hlsInstance) {
-      console.log('Video element ready, initializing HLS...');
+      console.log('🎬 Video element ready, initializing HLS...');
       initializeHlsPlayer(streamUrl);
     }
   }, [streamUrl, streamType, videoRef.current]);
+
+  // Additional effect to handle case where video ref becomes available after stream URL is set
+  useEffect(() => {
+    if (videoRef.current && streamUrl && streamType === 'hls' && !hlsInstance) {
+      console.log('🎬 Video ref became available after stream URL was set, initializing HLS...');
+      initializeHlsPlayer(streamUrl);
+    }
+  }, [videoRef.current]);
 
   // Initialize direct video streams
   useEffect(() => {
@@ -828,35 +836,35 @@ const MediaPlayer = ({
           </div>
         )}
         
-        {streamUrl && !loading && !error && !autoSwitching && (
-          <div className={styles.videoContainer}>            
-            <div className={styles.videoWrapper}>
-              <video
-                ref={videoRef}
-                controls
-                autoPlay
-                width="100%"
-                height="100%"
-                className={styles.videoElement}
-                onError={handleVideoError}
-                onLoadStart={() => console.log('Video loading started')}
-                onCanPlay={() => console.log('Video can start playing')}
-                onPlaying={() => console.log('Video playback started')}
-                onLoadedMetadata={(e) => {
-                  const duration = e.target.duration;
-                  setVideoDuration(duration);
-                  console.log(`Video duration loaded: ${Math.round(duration / 60)} minutes`);
-                }}
-                onDurationChange={(e) => {
-                  const duration = e.target.duration;
-                  setVideoDuration(duration);
-                  console.log(`Video duration updated: ${Math.round(duration / 60)} minutes`);
-                }}
-                crossOrigin="anonymous"
-                preload="metadata"
-              >
-                Your browser does not support the video tag.
-              </video>
+        {/* Video element - always render to ensure ref is available */}
+        <div className={styles.videoContainer} style={{ display: (streamUrl && !loading && !error && !autoSwitching) ? 'block' : 'none' }}>            
+          <div className={styles.videoWrapper}>
+            <video
+              ref={videoRef}
+              controls
+              autoPlay
+              width="100%"
+              height="100%"
+              className={styles.videoElement}
+              onError={handleVideoError}
+              onLoadStart={() => console.log('Video loading started')}
+              onCanPlay={() => console.log('Video can start playing')}
+              onPlaying={() => console.log('Video playback started')}
+              onLoadedMetadata={(e) => {
+                const duration = e.target.duration;
+                setVideoDuration(duration);
+                console.log(`Video duration loaded: ${Math.round(duration / 60)} minutes`);
+              }}
+              onDurationChange={(e) => {
+                const duration = e.target.duration;
+                setVideoDuration(duration);
+                console.log(`Video duration updated: ${Math.round(duration / 60)} minutes`);
+              }}
+              crossOrigin="anonymous"
+              preload="metadata"
+            >
+              Your browser does not support the video tag.
+            </video>
 
               {/* Overlay Controls */}
               <div className={styles.videoOverlay}>
@@ -910,7 +918,7 @@ const MediaPlayer = ({
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
       
       {/* Compact Controls Bar */}
