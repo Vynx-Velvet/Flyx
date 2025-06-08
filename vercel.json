@@ -7,7 +7,7 @@
   "regions": ["iad1"],
   "functions": {
     "app/api/extract-stream/route.js": {
-      "maxDuration": 60,
+      "maxDuration": 300,
       "memory": 3008
     },
     "app/api/stream-proxy/route.js": {

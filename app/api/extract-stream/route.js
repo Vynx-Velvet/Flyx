@@ -313,7 +313,6 @@ async function getBrowserConfig(logger) {
           '--metrics-recording-only',
           '--mute-audio',
           '--no-default-browser-check',
-          '--no-first-run',
           '--disable-cloud-import',
           '--disable-gesture-typing',
           '--disable-offer-store-unmasked-wallet-cards',
@@ -325,7 +324,29 @@ async function getBrowserConfig(logger) {
           '--enable-simple-cache-backend',
           '--enable-tcp-fast-open',
           '--memory-pressure-off',
-          '--max_old_space_size=4096'
+          '--max_old_space_size=4096',
+          // Additional stability flags for serverless
+          '--disable-ipc-flooding-protection',
+          '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+          '--disable-component-extensions-with-background-pages',
+          '--disable-default-apps',
+          '--disable-domain-reliability',
+          '--disable-features=AudioServiceOutOfProcess',
+          '--disable-hang-monitor',
+          '--disable-popup-blocking',
+          '--disable-prompt-on-repost',
+          '--disable-client-side-phishing-detection',
+          '--ignore-certificate-errors',
+          '--ignore-ssl-errors',
+          '--ignore-certificate-errors-spki-list',
+          '--disable-accelerated-2d-canvas',
+          '--disable-accelerated-jpeg-decoding',
+          '--disable-accelerated-mjpeg-decode',
+          '--disable-accelerated-video-decode',
+          '--disable-threaded-animation',
+          '--disable-threaded-scrolling',
+          '--disable-composited-antialiasing',
+          '--force-device-scale-factor=1'
         ]
       };
       
@@ -1330,61 +1351,140 @@ export async function GET(request) {
     // Setup stream interception
     const { streamUrls } = setupStreamInterception(page, logger, url);
 
-    // Navigate to the page
+    // Navigate to the page with retry logic
     logger.info('Navigating to target URL');
     const navigationStart = Date.now();
+    let response = null;
+    let navigationRetries = 0;
+    const maxNavigationRetries = 3;
     
-    try {
-             const response = await page.goto(url, { 
-         waitUntil: 'domcontentloaded',
-         timeout: 30000 
-       });
-      
-      const navigationStatus = response?.status() || 'unknown';
-      logger.info('Page navigation completed', { 
-        status: navigationStatus,
-        url: url.substring(0, 100)
-      });
-      
-      // Check for 404 error (for auto-switching)
-      if (navigationStatus === 404) {
-        logger.warn('404 error detected - page not found', { 
-          status: navigationStatus,
-          server 
+    while (navigationRetries < maxNavigationRetries) {
+      try {
+        // Add small delay before navigation to let browser stabilize
+        if (navigationRetries > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * navigationRetries));
+          logger.info(`Navigation retry ${navigationRetries}/${maxNavigationRetries}`);
+        }
+        
+        // Try different wait strategies based on retry attempt
+        const waitStrategy = navigationRetries === 0 ? 'domcontentloaded' : 
+                           navigationRetries === 1 ? 'load' : 'networkidle0';
+        
+        const timeout = Math.min(30000 + (navigationRetries * 10000), 60000);
+        
+        response = await page.goto(url, { 
+          waitUntil: waitStrategy,
+          timeout: timeout 
         });
         
-        return NextResponse.json({
-          success: false,
-          error: `Content not found on ${server}`,
-          debug: {
-            navigationStatus: 404,
-            wasNavigationError: true,
-            server,
-            suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
-          },
-          requestId
-        }, { status: 404 });
+        const navigationStatus = response?.status() || 'unknown';
+        logger.info('Page navigation completed', { 
+          status: navigationStatus,
+          url: url.substring(0, 100),
+          retry: navigationRetries,
+          waitStrategy
+        });
+        
+        // Check for 404 error (for auto-switching)
+        if (navigationStatus === 404) {
+          logger.warn('404 error detected - page not found', { 
+            status: navigationStatus,
+            server 
+          });
+          
+          return NextResponse.json({
+            success: false,
+            error: `Content not found on ${server}`,
+            debug: {
+              navigationStatus: 404,
+              wasNavigationError: true,
+              server,
+              suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
+            },
+            requestId
+          }, { status: 404 });
+        }
+        
+        // Navigation successful, break out of retry loop
+        break;
+        
+      } catch (navigationError) {
+        navigationRetries++;
+        logger.warn(`Navigation attempt ${navigationRetries} failed`, {
+          error: navigationError.message,
+          url: url.substring(0, 100),
+          retry: navigationRetries
+        });
+        
+        // Handle specific errors
+        if (navigationError.message?.includes('404') || navigationError.message?.includes('ERR_FAILED')) {
+          return NextResponse.json({
+            success: false,
+            error: `Content not found on ${server}`,
+            debug: {
+              wasNavigationError: true,
+              navigationStatus: 404,
+              server,
+              suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
+            },
+            requestId
+          }, { status: 404 });
+        }
+        
+        // If this was the last retry, throw the error
+        if (navigationRetries >= maxNavigationRetries) {
+          logger.error('All navigation retries failed', navigationError, { url });
+          
+          // For frame detached errors, try a different approach
+          if (navigationError.message?.includes('frame was detached') || 
+              navigationError.message?.includes('Target closed')) {
+            logger.warn('Frame detached error - attempting page recreation');
+            
+            try {
+              // Close current page and create a new one
+              await page.close();
+              page = await browser.newPage();
+              
+              // Re-setup the page
+              await page.setViewport({ 
+                width: 1920, 
+                height: 1080, 
+                deviceScaleFactor: 1,
+                hasTouch: false,
+                isLandscape: true,
+                isMobile: false
+              });
+              
+              await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+              
+              // Re-setup stream interception
+              const { streamUrls: newStreamUrls } = setupStreamInterception(page, logger, url);
+              // Update the streamUrls reference
+              streamUrls.splice(0, streamUrls.length, ...newStreamUrls);
+              
+              // Try navigation one more time with simpler settings
+              response = await page.goto(url, { 
+                waitUntil: 'domcontentloaded',
+                timeout: 45000 
+              });
+              
+              logger.info('Page recreation successful after frame detached error');
+              break;
+              
+            } catch (recreationError) {
+              logger.error('Page recreation also failed', recreationError);
+              throw navigationError; // Throw original error
+            }
+          } else {
+            throw navigationError;
+          }
+        }
+        
+        // Wait before retry if not frame detached error
+        if (!navigationError.message?.includes('frame was detached')) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
-      
-    } catch (navigationError) {
-      logger.error('Navigation failed', navigationError, { url });
-      
-      // Check if it's a 404 specifically
-      if (navigationError.message?.includes('404') || navigationError.message?.includes('ERR_FAILED')) {
-        return NextResponse.json({
-          success: false,
-          error: `Content not found on ${server}`,
-          debug: {
-            wasNavigationError: true,
-            navigationStatus: 404,
-            server,
-            suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
-          },
-          requestId
-        }, { status: 404 });
-      }
-      
-      throw navigationError;
     }
     
     logger.timing('Navigation took', navigationStart);
