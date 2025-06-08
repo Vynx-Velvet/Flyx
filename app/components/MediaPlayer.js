@@ -918,7 +918,6 @@ const MediaPlayer = ({
               </div>
             </div>
           </div>
-        </div>
       </div>
       
       {/* Compact Controls Bar */}
