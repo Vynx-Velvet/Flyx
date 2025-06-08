@@ -275,20 +275,62 @@ const MediaPlayer = ({
         
         setExtractionStep("Launching browser automation...");
         
-        const extractResponse = await fetch(`/api/extract-stream?${params}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+        // Use external extract service or fallback to local API
+        const extractServiceUrl = process.env.NEXT_PUBLIC_EXTRACT_SERVICE_URL || 'http://35.188.123.210:3001';
+        const isExternalService = !extractServiceUrl.includes('localhost') && !extractServiceUrl.startsWith('/');
+        const fullUrl = isExternalService ? `${extractServiceUrl}/extract?${params}` : `/api/extract-stream?${params}`;
+        
+        console.log('🌐 Calling extract service:', {
+          extractServiceUrl,
+          isExternalService,
+          fullUrl,
+          params: params.toString()
+        });
+        
+        let extractResponse;
+        try {
+          extractResponse = await fetch(fullUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+        } catch (fetchError) {
+          console.error('❌ Fetch failed:', fetchError.message);
+          if (isExternalService) {
+            console.log('🔄 External service failed, trying local API...');
+            setExtractionStep("External service failed, trying local API...");
+            extractResponse = await fetch(`/api/extract-stream?${params}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+          } else {
+            throw fetchError;
+          }
+        }
+        
+        console.log('📡 Extract service response:', {
+          status: extractResponse.status,
+          statusText: extractResponse.statusText,
+          ok: extractResponse.ok,
+          headers: Object.fromEntries(extractResponse.headers.entries())
         });
         
         setExtractionStep("Processing response...");
-        const extractData = await extractResponse.json();
         
-        // Handle non-200 responses after reading JSON (to get debug info)
-        if (!extractResponse.ok && extractResponse.status !== 404) {
-          throw new Error(`HTTP ${extractResponse.status}: ${extractResponse.statusText}`);
+        if (!extractResponse.ok) {
+          const errorText = await extractResponse.text();
+          console.error('❌ Extract service error:', {
+            status: extractResponse.status,
+            statusText: extractResponse.statusText,
+            responseText: errorText
+          });
+          throw new Error(`Extract service error: ${extractResponse.status} ${extractResponse.statusText}`);
         }
+        
+        const extractData = await extractResponse.json();
         
         if (extractData.success && extractData.streamUrl) {
           setRequestId(extractData.requestId);

@@ -10,7 +10,7 @@
 
 # production
 /build
-
+/extract-stream-service
 # Chromium executable (downloaded locally)
 /bin
 

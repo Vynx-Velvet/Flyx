@@ -94,33 +94,33 @@ function validateParameters(searchParams, logger) {
       }
     } else {
       // Default to embed.su URL construction (backup server)
-      if (mediaType === 'movie') {
-        finalUrl = `https://embed.su/embed/movie/${movieId}`;
-        logger.info('Constructed embed.su movie URL', { 
-          movieId, 
+    if (mediaType === 'movie') {
+      finalUrl = `https://embed.su/embed/movie/${movieId}`;
+      logger.info('Constructed embed.su movie URL', { 
+        movieId, 
           server,
-          constructedUrl: finalUrl 
-        });
-      } else if (mediaType === 'tv' && seasonId && episodeId) {
-        finalUrl = `https://embed.su/embed/tv/${movieId}/${seasonId}/${episodeId}`;
-        logger.info('Constructed embed.su TV episode URL', { 
-          movieId, 
-          seasonId, 
-          episodeId,
+        constructedUrl: finalUrl 
+      });
+    } else if (mediaType === 'tv' && seasonId && episodeId) {
+      finalUrl = `https://embed.su/embed/tv/${movieId}/${seasonId}/${episodeId}`;
+      logger.info('Constructed embed.su TV episode URL', { 
+        movieId, 
+        seasonId, 
+        episodeId, 
           server, 
-          constructedUrl: finalUrl 
-        });
-      } else if (mediaType === 'tv') {
-        logger.error('TV show missing season/episode parameters', null, {
-          movieId,
-          seasonId,
+        constructedUrl: finalUrl 
+      });
+    } else if (mediaType === 'tv') {
+      logger.error('TV show missing season/episode parameters', null, {
+        movieId,
+        seasonId,
           episodeId,
           server
-        });
-        return { 
-          isValid: false, 
-          error: 'TV shows require seasonId and episodeId parameters' 
-        };
+      });
+      return { 
+        isValid: false, 
+        error: 'TV shows require seasonId and episodeId parameters' 
+      };
       }
     }
   }
@@ -185,7 +185,7 @@ async function getBrowserConfig(logger) {
       try {
         if (fs.existsSync(path)) {
           chromeExecutable = path;
-          logger.debug('Found Chrome at:', { path });
+          logger.debug('Found Chrome at:', path);
           break;
         }
       } catch (e) {
@@ -244,182 +244,20 @@ async function getBrowserConfig(logger) {
     };
   } else {
     // Production - use @sparticuz/chromium for serverless
-    logger.info('Using @sparticuz/chromium for serverless environment');
-    
-    try {
-      // Set required environment variables for @sparticuz/chromium
-      process.env.FONTCONFIG_PATH = '/tmp';
-      process.env.LD_LIBRARY_PATH = '/tmp:' + (process.env.LD_LIBRARY_PATH || '');
-      
-      // Get the executable path from @sparticuz/chromium
-      const executablePath = await chromium.executablePath();
-      logger.info('Chromium executable path resolved', { 
-        executablePath: executablePath ? executablePath.substring(0, 100) : 'null' 
-      });
-      
-      // Verify the executable exists if we have access to fs
-      try {
-        const fs = require('fs');
-        if (executablePath && !fs.existsSync(executablePath)) {
-          logger.warn('Chromium executable path does not exist', { executablePath });
-        } else if (executablePath) {
-          // Check if executable has proper permissions
-          try {
-            fs.accessSync(executablePath, fs.constants.X_OK);
-            logger.info('Chromium executable permissions verified');
-          } catch (permError) {
-            logger.warn('Chromium executable permission issue', { error: permError.message });
-            // Try to fix permissions
-            try {
-              fs.chmodSync(executablePath, '755');
-              logger.info('Fixed Chromium executable permissions');
-            } catch (chmodError) {
-              logger.warn('Could not fix permissions', { error: chmodError.message });
-            }
-          }
-        }
-      } catch (fsError) {
-        logger.debug('Could not verify executable path (fs not accessible)', { 
-          error: fsError.message 
-        });
-      }
-      
-      const config = {
-        executablePath,
-        headless: chromium.headless,
-        args: [
-          ...chromium.args,
-          '--disable-web-security',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-blink-features=AutomationControlled',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu',
-          '--disable-dev-shm-usage',
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--single-process', // Important for serverless
-          '--disable-background-timer-throttling',
-          '--disable-renderer-backgrounding',
-          '--disable-backgrounding-occluded-windows',
-          // Additional flags for shared library compatibility
-          '--disable-software-rasterizer',
-          '--disable-background-networking',
-          '--disable-default-apps',
-          '--disable-extensions',
-          '--disable-sync',
-          '--disable-translate',
-          '--hide-scrollbars',
-          '--metrics-recording-only',
-          '--mute-audio',
-          '--no-default-browser-check',
-          '--disable-cloud-import',
-          '--disable-gesture-typing',
-          '--disable-offer-store-unmasked-wallet-cards',
-          '--disable-offer-upload-credit-cards',
-          '--disable-print-preview',
-          '--disable-voice-input',
-          '--disable-wake-on-wifi',
-          '--enable-async-dns',
-          '--enable-simple-cache-backend',
-          '--enable-tcp-fast-open',
-          '--memory-pressure-off',
-          '--max_old_space_size=4096',
-          // Additional stability flags for serverless
-          '--disable-ipc-flooding-protection',
-          '--disable-features=TranslateUI,BlinkGenPropertyTrees',
-          '--disable-component-extensions-with-background-pages',
-          '--disable-default-apps',
-          '--disable-domain-reliability',
-          '--disable-features=AudioServiceOutOfProcess',
-          '--disable-hang-monitor',
-          '--disable-popup-blocking',
-          '--disable-prompt-on-repost',
-          '--disable-client-side-phishing-detection',
-          '--ignore-certificate-errors',
-          '--ignore-ssl-errors',
-          '--ignore-certificate-errors-spki-list',
-          '--disable-accelerated-2d-canvas',
-          '--disable-accelerated-jpeg-decoding',
-          '--disable-accelerated-mjpeg-decode',
-          '--disable-accelerated-video-decode',
-          '--disable-threaded-animation',
-          '--disable-threaded-scrolling',
-          '--disable-composited-antialiasing',
-          '--force-device-scale-factor=1'
-        ]
-      };
-      
-      logger.info('Browser configuration prepared', {
-        hasExecutablePath: !!config.executablePath,
-        headless: config.headless,
-        argsCount: config.args.length
-      });
-      
-      return config;
-    } catch (chromiumError) {
-      logger.error('Failed to configure Chromium for serverless', chromiumError, {
-        errorName: chromiumError.name,
-        errorMessage: chromiumError.message
-      });
-      
-      // Enhanced fallback configuration for serverless without @sparticuz/chromium
-      logger.warn('Falling back to basic serverless configuration');
-      
-      // Try bundled chromium first
-      const path = require('path');
-      const bundledChromiumPath = path.join(process.cwd(), 'bin', 'chromium');
-      
-      try {
-        const fs = require('fs');
-        if (fs.existsSync(bundledChromiumPath)) {
-          logger.info('Found bundled Chromium executable', { path: bundledChromiumPath });
-          return {
-            executablePath: bundledChromiumPath,
-            headless: true,
-            args: [
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-web-security',
-              '--disable-features=VizDisplayCompositor',
-              '--disable-blink-features=AutomationControlled',
-              '--no-first-run',
-              '--no-zygote',
-              '--disable-gpu',
-              '--single-process',
-              '--disable-background-timer-throttling',
-              '--disable-renderer-backgrounding',
-              '--disable-backgrounding-occluded-windows'
-            ]
-          };
-        }
-      } catch (bundledError) {
-        logger.debug('Bundled chromium not available', { error: bundledError.message });
-      }
-      
-      // Final fallback - try system chromium
-      return {
-        headless: true,
-        // Try to use system chromium as fallback
-        executablePath: '/usr/bin/chromium-browser',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-web-security',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-blink-features=AutomationControlled',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu',
-          '--single-process',
-          '--disable-background-timer-throttling',
-          '--disable-renderer-backgrounding',
-          '--disable-backgrounding-occluded-windows'
-        ]
-      };
-    }
+    logger.debug('Using @sparticuz/chromium for serverless environment');
+    return {
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      args: [
+        ...chromium.args,
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--disable-blink-features=AutomationControlled',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu'
+      ]
+    };
   }
 }
 
@@ -538,9 +376,8 @@ async function interactWithPage(page, logger) {
     // Wait for page to be ready with realistic timing
     await page.waitForSelector('body', { timeout: 15000 });
     
-    // LONGER stabilization wait to prevent frame detachment
-    logger.info('Additional page stabilization wait in interaction...');
-    await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 2000));
+    // Simulate human-like page reading time
+    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
     
     // Simulate mouse movement and scrolling
     await page.evaluate(() => {
@@ -567,26 +404,6 @@ async function interactWithPage(page, logger) {
     if (iframes.length > 0) {
       logger.info('Found iframes, attempting to interact', { count: iframes.length });
       
-      // First, try to interact with iframes immediately before they can detach
-      try {
-        for (let i = 0; i < Math.min(iframes.length, 3); i++) {
-          const iframe = iframes[i];
-          try {
-            // Click iframe immediately to trigger any loading
-            await iframe.click();
-            logger.info('Clicked iframe for immediate interaction', { iframeIndex: i });
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          } catch (e) {
-            logger.debug('Could not click iframe immediately', { iframeIndex: i, error: e.message });
-          }
-        }
-        
-        // Wait for any triggered loading to complete
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      } catch (e) {
-        logger.debug('Error during immediate iframe interaction', { error: e.message });
-      }
-      
       for (let i = 0; i < Math.min(iframes.length, 3); i++) {
         try {
           const iframe = iframes[i];
@@ -595,138 +412,60 @@ async function interactWithPage(page, logger) {
           if (src && (src.includes('player') || src.includes('embed') || src.includes('video'))) {
             logger.info('Found video iframe', { src: src.substring(0, 100) });
             
-                         // Try to access iframe content with robust error handling
-             try {
-               const frame = await iframe.contentFrame();
-               if (frame) {
-                 // Wait for frame to be stable but not too long to miss stream loading
-                 logger.info('Waiting for iframe content to stabilize...', { iframeIndex: i });
-                 await new Promise(resolve => setTimeout(resolve, 3000)); // Balanced wait time
-                 
-                 // Debug: Scan iframe for elements (with detached frame handling)
-                 let iframeElements = [];
-                 try {
-                   iframeElements = await frame.evaluate(() => {
-                     const elements = [];
-                     const selectors = ['#pl_but', '.fas.fa-play', 'i.fas.fa-play', '[id*="play"]', '[class*="play"]'];
-                     
-                     selectors.forEach(selector => {
-                       try {
-                         const found = document.querySelectorAll(selector);
-                         found.forEach((el, index) => {
-                           elements.push({
-                             selector,
-                             index,
-                             tagName: el.tagName,
-                             id: el.id,
-                             className: el.className,
-                             innerText: el.innerText?.substring(0, 50),
-                             visible: el.offsetParent !== null,
-                             disabled: el.disabled
-                           });
-                         });
-                       } catch (e) {
-                         // Continue
-                       }
-                     });
-                     
-                     return elements;
-                   });
-                 } catch (frameError) {
-                   if (frameError.message.includes('detached Frame')) {
-                     logger.warn('Frame detached during element scanning, skipping iframe interaction', { 
-                       iframeIndex: i,
-                       src: src.substring(0, 100) 
-                     });
-                     continue; // Skip this iframe and try the next one
-                   }
-                   throw frameError; // Re-throw if it's a different error
-                 }
-                 
-                 logger.info('Elements found in iframe', { iframeIndex: i, elements: iframeElements });
-                 
-                 // Look for play buttons in iframe (prioritizing vidsrc.xyz specific)
-                 try {
-                   const playSelectors = [
-                     '#pl_but',                           // Specific vidsrc.xyz play button ID
-                     '.fas.fa-play',                     // Specific vidsrc.xyz play button class
-                     'button#pl_but',                    // More specific vidsrc button selector
-                     '[id="pl_but"]',                    // Alternative ID selector
-                     'button.fas.fa-play',               // Alternative class selector
-                     'i.fas.fa-play',                    // Icon element with play class
-                     'button[class*="play"]',
-                     'div[class*="play"]',
-                     '[data-testid*="play"]',
-                     '.play-button',
-                     '.video-play-button',
-                     'button[aria-label*="play" i]',
-                     'button[title*="play" i]',
-                     '.play',
-                     '.btn-play',
-                     '#play-btn',
-                     '.play-icon'
-                   ];
-                  
-                  for (const selector of playSelectors) {
-                    try {
-                      const playButton = await frame.$(selector);
-                      if (playButton) {
-                        logger.info('Found play button in iframe', { selector });
-                        await playButton.click();
-                        await new Promise(resolve => setTimeout(resolve, 2000));
-                        break;
-                      }
-                    } catch (e) {
-                      if (e.message.includes('detached Frame')) {
-                        logger.warn('Frame detached during play button search', { selector });
-                        break; // Exit the loop and skip this iframe
-                      }
-                      // Continue for other errors
-                    }
-                  }
-                  
-                  // Try clicking on video elements in iframe
-                  const videoElements = await frame.$$('video, .video, .player');
-                  if (videoElements.length > 0) {
-                    try {
-                      await videoElements[0].click();
-                      logger.info('Clicked video element in iframe');
+            // Try to access iframe content
+            try {
+              const frame = await iframe.contentFrame();
+              if (frame) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Look for play buttons in iframe (prioritizing vidsrc.xyz specific)
+                const playSelectors = [
+                  '#pl_but',                           // Specific vidsrc.xyz play button ID
+                  '.fas.fa-play',                     // Specific vidsrc.xyz play button class
+                  'button#pl_but',                    // More specific vidsrc button selector
+                  '[id="pl_but"]',                    // Alternative ID selector
+                  'button.fas.fa-play',               // Alternative class selector
+                  'button[class*="play"]',
+                  'div[class*="play"]',
+                  '[data-testid*="play"]',
+                  '.play-button',
+                  '.video-play-button',
+                  'button[aria-label*="play" i]',
+                  'button[title*="play" i]',
+                  '.play',
+                  '.btn-play',
+                  '#play-btn',
+                  '.play-icon'
+                ];
+                
+                for (const selector of playSelectors) {
+                  try {
+                    const playButton = await frame.$(selector);
+                    if (playButton) {
+                      logger.info('Found play button in iframe', { selector });
+                      await playButton.click();
                       await new Promise(resolve => setTimeout(resolve, 2000));
-                    } catch (e) {
-                      if (e.message.includes('detached Frame')) {
-                        logger.warn('Frame detached during video element click');
-                      }
-                      // Continue for other errors
+                      break;
                     }
+                  } catch (e) {
+                    // Continue
                   }
-                } catch (frameError) {
-                  if (frameError.message.includes('detached Frame')) {
-                    logger.warn('Frame detached during iframe interaction, skipping to next iframe', { 
-                      iframeIndex: i 
-                    });
-                    continue; // Skip this iframe and try the next one
+                }
+                
+                // Try clicking on video elements in iframe
+                const videoElements = await frame.$$('video, .video, .player');
+                if (videoElements.length > 0) {
+                  try {
+                    await videoElements[0].click();
+                    logger.info('Clicked video element in iframe');
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                  } catch (e) {
+                    // Continue
                   }
-                  // Log other errors but continue
-                  logger.debug('Error during iframe interaction', { error: frameError.message });
                 }
               }
             } catch (e) {
-              if (e.message.includes('detached Frame')) {
-                logger.warn('Frame detached immediately after access, iframe content changed too quickly', {
-                  iframeIndex: i,
-                  src: src.substring(0, 100)
-                });
-                // Try clicking the iframe itself as fallback
-                try {
-                  await iframe.click();
-                  logger.info('Clicked iframe as fallback for detached frame');
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-                } catch (clickError) {
-                  logger.debug('Could not click iframe either', { error: clickError.message });
-                }
-              } else {
-                logger.debug('Could not access iframe content (CORS or other)', { error: e.message });
-              }
+              logger.debug('Could not access iframe content (CORS)');
             }
             
             // Click on the iframe itself
@@ -741,47 +480,15 @@ async function interactWithPage(page, logger) {
           logger.debug('Error interacting with iframe', { index: i, error: e.message });
         }
       }
-         }
-     
-     // Debug: Scan for all potential play elements on the page
-     const allPlayElements = await page.evaluate(() => {
-       const elements = [];
-       const selectors = ['#pl_but', '.fas.fa-play', 'i.fas.fa-play', '[id*="play"]', '[class*="play"]'];
-       
-       selectors.forEach(selector => {
-         try {
-           const found = document.querySelectorAll(selector);
-           found.forEach((el, index) => {
-             elements.push({
-               selector,
-               index,
-               tagName: el.tagName,
-               id: el.id,
-               className: el.className,
-               innerText: el.innerText?.substring(0, 50),
-               visible: el.offsetParent !== null,
-               disabled: el.disabled,
-               src: el.src
-             });
-           });
-         } catch (e) {
-           // Continue
-         }
-       });
-       
-       return elements;
-     });
-     
-     logger.info('All potential play elements found on page', allPlayElements);
-     
-     // Look for and click play buttons in main page (prioritizing vidsrc.xyz specific button)
+    }
+    
+         // Look for and click play buttons in main page (prioritizing vidsrc.xyz specific button)
      const playSelectors = [
        '#pl_but',                                    // Specific vidsrc.xyz play button ID
        '.fas.fa-play',                              // Specific vidsrc.xyz play button class
        'button#pl_but',                             // More specific vidsrc button selector
        '[id="pl_but"]',                             // Alternative ID selector
        'button.fas.fa-play',                        // Alternative class selector
-       'i.fas.fa-play',                             // Icon element with play class
        'button[class*="play"]',
        'div[class*="play"]',
        '[data-testid*="play"]',
@@ -794,6 +501,7 @@ async function interactWithPage(page, logger) {
        '.btn-play',
        '#play-btn',
        '.play-icon',
+       'div[role="button"]',  // Will check text content programmatically if needed
        '[class*="play"][role="button"]',
        '[id*="play"]',
        '.vjs-big-play-button',
@@ -841,6 +549,71 @@ async function interactWithPage(page, logger) {
         }
       } catch (e) {
         logger.debug('Error with play button selector', { selector, error: e.message });
+      }
+    }
+
+    // If still no play button found, try text-based detection
+    if (!playButtonFound) {
+      logger.info('Attempting text-based play button detection');
+      
+      try {
+        // Look for buttons or elements with "Play" text
+        const playButtons = await page.evaluate(() => {
+          const elements = [];
+          const allElements = document.querySelectorAll('button, div[role="button"], span, a');
+          
+          for (const el of allElements) {
+            const text = el.innerText?.toLowerCase() || '';
+            const title = el.title?.toLowerCase() || '';
+            const ariaLabel = el.getAttribute('aria-label')?.toLowerCase() || '';
+            
+            if (text.includes('play') || title.includes('play') || ariaLabel.includes('play')) {
+              elements.push({
+                selector: el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.className ? '.' + el.className.split(' ').join('.') : ''),
+                text: el.innerText,
+                visible: el.offsetParent !== null
+              });
+            }
+          }
+          return elements;
+        });
+        
+        if (playButtons.length > 0) {
+          logger.info('Found text-based play buttons', { count: playButtons.length, buttons: playButtons });
+          
+          // Try to click the first visible one
+          for (const buttonInfo of playButtons) {
+            if (buttonInfo.visible) {
+              try {
+                const button = await page.evaluateHandle((selector) => {
+                  // More robust element finding
+                  const elements = document.querySelectorAll('button, div[role="button"], span, a');
+                  for (const el of elements) {
+                    const text = el.innerText?.toLowerCase() || '';
+                    if (text.includes('play')) {
+                      return el;
+                    }
+                  }
+                  return null;
+                }, buttonInfo.selector);
+                
+                if (button) {
+                  await button.hover();
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                  await button.click();
+                  logger.info('Clicked text-based play button', { text: buttonInfo.text });
+                  playButtonFound = true;
+                  await new Promise(resolve => setTimeout(resolve, 3000));
+                  break;
+                }
+              } catch (e) {
+                logger.debug('Error clicking text-based play button', { error: e.message });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        logger.debug('Error in text-based play button detection', { error: e.message });
       }
     }
 
@@ -937,51 +710,9 @@ async function interactWithPage(page, logger) {
     });
 
     logger.timing('Page interaction completed', interactionStart);
-    
-  } catch (error) {
-    if (error.message.includes('detached Frame')) {
-      logger.warn('Main page interaction failed due to frame detachment, attempting recovery', { 
-        error: error.message 
-      });
       
-      // If we get frame detachment in main interaction, the page might be changing
-      // Wait a bit and try simpler interactions
-      try {
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Try basic page interactions using direct Puppeteer selectors (no frame evaluation)
-        const directClickTargets = [
-          'video', '.video', '#video', 
-          '.player', '#player', '.video-player',
-          '.play-button', '.btn-play', '#play-btn',
-          'iframe[src*="player"]', 'iframe[src*="embed"]'
-        ];
-        
-        for (const selector of directClickTargets) {
-          try {
-            const elements = await page.$$(selector);
-            for (const element of elements) {
-              try {
-                await element.click();
-                logger.info('Recovery: clicked element', { selector });
-                await new Promise(resolve => setTimeout(resolve, 500));
-              } catch (clickError) {
-                // Continue to next element
-              }
-            }
-          } catch (selectorError) {
-            // Continue to next selector
-          }
-        }
-        
-        logger.info('Completed recovery interaction after frame detachment');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      } catch (recoveryError) {
-        logger.warn('Recovery interaction also failed', { error: recoveryError.message });
-      }
-    } else {
-      logger.warn('Page interaction error', { error: error.message });
-    }
+    } catch (error) {
+    logger.warn('Page interaction error', { error: error.message });
   }
 }
 
@@ -1022,65 +753,22 @@ export async function GET(request) {
     const launchStart = Date.now();
     
     const browserConfig = await getBrowserConfig(logger);
-    logger.debug('Browser configuration', { 
-      hasExecutablePath: !!browserConfig.executablePath,
-      headless: browserConfig.headless,
-      argsCount: browserConfig.args?.length || 0
-    });
+    logger.debug('Browser configuration', browserConfig);
     
-    const isDev = process.env.NODE_ENV === 'development';
-    
-    try {
-      if (isDev) {
-        // Use puppeteer-core for development (with local Chromium)
-        browser = await puppeteer.launch(browserConfig);
-        logger.info('Development browser launched successfully');
-      } else {
-        // Use puppeteer-core with @sparticuz/chromium for production
-        browser = await puppeteer.launch(browserConfig);
-        logger.info('Production browser launched successfully');
-      }
-    } catch (launchError) {
-      logger.error('Failed to launch browser with primary config', launchError);
-      
-      // Fallback: try launching without executable path for serverless
-      if (!isDev) {
-        logger.warn('Attempting fallback browser launch without executable path');
-        try {
-          const fallbackConfig = {
-            headless: true,
-            args: [
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-web-security',
-              '--disable-features=VizDisplayCompositor',
-              '--disable-blink-features=AutomationControlled',
-              '--no-first-run',
-              '--no-zygote',
-              '--disable-gpu',
-              '--single-process',
-              '--disable-background-timer-throttling',
-              '--disable-renderer-backgrounding',
-              '--disable-backgrounding-occluded-windows'
-            ]
-          };
-          
-          browser = await puppeteer.launch(fallbackConfig);
-          logger.info('Fallback browser launched successfully');
-        } catch (fallbackError) {
-          logger.error('Fallback browser launch also failed', fallbackError);
-          throw new Error(`Both primary and fallback browser launch failed. Primary: ${launchError.message}, Fallback: ${fallbackError.message}`);
-        }
-      } else {
-        throw launchError; // Re-throw original error for development
-      }
-    }
+         const isDev = process.env.NODE_ENV === 'development';
+     
+     if (isDev) {
+       // Use puppeteer-core for development (with local Chromium)
+       browser = await puppeteer.launch(browserConfig);
+     } else {
+       // Use puppeteer-core with @sparticuz/chromium for production
+       browser = await puppeteer.launch(browserConfig);
+     }
     
     logger.timing('Browser launch took', launchStart);
 
          // Create new page with enhanced stealth settings
-     let page = await browser.newPage();
+     const page = await browser.newPage();
      
      // Set realistic viewport and user agent
      await page.setViewport({ 
@@ -1433,111 +1121,13 @@ export async function GET(request) {
            if (success) success(mockPosition);
          };
        }
-       
-       // === FRAME DETACHMENT PREVENTION ===
-       // Prevent common causes of frame detachment
-       
-       // 1. Monitor iframe removal/replacement but allow legitimate changes
-       const originalRemoveChild = Node.prototype.removeChild;
-       Node.prototype.removeChild = function(child) {
-         if (child && child.tagName === 'IFRAME') {
-           console.log('Detected iframe removal - monitoring for stability');
-           // Allow removal but log it (some legitimate updates may need this)
-         }
-         return originalRemoveChild.call(this, child);
-       };
-       
-       const originalReplaceChild = Node.prototype.replaceChild;
-       Node.prototype.replaceChild = function(newChild, oldChild) {
-         if (oldChild && oldChild.tagName === 'IFRAME') {
-           console.log('Detected iframe replacement - monitoring for stability');
-           // Allow replacement but log it (some legitimate updates may need this)
-         }
-         return originalReplaceChild.call(this, newChild, oldChild);
-       };
-       
-       // 2. Block location changes that could reload the page
-       try {
-         const originalLocationReload = location.reload;
-         location.reload = function(forceReload) {
-           console.log('Blocked location.reload');
-           return; // Block the reload
-         };
-       } catch (e) {}
-       
-       // 3. Block document.write that could clear the page
-       const originalDocumentWrite = document.write;
-       document.write = function(content) {
-         console.log('Blocked document.write that could detach frames');
-         return; // Block document writes
-       };
-       
-       // 4. Monitor and prevent page unload
-       window.addEventListener('beforeunload', function(e) {
-         console.log('Preventing page unload that could detach frames');
-         e.preventDefault();
-         e.returnValue = '';
-         return '';
-       }, true);
-       
-       // 5. Monitor iframe changes but don't prevent all legitimate updates
-       const monitorIframes = () => {
-         const iframes = document.querySelectorAll('iframe');
-         iframes.forEach((iframe, index) => {
-           try {
-             // Just log iframe presence and src for monitoring
-             const currentSrc = iframe.src;
-             console.log(`Monitoring iframe ${index}:`, currentSrc.substring(0, 50));
-             
-             // Light protection - only prevent obvious detachment patterns
-             const originalSrcSetter = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'src').set;
-             Object.defineProperty(iframe, 'src', {
-               get: () => iframe.getAttribute('src'),
-               set: function(newSrc) {
-                 // Allow legitimate src changes but log them
-                 console.log('Iframe src change detected:', newSrc.substring(0, 50));
-                 return originalSrcSetter.call(this, newSrc);
-               },
-               configurable: true
-             });
-           } catch (e) {
-             // Continue if can't monitor this iframe
-           }
-         });
-       };
-       
-       // Run iframe monitoring less frequently and less aggressively
-       setTimeout(monitorIframes, 2000);
-       setTimeout(monitorIframes, 4000);
-       
-       // 6. Prevent DOM mutations that could affect iframes
-       if (window.MutationObserver) {
-         const observer = new MutationObserver(function(mutations) {
-           mutations.forEach(function(mutation) {
-             if (mutation.type === 'childList') {
-               mutation.removedNodes.forEach(function(node) {
-                 if (node.tagName === 'IFRAME') {
-                   console.log('Detected iframe removal attempt - this could cause detachment');
-                   // We already blocked it above, but log it
-                 }
-               });
-             }
-           });
-         });
-         
-         observer.observe(document.body || document.documentElement, {
-           childList: true,
-           subtree: true
-         });
-       }
      });
     
-    // Enable request interception for header modification and frame detachment prevention
+    // Enable request interception for header modification
     await page.setRequestInterception(true);
     
-    // Intercept and modify requests for better stealth + prevent frame detachment
+    // Intercept and modify requests for better stealth
     page.on('request', request => {
-      const url = request.url();
       const headers = {
         ...request.headers(),
         'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
@@ -1553,227 +1143,73 @@ export async function GET(request) {
       delete headers['x-devtools-emulation-enabled'];
       delete headers['x-client-data'];
       
-             // SELECTIVE BLOCKING: Only block very specific problematic requests
-       if (request.resourceType() === 'script') {
-         // Only block very specific anti-automation scripts, not general ones
-         const veryProblematicScripts = [
-           'anti-automation', 'bot-detector.js', 'antibot.js', 
-           'captcha', 'recaptcha', 'cloudflare-challenge'
-         ];
-         
-         const shouldBlock = veryProblematicScripts.some(keyword => 
-           url.toLowerCase().includes(keyword)
-         );
-         
-         if (shouldBlock) {
-           logger.debug('Blocking specific anti-automation script', { url: url.substring(0, 100) });
-           request.abort('blockedbyclient');
-           return;
-         }
-       }
-       
-       // SELECTIVE NAVIGATION BLOCKING: Only block obvious page redirects, not iframe navigation
-       if (request.resourceType() === 'document' && request.isNavigationRequest()) {
-         const isInitialNavigation = !request.redirectChain().length && request.frame() === page.mainFrame();
-         const isIframeNavigation = request.frame() !== page.mainFrame();
-         
-         // Don't block iframe navigation (needed for streams) or initial navigation
-         if (!isInitialNavigation && !isIframeNavigation) {
-           // Only block main frame redirects that look like captcha/security checks
-           const isSecurityRedirect = url.includes('captcha') || url.includes('challenge') || 
-                                      url.includes('security') || url.includes('blocked');
-           
-           if (isSecurityRedirect) {
-             logger.debug('Blocking security/captcha redirect', { url: url.substring(0, 100) });
-             request.abort('blockedbyclient');
-             return;
-           }
-         }
-       }
-      
       request.continue({ headers });
     });
     
     // Setup stream interception
     const { streamUrls } = setupStreamInterception(page, logger, url);
 
-    // Navigate to the page with retry logic
+    // Navigate to the page
     logger.info('Navigating to target URL');
     const navigationStart = Date.now();
-    let response = null;
-    let navigationRetries = 0;
-    const maxNavigationRetries = 3;
     
-    while (navigationRetries < maxNavigationRetries) {
-      try {
-        // Add small delay before navigation to let browser stabilize
-        if (navigationRetries > 0) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * navigationRetries));
-          logger.info(`Navigation retry ${navigationRetries}/${maxNavigationRetries}`);
-        }
-        
-        // Try different wait strategies based on retry attempt
-        const waitStrategy = navigationRetries === 0 ? 'domcontentloaded' : 
-                           navigationRetries === 1 ? 'load' : 'networkidle0';
-        
-        const timeout = Math.min(30000 + (navigationRetries * 10000), 60000);
-        
-        response = await page.goto(url, { 
-          waitUntil: waitStrategy,
-          timeout: timeout 
-        });
-        
-        const navigationStatus = response?.status() || 'unknown';
-        logger.info('Page navigation completed', { 
+    try {
+    const response = await page.goto(url, { 
+         waitUntil: 'domcontentloaded',
+      timeout: 30000 
+    });
+
+      const navigationStatus = response?.status() || 'unknown';
+      logger.info('Page navigation completed', { 
+      status: navigationStatus,
+        url: url.substring(0, 100)
+    });
+
+      // Check for 404 error (for auto-switching)
+    if (navigationStatus === 404) {
+        logger.warn('404 error detected - page not found', { 
           status: navigationStatus,
-          url: url.substring(0, 100),
-          retry: navigationRetries,
-          waitStrategy
+          server 
         });
         
-        // Check for 404 error (for auto-switching)
-        if (navigationStatus === 404) {
-          logger.warn('404 error detected - page not found', { 
-            status: navigationStatus,
-            server 
-          });
-          
-          return NextResponse.json({
-            success: false,
-            error: `Content not found on ${server}`,
-            debug: {
-              navigationStatus: 404,
-              wasNavigationError: true,
-              server,
-              suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
-            },
-            requestId
-          }, { status: 404 });
-        }
-        
-        // Navigation successful, break out of retry loop
-        break;
-        
-      } catch (navigationError) {
-        navigationRetries++;
-        logger.warn(`Navigation attempt ${navigationRetries} failed`, {
-          error: navigationError.message,
-          url: url.substring(0, 100),
-          retry: navigationRetries
-        });
-        
-        // Handle specific errors
-        if (navigationError.message?.includes('404') || navigationError.message?.includes('ERR_FAILED')) {
-          return NextResponse.json({
-            success: false,
-            error: `Content not found on ${server}`,
-            debug: {
-              wasNavigationError: true,
-              navigationStatus: 404,
-              server,
-              suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
-            },
-            requestId
-          }, { status: 404 });
-        }
-        
-        // If this was the last retry, throw the error
-        if (navigationRetries >= maxNavigationRetries) {
-          logger.error('All navigation retries failed', navigationError, { url });
-          
-          // For frame detached errors, try a different approach
-          if (navigationError.message?.includes('frame was detached') || 
-              navigationError.message?.includes('Target closed')) {
-            logger.warn('Frame detached error - attempting page recreation');
-            
-            try {
-              // Close current page and create a new one
-              await page.close();
-              page = await browser.newPage();
-              
-              // Re-setup the page
-              await page.setViewport({ 
-                width: 1920, 
-                height: 1080, 
-                deviceScaleFactor: 1,
-                hasTouch: false,
-                isLandscape: true,
-                isMobile: false
-              });
-              
-              await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
-              
-              // Re-setup stream interception
-              const { streamUrls: newStreamUrls } = setupStreamInterception(page, logger, url);
-              // Update the streamUrls reference
-              streamUrls.splice(0, streamUrls.length, ...newStreamUrls);
-              
-              // Try navigation one more time with simpler settings
-              response = await page.goto(url, { 
-                waitUntil: 'domcontentloaded',
-                timeout: 45000 
-              });
-              
-              logger.info('Page recreation successful after frame detached error');
-              break;
-              
-            } catch (recreationError) {
-              logger.error('Page recreation also failed', recreationError);
-              throw navigationError; // Throw original error
-            }
-          } else {
-            throw navigationError;
-          }
-        }
-        
-        // Wait before retry if not frame detached error
-        if (!navigationError.message?.includes('frame was detached')) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
+        return NextResponse.json({
+          success: false,
+          error: `Content not found on ${server}`,
+          debug: {
+            navigationStatus: 404,
+            wasNavigationError: true,
+            server,
+            suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
+          },
+          requestId
+        }, { status: 404 });
       }
+      
+    } catch (navigationError) {
+      logger.error('Navigation failed', navigationError, { url });
+      
+      // Check if it's a 404 specifically
+      if (navigationError.message?.includes('404') || navigationError.message?.includes('ERR_FAILED')) {
+        return NextResponse.json({
+          success: false,
+          error: `Content not found on ${server}`,
+          debug: {
+            wasNavigationError: true,
+            navigationStatus: 404,
+            server,
+            suggestSwitch: server === 'vidsrc.xyz' ? 'embed.su' : 'vidsrc.xyz'
+          },
+          requestId
+        }, { status: 404 });
+      }
+      
+      throw navigationError;
     }
     
     logger.timing('Navigation took', navigationStart);
 
-    // Balanced stabilization wait - enough to prevent detachment but not too long to miss streams
-    logger.info('Waiting for page and frames to stabilize before interaction...');
-    await new Promise(resolve => setTimeout(resolve, 4000)); // Reduced from 8s to 4s
-    
-    // Additional frame stability check
-    try {
-      const frameCount = await page.evaluate(() => {
-        const iframes = document.querySelectorAll('iframe');
-        return iframes.length;
-      });
-      logger.info('Frame stability check completed', { frameCount });
-      
-      // Give frames extra time to load their content but not too much
-      if (frameCount > 0) {
-        logger.info('Detected iframes, giving additional stabilization time...');
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Reduced from 5s to 2s
-      }
-    } catch (e) {
-      logger.debug('Frame stability check failed, proceeding anyway', { error: e.message });
-    }
-
     // Interact with page to trigger stream loading
-    let pageInteractionFailed = false;
-    try {
       await interactWithPage(page, logger);
-    } catch (interactionError) {
-      if (interactionError.message.includes('detached Frame')) {
-        logger.warn('Page interaction failed due to frame detachment, switching to passive mode', {
-          error: interactionError.message
-        });
-        pageInteractionFailed = true;
-        
-        // Passive mode: just wait for any additional network responses without interaction
-        logger.info('Entering passive mode - waiting for network responses without page interaction');
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Initial wait
-      } else {
-        throw interactionError; // Re-throw if it's not a frame detachment issue
-      }
-    }
 
     // Wait additional time for streams to be captured with progressive checking
     let checkCount = 0;
@@ -1784,58 +1220,41 @@ export async function GET(request) {
       checkCount++;
       
       if (checkCount % 2 === 0) {
-        if (!pageInteractionFailed) {
-          // Trigger additional interactions every 4 seconds (only if not in passive mode)
-          try {
-            await page.evaluate(() => {
-              // Trigger events that might load delayed content
-              window.dispatchEvent(new Event('scroll'));
-              window.dispatchEvent(new Event('resize'));
-              document.dispatchEvent(new Event('visibilitychange'));
-              
-              // Try clicking specific vidsrc.xyz play button first
-              const vidsrcPlayButton = document.querySelector('#pl_but') || document.querySelector('.fas.fa-play');
-              if (vidsrcPlayButton) {
-                try {
-                  vidsrcPlayButton.click();
-                  vidsrcPlayButton.dispatchEvent(new Event('mouseenter'));
-                  vidsrcPlayButton.dispatchEvent(new Event('focus'));
-                } catch (e) {
-                  // Continue
-                }
-              }
-              
-              // Try clicking any remaining play buttons or video elements
-              const elements = document.querySelectorAll('video, iframe, [class*="play"], [id*="play"]');
-              elements.forEach((element, index) => {
-                if (index < 3) { // Limit to first 3 elements
-                  try {
-                    element.click();
-                    element.dispatchEvent(new Event('mouseenter'));
-                  } catch (e) {
-                    // Continue
-                  }
-                }
-              });
-            });
-          } catch (evalError) {
-            if (evalError.message.includes('detached Frame')) {
-              logger.warn('Progressive check evaluation failed due to frame detachment, continuing in passive mode');
-              pageInteractionFailed = true; // Switch to passive mode permanently
-            } else {
-              logger.debug('Progressive check evaluation error', { error: evalError.message });
-            }
-          }
-        } else {
-          // In passive mode - just wait and let network interception do its work
-          logger.info(`Passive mode check ${checkCount}/${maxChecks} - waiting for network responses`, {
-            currentStreams: streamUrls.length
-          });
-        }
+                 // Trigger additional interactions every 4 seconds
+         await page.evaluate(() => {
+           // Trigger events that might load delayed content
+           window.dispatchEvent(new Event('scroll'));
+           window.dispatchEvent(new Event('resize'));
+           document.dispatchEvent(new Event('visibilitychange'));
+           
+           // Try clicking specific vidsrc.xyz play button first
+           const vidsrcPlayButton = document.querySelector('#pl_but') || document.querySelector('.fas.fa-play');
+           if (vidsrcPlayButton) {
+             try {
+               vidsrcPlayButton.click();
+               vidsrcPlayButton.dispatchEvent(new Event('mouseenter'));
+               vidsrcPlayButton.dispatchEvent(new Event('focus'));
+             } catch (e) {
+               // Continue
+             }
+           }
+           
+           // Try clicking any remaining play buttons or video elements
+           const elements = document.querySelectorAll('video, iframe, [class*="play"], [id*="play"]');
+           elements.forEach((element, index) => {
+             if (index < 3) { // Limit to first 3 elements
+               try {
+                 element.click();
+                 element.dispatchEvent(new Event('mouseenter'));
+               } catch (e) {
+                 // Continue
+               }
+             }
+           });
+         });
         
         logger.info(`Progressive check ${checkCount}/${maxChecks}`, { 
-          currentStreams: streamUrls.length,
-          mode: pageInteractionFailed ? 'passive' : 'active'
+          currentStreams: streamUrls.length 
         });
       }
     }
@@ -1905,14 +1324,14 @@ export async function GET(request) {
     const totalDuration = logger.timing('Total request duration', requestStart);
 
     // Return successful response
-    return NextResponse.json({ 
-      success: true, 
-      streamUrl: selectedStream.url,
+      return NextResponse.json({ 
+        success: true, 
+        streamUrl: selectedStream.url,
       type: 'hls',
       server: server,
-      totalFound: streamUrls.length,
-      m3u8Count: m3u8Streams.length,
-      requestId,
+        totalFound: streamUrls.length,
+        m3u8Count: m3u8Streams.length,
+        requestId,
       debug: {
         selectedStream: {
           source: selectedStream.source,

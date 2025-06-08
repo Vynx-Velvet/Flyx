@@ -3,6 +3,9 @@ const nextConfig = {
   images: {
     domains: ['image.tmdb.org'],
   },
+  env: {
+    NEXT_PUBLIC_EXTRACT_SERVICE_URL: process.env.NEXT_PUBLIC_EXTRACT_SERVICE_URL || 'http://35.188.123.210:3001',
+  },
   // Optimize for serverless functions
   experimental: {
     serverComponentsExternalPackages: ['@sparticuz/chromium'],
