@@ -14,7 +14,7 @@
 /* Carousel Container */
 .carousel-container {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   padding: 0 2rem; /* Full width with minimal edge padding */
 }
 
@@ -22,6 +22,7 @@
   display: flex;
   gap: 1.2rem;
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-behavior: smooth;
   padding: 1.5rem 0 2rem 0;
   scrollbar-width: none;
@@ -160,16 +161,15 @@
   font-weight: 600;
 }
 
-/* Carousel Navigation Arrows - Enhanced */
+/* Carousel Navigation Arrows - Thin Rectangle Design */
 .left-arrow, .right-arrow {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
+  bottom: 0;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  border-radius: 50%;
-  width: 60px;
-  height: 60px;
+  border-radius: 8px;
+  width: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,7 +178,7 @@
   cursor: pointer;
   backdrop-filter: blur(20px);
   transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
-  z-index: 10;
+  z-index: 9999;
   box-shadow: var(--shadow-glass);
   opacity: 0.8;
 }
@@ -191,24 +191,24 @@
   right: 0;
   bottom: 0;
   background: var(--gradient-primary);
-  border-radius: 50%;
+  border-radius: 8px;
   opacity: 0;
-  transform: scale(0.8);
+  transform: scaleX(0.8);
   transition: all 0.5s cubic-bezier(0.23, 1, 0.320, 1);
   z-index: -1;
 }
 
 .left-arrow {
-  left: 0.5rem;
+  left: -2rem;
 }
 
 .right-arrow {
-  right: 0.5rem;
+  right: -2rem;
 }
 
 .left-arrow:hover, .right-arrow:hover {
   border-color: var(--neon-cyan);
-  transform: translateY(-50%) scale(1.15);
+  transform: scaleX(1.1);
   box-shadow: 
     0 10px 30px rgba(0, 0, 0, 0.4),
     0 0 30px rgba(0, 245, 255, 0.5),
@@ -218,11 +218,11 @@
 
 .left-arrow:hover::before, .right-arrow:hover::before {
   opacity: 0.1;
-  transform: scale(1);
+  transform: scaleX(1);
 }
 
 .left-arrow:active, .right-arrow:active {
-  transform: translateY(-50%) scale(1.05);
+  transform: scaleX(0.95);
 }
 
 /* Loading State */
@@ -272,9 +272,16 @@
   }
   
   .left-arrow, .right-arrow {
-    width: 50px;
-    height: 50px;
+    width: 40px;
     font-size: 1.2rem;
+  }
+  
+  .left-arrow {
+    left: -1.5rem;
+  }
+  
+  .right-arrow {
+    right: -1.5rem;
   }
 }
 
@@ -309,9 +316,16 @@
   }
   
   .left-arrow, .right-arrow {
-    width: 45px;
-    height: 45px;
+    width: 35px;
     font-size: 1.1rem;
+  }
+  
+  .left-arrow {
+    left: -1rem;
+  }
+  
+  .right-arrow {
+    right: -1rem;
   }
 }
   

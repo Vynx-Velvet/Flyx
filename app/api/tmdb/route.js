@@ -1,5 +1,15 @@
 import { NextResponse } from 'next/server';
 
+// Helper function to filter out unreleased content
+const filterReleasedContent = (items) => {
+	const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+	
+	return items.filter(item => {
+		const releaseDate = item.release_date || item.first_air_date;
+		return releaseDate && releaseDate <= today;
+	});
+};
+
 const tmdbOptions = {
 	method: 'GET',
 	headers: {
@@ -55,21 +65,24 @@ export async function GET(request) {
 				const trendingMoviesDailyData = await trendingMoviesDailyResponse.json();
 				const trendingShowsDailyData = await trendingShowsDailyResponse.json();
 				
-				// Add media_type to each item and combine results
-				const moviesWithType = trendingMoviesDailyData.results?.map(movie => ({
+				// Add media_type to each item, filter released content, and combine results
+				const moviesWithType = filterReleasedContent(trendingMoviesDailyData.results || []).map(movie => ({
 					...movie,
 					media_type: "movie"
-				})) || [];
+				}));
 				
-				const showsWithType = trendingShowsDailyData.results?.map(show => ({
+				const showsWithType = filterReleasedContent(trendingShowsDailyData.results || []).map(show => ({
 					...show,
 					media_type: "tv"
-				})) || [];
+				}));
 				
-				// Combine and shuffle the results
-				const combinedResults = [...moviesWithType, ...showsWithType]
-					.sort(() => Math.random() - 0.5)
-					.slice(0, 20); // Limit to 20 items
+				// Combine the results (interleaved for variety but consistent)
+				const combinedResults = [];
+				const maxLength = Math.max(moviesWithType.length, showsWithType.length);
+				for (let i = 0; i < maxLength && combinedResults.length < 20; i++) {
+					if (i < moviesWithType.length) combinedResults.push(moviesWithType[i]);
+					if (i < showsWithType.length && combinedResults.length < 20) combinedResults.push(showsWithType[i]);
+				}
 				
 				return NextResponse.json({
 					...trendingMoviesDailyData,
@@ -82,21 +95,24 @@ export async function GET(request) {
 				const trendingMoviesWeeklyData = await trendingMoviesWeeklyResponse.json();
 				const trendingShowsWeeklyData = await trendingShowsWeeklyResponse.json();
 				
-				// Add media_type to each item and combine results
-				const moviesWithTypeWeekly = trendingMoviesWeeklyData.results?.map(movie => ({
+				// Add media_type to each item, filter released content, and combine results
+				const moviesWithTypeWeekly = filterReleasedContent(trendingMoviesWeeklyData.results || []).map(movie => ({
 					...movie,
 					media_type: "movie"
-				})) || [];
+				}));
 				
-				const showsWithTypeWeekly = trendingShowsWeeklyData.results?.map(show => ({
+				const showsWithTypeWeekly = filterReleasedContent(trendingShowsWeeklyData.results || []).map(show => ({
 					...show,
 					media_type: "tv"
-				})) || [];
+				}));
 				
-				// Combine and shuffle the results
-				const combinedWeeklyResults = [...moviesWithTypeWeekly, ...showsWithTypeWeekly]
-					.sort(() => Math.random() - 0.5)
-					.slice(0, 20); // Limit to 20 items
+				// Combine the results (interleaved for variety but consistent)
+				const combinedWeeklyResults = [];
+				const maxLengthWeekly = Math.max(moviesWithTypeWeekly.length, showsWithTypeWeekly.length);
+				for (let i = 0; i < maxLengthWeekly && combinedWeeklyResults.length < 20; i++) {
+					if (i < moviesWithTypeWeekly.length) combinedWeeklyResults.push(moviesWithTypeWeekly[i]);
+					if (i < showsWithTypeWeekly.length && combinedWeeklyResults.length < 20) combinedWeeklyResults.push(showsWithTypeWeekly[i]);
+				}
 				
 				return NextResponse.json({
 					...trendingMoviesWeeklyData,
@@ -110,8 +126,8 @@ export async function GET(request) {
 				);
 				const popularAnimeResponseData = await popularAnimeResponse.json();
 
-				// Check if `results` exists and map over it
-				const correctedAnimeResponseData = popularAnimeResponseData.results.map((anime) => {
+				// Filter released content and add media_type
+				const correctedAnimeResponseData = filterReleasedContent(popularAnimeResponseData.results || []).map((anime) => {
 					return {
 						...anime,
 						media_type: "tv", // Add media_type to each item
@@ -137,8 +153,8 @@ export async function GET(request) {
 					);
 					const searchData = await searchResponse.json();
 
-					// Map over the results to ensure consistent structure
-					const correctedSearchResults = searchData.results.map((result) => {
+					// Filter released content and ensure consistent structure
+					const correctedSearchResults = filterReleasedContent(searchData.results || []).map((result) => {
 						return {
 							...result,
 							media_type: result.media_type || "unknown", // Ensure media_type is always present
@@ -178,7 +194,14 @@ export async function GET(request) {
 			case 'getTopRatedMovies':
 				const topRatedMoviesResponse = await fetch(`https://api.themoviedb.org/3/movie/top_rated?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
 				const topRatedMoviesData = await topRatedMoviesResponse.json();
-				return NextResponse.json(topRatedMoviesData);
+				
+				// Filter out unreleased movies
+				const filteredTopRatedMovies = filterReleasedContent(topRatedMoviesData.results || []);
+				
+				return NextResponse.json({
+					...topRatedMoviesData,
+					results: filteredTopRatedMovies
+				});
 
 			case 'getUpcomingMovies':
 				const upcomingMoviesResponse = await fetch(`https://api.themoviedb.org/3/movie/upcoming?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
@@ -188,17 +211,24 @@ export async function GET(request) {
 			case 'getAiringTodayShows':
 				const airingTodayShowsResponse = await fetch(`https://api.themoviedb.org/3/tv/airing_today?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
 				const airingTodayShowsData = await airingTodayShowsResponse.json();
-				return NextResponse.json(airingTodayShowsData);
+				
+				// Filter out unreleased shows
+				const filteredAiringTodayShows = filterReleasedContent(airingTodayShowsData.results || []);
+				
+				return NextResponse.json({
+					...airingTodayShowsData,
+					results: filteredAiringTodayShows
+				});
 
 			case 'getMovieRecommendations':
 				const movieRecommendationsResponse = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/recommendations?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
 				const movieRecommendationsData = await movieRecommendationsResponse.json();
 				
-				// Add media_type to each recommendation
-				const correctedMovieRecommendations = movieRecommendationsData.results?.map((movie) => ({
+				// Filter released content and add media_type to each recommendation
+				const correctedMovieRecommendations = filterReleasedContent(movieRecommendationsData.results || []).map((movie) => ({
 					...movie,
 					media_type: "movie"
-				})) || [];
+				}));
 				
 				return NextResponse.json({
 					...movieRecommendationsData,
@@ -209,11 +239,11 @@ export async function GET(request) {
 				const tvRecommendationsResponse = await fetch(`https://api.themoviedb.org/3/tv/${movieId}/recommendations?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
 				const tvRecommendationsData = await tvRecommendationsResponse.json();
 				
-				// Add media_type to each recommendation
-				const correctedTVRecommendations = tvRecommendationsData.results?.map((show) => ({
+				// Filter released content and add media_type to each recommendation
+				const correctedTVRecommendations = filterReleasedContent(tvRecommendationsData.results || []).map((show) => ({
 					...show,
 					media_type: "tv"
-				})) || [];
+				}));
 				
 				return NextResponse.json({
 					...tvRecommendationsData,
@@ -224,11 +254,11 @@ export async function GET(request) {
 				const similarMoviesResponse = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/similar?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
 				const similarMoviesData = await similarMoviesResponse.json();
 				
-				// Add media_type to each similar movie
-				const correctedSimilarMovies = similarMoviesData.results?.map((movie) => ({
+				// Filter released content and add media_type to each similar movie
+				const correctedSimilarMovies = filterReleasedContent(similarMoviesData.results || []).map((movie) => ({
 					...movie,
 					media_type: "movie"
-				})) || [];
+				}));
 				
 				return NextResponse.json({
 					...similarMoviesData,
@@ -239,11 +269,11 @@ export async function GET(request) {
 				const similarTVResponse = await fetch(`https://api.themoviedb.org/3/tv/${movieId}/similar?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
 				const similarTVData = await similarTVResponse.json();
 				
-				// Add media_type to each similar show
-				const correctedSimilarTV = similarTVData.results?.map((show) => ({
+				// Filter released content and add media_type to each similar show
+				const correctedSimilarTV = filterReleasedContent(similarTVData.results || []).map((show) => ({
 					...show,
 					media_type: "tv"
-				})) || [];
+				}));
 				
 				return NextResponse.json({
 					...similarTVData,
