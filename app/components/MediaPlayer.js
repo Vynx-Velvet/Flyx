@@ -40,25 +40,8 @@ const MediaPlayer = ({
   // Reset all states to initial values
   const resetPlayerState = () => {
     console.log('🔄 Resetting player state...');
-    setStreamUrl(null);
-    setLoading(true);
-    setError(null);
-    setExtractionStep("");
-    setRequestId(null);
-    setStreamType(null);
-    setQualities([]);
-    setSelectedQuality(-1);
-    setAutoSwitching(false);
-    setVideoDuration(0);
-    setLoadingProgress(0);
-    setLoadingPhase('initializing');
-    setTimeElapsed(0);
-    setEstimatedTimeRemaining(20);
-    setLoadingStartTime(null);
-    setCurrentFactIndex(0);
-    setExtractionCompleted(false);
     
-    // Clean up video element
+    // Clean up video element first
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.src = '';
@@ -76,6 +59,25 @@ const MediaPlayer = ({
       progressEventSource.close();
       setProgressEventSource(null);
     }
+    
+    // Reset all state variables
+    setStreamUrl(null);
+    setLoading(true);
+    setError(null);
+    setExtractionStep("");
+    setRequestId(null);
+    setStreamType(null);
+    setQualities([]);
+    setSelectedQuality(-1);
+    setAutoSwitching(false);
+    setVideoDuration(0);
+    setLoadingProgress(0);
+    setLoadingPhase('initializing');
+    setTimeElapsed(0);
+    setEstimatedTimeRemaining(20);
+    setLoadingStartTime(null);
+    setCurrentFactIndex(0);
+    setExtractionCompleted(false);
   };
 
   // Fun facts to rotate through during loading
@@ -655,8 +657,16 @@ const MediaPlayer = ({
     }
   }, [streamUrl, streamType]);
 
-  // Reset state when switching episodes or movies
+  // Reset state when switching episodes or movies (but not on initial mount)
+  const isInitialMount = useRef(true);
+  
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      console.log('🎯 Initial mount, skipping reset');
+      return;
+    }
+    
     console.log('🎯 Content changed, resetting player state...', {
       mediaType,
       movieId,
@@ -767,6 +777,12 @@ const MediaPlayer = ({
   };
 
   const handleVideoError = (e) => {
+    // Ignore errors if we don't have a valid stream URL or if we're still loading
+    if (!streamUrl || loading || !e.target.src) {
+      console.log('Ignoring video error - no stream URL or still loading');
+      return;
+    }
+    
     console.error('Video playback error:', {
       error: e.target.error,
       networkState: e.target.networkState,

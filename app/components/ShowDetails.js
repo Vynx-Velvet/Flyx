@@ -89,6 +89,7 @@ const ShowDetails = ({ movieId, clearMovie }) => {
       // For movies, we don't need season/episode info
       return (
         <MediaPlayer
+          key={`movie-${movieId.id}`}
           mediaType="movie"
           movieId={movieId.id}
           seasonId={null}
@@ -103,6 +104,7 @@ const ShowDetails = ({ movieId, clearMovie }) => {
       const maxEpisodes = seasons ? seasons[selectedSeason]?.episodes?.length : null;
       return (
         <MediaPlayer
+          key={`tv-${movieId.id}-s${selectedSeason + 1}-e${selectedEpisode.episode_number}`}
           mediaType={movieId.media_type}
           movieId={movieId.id}
           seasonId={selectedSeason + 1} // Season numbers are 1-indexed
