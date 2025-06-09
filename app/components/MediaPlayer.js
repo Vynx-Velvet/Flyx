@@ -691,6 +691,12 @@ const MediaPlayer = ({
     setError(`${errorMessage}. Try switching servers or refreshing the page.`);
   };
 
+  // Responsive SVG dimensions - these will scale with CSS
+  const svgSize = 100; // Base size - CSS will scale with var(--spinner-size)
+  const strokeWidth = 3;
+  const radius = (svgSize - strokeWidth * 2) / 2;
+  const circumference = 2 * Math.PI * radius;
+
   return (
     <div className={styles.mediaContainer}>
       <div className={styles.mediaPlayer}>
@@ -700,43 +706,37 @@ const MediaPlayer = ({
               {/* Main spinner with progress ring */}
               <div className={styles.progressSpinnerContainer}>
                 <div className={styles.loadingSpinner}></div>
-                <svg className={styles.progressRing} width="120" height="120">
+                <svg 
+                  className={styles.progressRing} 
+                  width={svgSize} 
+                  height={svgSize}
+                  viewBox={`0 0 ${svgSize} ${svgSize}`}
+                >
                   <circle
-                    className={styles.progressRingBackground}
-                    cx="60"
-                    cy="60"
-                    r="50"
-                    fill="none"
+                    cx={svgSize / 2}
+                    cy={svgSize / 2}
+                    r={radius}
                     stroke="rgba(59, 130, 246, 0.2)"
-                    strokeWidth="3"
+                    strokeWidth={strokeWidth}
+                    fill="none"
                   />
                   <circle
                     className={styles.progressRingProgress}
-                    cx="60"
-                    cy="60"
-                    r="50"
+                    cx={svgSize / 2}
+                    cy={svgSize / 2}
+                    r={radius}
+                    stroke="#3b82f6"
+                    strokeWidth={strokeWidth}
                     fill="none"
-                    stroke="url(#progressGradient)"
-                    strokeWidth="3"
                     strokeLinecap="round"
-                    strokeDasharray={`${(loadingProgress / 100) * 314} 314`}
-                    transform="rotate(-90 60 60)"
-                    data-complete={loadingProgress >= 100}
+                    strokeDasharray={circumference}
+                    strokeDashoffset={circumference - (circumference * loadingProgress) / 100}
+                    transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
                   />
-                  <defs>
-                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#3b82f6" />
-                      <stop offset="50%" stopColor="#a855f7" />
-                      <stop offset="100%" stopColor="#ec4899" />
-                    </linearGradient>
-                  </defs>
                 </svg>
                 
                 {/* Progress percentage */}
-                <div 
-                  className={styles.progressPercentage}
-                  data-complete={loadingProgress >= 100}
-                >
+                <div className={styles.progressPercentage}>
                   {Math.round(loadingProgress)}%
                 </div>
               </div>

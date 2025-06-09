@@ -104,7 +104,22 @@ const Results = ({ category, movieClick }) => {
               <div
                 key={movie.id}
                 className="movie-card"
-                onClick={() => movieClick(movie)}
+                onClick={() => {
+                  console.log('Movie card clicked:', movie);
+                  console.log('movieClick function:', movieClick);
+                  
+                  // Ensure media_type is present, fallback to 'movie' if missing
+                  const movieWithType = {
+                    ...movie,
+                    media_type: movie.media_type || (movie.title ? 'movie' : 'tv')
+                  };
+                  
+                  if (movieClick) {
+                    movieClick(movieWithType);
+                  } else {
+                    console.error('movieClick function is not defined');
+                  }
+                }}
                 onMouseEnter={() => handleMouseEnter(movie)}
                 onMouseLeave={handleMouseLeave}
               >

@@ -87,7 +87,22 @@ const SearchResults = ({ query, movieClick }) => {
                 <div
                   key={result.id}
                   className="result-item"
-                  onClick={() => movieClick(result)}
+                  onClick={() => {
+                    console.log('Search result clicked:', result);
+                    console.log('movieClick function:', movieClick);
+                    
+                    // Ensure media_type is present, fallback logic
+                    const resultWithType = {
+                      ...result,
+                      media_type: result.media_type || (result.title ? 'movie' : 'tv')
+                    };
+                    
+                    if (movieClick) {
+                      movieClick(resultWithType);
+                    } else {
+                      console.error('movieClick function is not defined');
+                    }
+                  }}
                 >
                   <img
                     src={`https://image.tmdb.org/t/p/w500${result.poster_path}`}

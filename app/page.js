@@ -12,8 +12,12 @@ export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleMovieClick = (movieData) => {
-    if (movieData && movieData.id) {
-      router.push(`/details/${movieData.id}`);
+    console.log('handleMovieClick called with:', movieData);
+    if (movieData && movieData.id && movieData.media_type) {
+      console.log('Navigating to details page for:', movieData.media_type, movieData.id);
+      router.push(`/details/${movieData.id}?type=${movieData.media_type}`);
+    } else {
+      console.error('Invalid movie data or missing media_type:', movieData);
     }
   };
 

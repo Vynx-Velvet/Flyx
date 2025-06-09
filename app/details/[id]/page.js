@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import ShowDetails from '../../components/ShowDetails';
 import NavBar from '../../components/NavBar';
 import Footer from '../../components/Footer';
@@ -10,6 +10,7 @@ import { MediaProvider } from '../../context/MediaContext';
 export default function DetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [movieData, setMovieData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -19,54 +20,43 @@ export default function DetailsPage() {
       
       try {
         setLoading(true);
-        // The ID from URL is just the TMDB ID, we need to determine if it's a movie or TV show
-        // We'll make requests to both endpoints and see which one succeeds
+        
+        // Get media type from URL parameter
+        const mediaType = searchParams.get('type');
+        console.log('Media type from URL:', mediaType);
+        
+        if (!mediaType) {
+          console.error('Media type not specified in URL');
+          setLoading(false);
+          return;
+        }
         
         let movieDetails = null;
-        let mediaType = null;
         
-        // Try TV show first
-        try {
+        if (mediaType === 'tv') {
           const tvResponse = await fetch(
             `/api/tmdb?action=getShowDetails&movieId=${params.id}`
           );
           if (tvResponse.ok) {
-            const tvData = await tvResponse.json();
-            if (tvData && tvData.id) {
-              movieDetails = tvData;
-              mediaType = 'tv';
-            }
+            movieDetails = await tvResponse.json();
           }
-        } catch (error) {
-          console.log('Not a TV show, trying movie...');
-        }
-        
-        // If not a TV show, try movie
-        if (!movieDetails) {
-          try {
-            const movieResponse = await fetch(
-              `/api/tmdb?action=getMovieDetails&movieId=${params.id}`
-            );
-            if (movieResponse.ok) {
-              const movieData = await movieResponse.json();
-              if (movieData && movieData.id) {
-                movieDetails = movieData;
-                mediaType = 'movie';
-              }
-            }
-          } catch (error) {
-            console.error('Error fetching movie details:', error);
+        } else if (mediaType === 'movie') {
+          const movieResponse = await fetch(
+            `/api/tmdb?action=getMovieDetails&movieId=${params.id}`
+          );
+          if (movieResponse.ok) {
+            movieDetails = await movieResponse.json();
           }
         }
         
-        if (movieDetails && mediaType) {
+        if (movieDetails && movieDetails.id) {
           setMovieData({
             id: parseInt(params.id),
             media_type: mediaType,
             ...movieDetails
           });
         } else {
-          console.error('Could not fetch details for ID:', params.id);
+          console.error('Could not fetch details for ID:', params.id, 'Type:', mediaType);
         }
       } catch (error) {
         console.error('Error in fetchMovieData:', error);
@@ -76,7 +66,7 @@ export default function DetailsPage() {
     };
 
     fetchMovieData();
-  }, [params.id]);
+  }, [params.id, searchParams]);
 
   const handleClearMovie = () => {
     router.push('/');

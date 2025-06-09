@@ -1,11 +1,10 @@
-/* HomePage Component */  
+/* Clean HomePage - Minimal & Elegant */
 .home-page {
 	min-height: calc(100vh - 100px);
-	padding: 2rem 0; /* Remove side padding, keep top/bottom */
 	background: transparent;
 	position: relative;
 	overflow-x: hidden;
-	overflow-y: auto;
+	padding: 2rem 0;
 }
 
 .home-page::before {
@@ -16,39 +15,119 @@
 	right: 0;
 	bottom: 0;
 	background: 
-		radial-gradient(circle at 25% 25%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-		radial-gradient(circle at 75% 75%, rgba(0, 245, 255, 0.1) 0%, transparent 50%);
+		radial-gradient(circle at 25% 25%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+		radial-gradient(circle at 75% 75%, rgba(0, 245, 255, 0.08) 0%, transparent 50%);
 	pointer-events: none;
 	z-index: -1;
 }
 
-/* Hero Section Styling */
-.home-page > *:first-child {
-	margin-top: 2rem;
+/* ========================================
+   HERO SECTION - SIMPLE & CLEAN
+   ======================================== */
+.hero-section {
+	text-align: center;
+	padding: 3rem 2rem 4rem 2rem;
+	width: 100%;
 }
 
-/* Section Spacing */
-.home-page > * + * {
-	margin-top: 3rem;
+.hero-content {
+	max-width: 800px;
+	margin: 0 auto;
 }
 
-/* Responsive Design */
+.hero-title {
+	font-size: clamp(2.5rem, 5vw, 4rem);
+	font-weight: 800;
+	line-height: 1.1;
+	margin-bottom: 1.5rem;
+	background: var(--gradient-primary);
+	background-clip: text;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+}
+
+.hero-highlight {
+	background: var(--gradient-secondary);
+	background-clip: text;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+}
+
+.hero-description {
+	font-size: clamp(1rem, 2.2vw, 1.2rem);
+	line-height: 1.6;
+	color: var(--text-secondary);
+	margin-bottom: 2.5rem;
+	max-width: 600px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.hero-search {
+	margin-bottom: 2rem;
+}
+
+/* Remove complex background animations */
+.hero-background,
+.floating-elements,
+.element {
+	display: none;
+}
+
+/* ========================================
+   CONTENT SECTION - CLEAN LAYOUT
+   ======================================== */
+.content-section {
+	width: 100%;
+	padding: 0 2rem;
+}
+
+.trending-sections {
+	display: flex;
+	flex-direction: column;
+	gap: 2rem;
+}
+
+/* ========================================
+   RESPONSIVE DESIGN - CLEAN
+   ======================================== */
 @media (max-width: 768px) {
 	.home-page {
-		padding: 1rem 0; /* Remove side padding, keep top/bottom */
+		padding: 1rem 0;
 	}
 	
-	.home-page > * + * {
-		margin-top: 2rem;
+	.hero-section {
+		padding: 2rem 1rem 3rem 1rem;
+	}
+	
+	.hero-description {
+		margin-bottom: 2rem;
+	}
+	
+	.content-section {
+		padding: 0 1rem;
+	}
+	
+	.trending-sections {
+		gap: 1.5rem;
 	}
 }
 
 @media (max-width: 480px) {
-	.home-page {
-		padding: 0.75rem 0; /* Remove side padding, keep top/bottom */
+	.hero-section {
+		padding: 1.5rem 0.5rem 2rem 0.5rem;
+	}
+	
+	.hero-description {
+		margin-bottom: 1.5rem;
+	}
+	
+	.content-section {
+		padding: 0 0.5rem;
 	}
 }
 
+/* Clean scrollbar */
 .home-page::-webkit-scrollbar {
-	display: none; /* Hide scrollbar */
+	display: none;
 }

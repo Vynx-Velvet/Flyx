@@ -50,18 +50,58 @@ export async function GET(request) {
 				return NextResponse.json({ externalData });
 
 			case 'getTrendingNow':
-				const trendingMoviesDailyResponse = await fetch(`https://api.themoviedb.org/3/trending/movie/day?language=en-US&page=${pageNumber ? pageNumber : 1}&origin_country=US%2CKR%2CJP%2CGB%2CCA`, tmdbOptions);
-				const trendingShowsDailyResponse = await fetch(`https://api.themoviedb.org/3/trending/tv/day?language=en-US&page=${pageNumber ? pageNumber : 1}&origin_country=US%2CKR%2CJP%2CGB%2CCA`, tmdbOptions);
+				const trendingMoviesDailyResponse = await fetch(`https://api.themoviedb.org/3/trending/movie/day?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
+				const trendingShowsDailyResponse = await fetch(`https://api.themoviedb.org/3/trending/tv/day?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
 				const trendingMoviesDailyData = await trendingMoviesDailyResponse.json();
 				const trendingShowsDailyData = await trendingShowsDailyResponse.json();
-				return NextResponse.json({ ...trendingMoviesDailyData, ...trendingShowsDailyData });
+				
+				// Add media_type to each item and combine results
+				const moviesWithType = trendingMoviesDailyData.results?.map(movie => ({
+					...movie,
+					media_type: "movie"
+				})) || [];
+				
+				const showsWithType = trendingShowsDailyData.results?.map(show => ({
+					...show,
+					media_type: "tv"
+				})) || [];
+				
+				// Combine and shuffle the results
+				const combinedResults = [...moviesWithType, ...showsWithType]
+					.sort(() => Math.random() - 0.5)
+					.slice(0, 20); // Limit to 20 items
+				
+				return NextResponse.json({
+					...trendingMoviesDailyData,
+					results: combinedResults
+				});
 
 			case 'getTrendingWeekly':
-				const trendingMoviesWeeklyResponse = await fetch(`https://api.themoviedb.org/3/trending/movie/week?language=en-US&page=${pageNumber ? pageNumber : 1}&origin_country=US%2CKR%2CJP%2CGB%2CCA`, tmdbOptions);
-				const trendingShowsWeeklyResponse = await fetch(`https://api.themoviedb.org/3/trending/tv/week?language=en-US&page=${pageNumber ? pageNumber : 1}&origin_country=US%2CKR%2CJP%2CGB%2CCA`, tmdbOptions);
+				const trendingMoviesWeeklyResponse = await fetch(`https://api.themoviedb.org/3/trending/movie/week?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
+				const trendingShowsWeeklyResponse = await fetch(`https://api.themoviedb.org/3/trending/tv/week?language=en-US&page=${pageNumber ? pageNumber : 1}`, tmdbOptions);
 				const trendingMoviesWeeklyData = await trendingMoviesWeeklyResponse.json();
 				const trendingShowsWeeklyData = await trendingShowsWeeklyResponse.json();
-				return NextResponse.json({ ...trendingMoviesWeeklyData, ...trendingShowsWeeklyData });
+				
+				// Add media_type to each item and combine results
+				const moviesWithTypeWeekly = trendingMoviesWeeklyData.results?.map(movie => ({
+					...movie,
+					media_type: "movie"
+				})) || [];
+				
+				const showsWithTypeWeekly = trendingShowsWeeklyData.results?.map(show => ({
+					...show,
+					media_type: "tv"
+				})) || [];
+				
+				// Combine and shuffle the results
+				const combinedWeeklyResults = [...moviesWithTypeWeekly, ...showsWithTypeWeekly]
+					.sort(() => Math.random() - 0.5)
+					.slice(0, 20); // Limit to 20 items
+				
+				return NextResponse.json({
+					...trendingMoviesWeeklyData,
+					results: combinedWeeklyResults
+				});
 
 			case 'getPopularAnime':
 				const popularAnimeResponse = await fetch(

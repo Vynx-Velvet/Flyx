@@ -1,9 +1,8 @@
 /* SearchResults Component */  
   .search-results {
 	padding: 20px;
-	max-width: 1400px;
-	margin: 0 auto;
-  }
+	width: 100%;
+}
   
   .results-container {
 	display: flex;
