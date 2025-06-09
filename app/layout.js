@@ -57,37 +57,12 @@ export const metadata = {
     initialScale: 1,
     maximumScale: 1,
   },
-  // Additional meta tags for better Discord support
-  other: {
-    'og:image:width': '1200',
-    'og:image:height': '630',
-    'og:image:type': 'image/png',
-    'og:image:alt': 'Flyx 2.0 - Stream Beyond',
-    // Discord-specific
-    'theme-color': '#6366f1',
-  },
+
 }
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <head>
-        {/* Essential meta tags for Discord */}
-        <meta property="og:title" content="Flyx 2.0 - Stream Beyond" />
-        <meta property="og:description" content="Discover and stream your favorite movies and TV shows with Flyx 2.0. Your ultimate entertainment destination." />
-        <meta property="og:image" content="https://tv.vynx.cc/opengraph-image" />
-        <meta property="og:url" content="https://tv.vynx.cc" />
-        <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="Flyx 2.0" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:image:type" content="image/png" />
-        
-        {/* Theme colors */}
-        <meta name="theme-color" content="#6366f1" />
-        <meta name="msapplication-TileColor" content="#6366f1" />
-        <meta name="msapplication-config" content="/browserconfig.xml" />
-      </head>
       <body>
         {children}
       </body>
