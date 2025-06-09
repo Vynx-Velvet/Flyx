@@ -12,4 +12,4 @@ Allow: /icon*
 Allow: /apple-icon*
 
 # Sitemap (update with your actual domain)
-Sitemap: https://flyx.vercel.app/sitemap.xml
+Sitemap: https://tv.vynx.cc/sitemap.xml

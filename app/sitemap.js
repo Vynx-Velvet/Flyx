@@ -1,5 +1,5 @@
 export default function sitemap() {
-  const baseUrl = 'https://flyx.vercel.app' // Update with your actual domain
+  const baseUrl = 'https://tv.vynx.cc'
   
   return [
     {

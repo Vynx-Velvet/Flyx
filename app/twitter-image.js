@@ -172,7 +172,7 @@ export default async function Image() {
             opacity: 0.5,
           }}
         >
-          flyx.vercel.app
+          tv.vynx.cc
         </div>
       </div>
     ),

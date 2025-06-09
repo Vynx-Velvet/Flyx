@@ -3,7 +3,7 @@ import './globals.css'
 export const metadata = {
   title: 'Flyx 2.0 - Stream Beyond',
   description: 'Discover and stream your favorite movies and TV shows with Flyx 2.0. Your ultimate entertainment destination.',
-  metadataBase: new URL('https://flyx.vercel.app'), // Update this with your actual domain
+  metadataBase: new URL('https://tv.vynx.cc'),
   keywords: ['movies', 'tv shows', 'streaming', 'entertainment', 'flyx'],
   authors: [{ name: 'Flyx Team' }],
   creator: 'Flyx Team',
@@ -17,11 +17,11 @@ export const metadata = {
   openGraph: {
     title: 'Flyx 2.0 - Stream Beyond',
     description: 'Discover and stream your favorite movies and TV shows with Flyx 2.0. Your ultimate entertainment destination.',
-    url: 'https://flyx.vercel.app', // Update this with your actual domain
+    url: 'https://tv.vynx.cc',
     siteName: 'Flyx 2.0',
     images: [
       {
-        url: 'https://flyx.vercel.app/opengraph-image', // Absolute URL for Discord
+        url: 'https://tv.vynx.cc/opengraph-image',
         width: 1200,
         height: 630,
         alt: 'Flyx 2.0 - Stream Beyond',
@@ -36,7 +36,7 @@ export const metadata = {
     card: 'summary_large_image',
     title: 'Flyx 2.0 - Stream Beyond',
     description: 'Discover and stream your favorite movies and TV shows with Flyx 2.0. Your ultimate entertainment destination.',
-    images: ['https://flyx.vercel.app/twitter-image'], // Absolute URL
+    images: ['https://tv.vynx.cc/twitter-image'],
     creator: '@flyx', // Update with your actual Twitter handle if you have one
   },
   // Apple Touch Icon
@@ -75,8 +75,8 @@ export default function RootLayout({ children }) {
         {/* Essential meta tags for Discord */}
         <meta property="og:title" content="Flyx 2.0 - Stream Beyond" />
         <meta property="og:description" content="Discover and stream your favorite movies and TV shows with Flyx 2.0. Your ultimate entertainment destination." />
-        <meta property="og:image" content="https://flyx.vercel.app/opengraph-image" />
-        <meta property="og:url" content="https://flyx.vercel.app" />
+        <meta property="og:image" content="https://tv.vynx.cc/opengraph-image" />
+        <meta property="og:url" content="https://tv.vynx.cc" />
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Flyx 2.0" />
         <meta property="og:image:width" content="1200" />
