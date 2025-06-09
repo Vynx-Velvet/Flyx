@@ -287,9 +287,24 @@ const MediaPlayer = ({
         
         setQualities(qualityLevels);
         
-        // Auto-play if possible
+        // Auto-play after a brief delay to ensure video element is ready
         if (videoRef.current) {
-          videoRef.current.play().catch(e => console.log('Auto-play prevented:', e));
+          console.log('🎬 Attempting auto-play...');
+          setTimeout(() => {
+            if (videoRef.current) {
+              console.log('🎬 Video element ready state:', videoRef.current.readyState);
+              console.log('🎬 Video element src:', videoRef.current.src || 'no src');
+              videoRef.current.play().catch(e => {
+                console.log('Auto-play prevented:', e);
+                console.log('Video element state:', {
+                  readyState: videoRef.current.readyState,
+                  networkState: videoRef.current.networkState,
+                  paused: videoRef.current.paused,
+                  currentSrc: videoRef.current.currentSrc
+                });
+              });
+            }
+          }, 500);
         }
       });
 
@@ -327,9 +342,13 @@ const MediaPlayer = ({
       });
 
       // Load the stream
+      console.log('🔗 Loading HLS source:', streamUrl.substring(0, 100) + '...');
       hls.loadSource(streamUrl);
+      
+      console.log('📺 Attaching HLS to video element:', !!videoRef.current);
       hls.attachMedia(videoRef.current);
       
+      console.log('✅ HLS instance created and attached');
       setHlsInstance(hls);
       
     } catch (error) {
@@ -622,7 +641,7 @@ const MediaPlayer = ({
     };
   }, [server, mediaType, movieId, seasonId, episodeId]);
 
-  // Initialize HLS when video element becomes available
+  // Initialize HLS when stream URL and type are available
   useEffect(() => {
     console.log('🎬 HLS initialization useEffect triggered:', {
       streamUrl: streamUrl ? streamUrl.substring(0, 100) + '...' : null,
@@ -636,15 +655,7 @@ const MediaPlayer = ({
       console.log('🎬 Video element ready, initializing HLS...');
       initializeHlsPlayer(streamUrl);
     }
-  }, [streamUrl, streamType, videoRef.current]);
-
-  // Additional effect to handle case where video ref becomes available after stream URL is set
-  useEffect(() => {
-    if (videoRef.current && streamUrl && streamType === 'hls' && !hlsInstance) {
-      console.log('🎬 Video ref became available after stream URL was set, initializing HLS...');
-      initializeHlsPlayer(streamUrl);
-    }
-  }, [videoRef.current]);
+  }, [streamUrl, streamType]);
 
   // Initialize direct video streams
   useEffect(() => {
