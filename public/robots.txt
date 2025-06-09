@@ -1,3 +1,15 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+
+# Disallow API routes from being crawled
+Disallow: /api/
+
+# Allow Open Graph images
+Allow: /opengraph-image*
+Allow: /twitter-image*
+Allow: /icon*
+Allow: /apple-icon*
+
+# Sitemap (update with your actual domain)
+Sitemap: https://flyx.vercel.app/sitemap.xml
