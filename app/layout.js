@@ -21,10 +21,11 @@ export const metadata = {
     siteName: 'Flyx 2.0',
     images: [
       {
-        url: '/og-image.png', // We'll create this image
+        url: 'https://flyx.vercel.app/opengraph-image', // Absolute URL for Discord
         width: 1200,
         height: 630,
         alt: 'Flyx 2.0 - Stream Beyond',
+        type: 'image/png',
       },
     ],
     locale: 'en_US',
@@ -35,14 +36,14 @@ export const metadata = {
     card: 'summary_large_image',
     title: 'Flyx 2.0 - Stream Beyond',
     description: 'Discover and stream your favorite movies and TV shows with Flyx 2.0. Your ultimate entertainment destination.',
-    images: ['/og-image.png'], // We'll create this image
+    images: ['https://flyx.vercel.app/twitter-image'], // Absolute URL
     creator: '@flyx', // Update with your actual Twitter handle if you have one
   },
   // Apple Touch Icon
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',
-    apple: '/apple-touch-icon.png', // We'll create this
+    apple: '/apple-touch-icon.png',
   },
   // Manifest
   manifest: '/manifest.json',
@@ -56,12 +57,33 @@ export const metadata = {
     initialScale: 1,
     maximumScale: 1,
   },
+  // Additional meta tags for better Discord support
+  other: {
+    'og:image:width': '1200',
+    'og:image:height': '630',
+    'og:image:type': 'image/png',
+    'og:image:alt': 'Flyx 2.0 - Stream Beyond',
+    // Discord-specific
+    'theme-color': '#6366f1',
+  },
 }
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
+        {/* Essential meta tags for Discord */}
+        <meta property="og:title" content="Flyx 2.0 - Stream Beyond" />
+        <meta property="og:description" content="Discover and stream your favorite movies and TV shows with Flyx 2.0. Your ultimate entertainment destination." />
+        <meta property="og:image" content="https://flyx.vercel.app/opengraph-image" />
+        <meta property="og:url" content="https://flyx.vercel.app" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Flyx 2.0" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:type" content="image/png" />
+        
+        {/* Theme colors */}
         <meta name="theme-color" content="#6366f1" />
         <meta name="msapplication-TileColor" content="#6366f1" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
