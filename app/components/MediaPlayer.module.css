@@ -339,17 +339,118 @@
   inset: 0;
   pointer-events: none;
   z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(8px, 2vmin, 16px);
 }
 
 .videoOverlay > * {
   pointer-events: auto;
 }
 
+/* Top controls row */
+.topControls {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.5vmin, 12px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Bottom controls row */
+.bottomControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(8px, 2vmin, 16px);
+  flex-wrap: wrap;
+}
+
+/* Episode navigation container */
+.episodeNavigation {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.5vmin, 10px);
+  background: rgba(0, 0, 0, 0.7);
+  padding: clamp(4px, 1vmin, 8px) clamp(8px, 2vmin, 12px);
+  border-radius: clamp(4px, 1vmin, 8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Overlay buttons */
+.overlayButton {
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: clamp(4px, 1vmin, 8px) clamp(8px, 2vmin, 12px);
+  border-radius: clamp(4px, 1vmin, 6px);
+  font-size: clamp(0.7rem, 1.6vmin, 0.9rem);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.overlayButton:hover:not(.disabled) {
+  background: rgba(59, 130, 246, 0.8);
+  border-color: rgba(59, 130, 246, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.overlayButton.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Navigation Controls Below Video */
+.navigationControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(8px, 2vmin, 12px);
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: clamp(4px, 1vmin, 8px);
+  margin-top: clamp(8px, 2vmin, 12px);
+  gap: clamp(8px, 2vmin, 16px);
+  flex-wrap: wrap;
+  border: 1px solid rgba(59, 130, 246, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+.navButton {
+  padding: clamp(6px, 1.5vmin, 10px) clamp(12px, 3vmin, 18px);
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: clamp(4px, 1vmin, 6px);
+  color: white;
+  font-size: clamp(0.75rem, 1.8vmin, 1rem);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: clamp(70px, 18vmin, 100px);
+  text-align: center;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.navButton:hover:not(.disabled) {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.navButton.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ======== CONTROLS ======== */
 .qualitySelector {
-  position: absolute;
-  top: clamp(8px, 2vmin, 12px);
-  right: clamp(8px, 2vmin, 12px);
+  /* Remove absolute positioning - now in topControls flex container */
 }
 
 .qualityDropdown, .serverDropdown {
@@ -361,6 +462,7 @@
   font-size: clamp(0.65rem, 1.5vmin, 0.85rem);
   cursor: pointer;
   transition: border-color 0.2s ease;
+  backdrop-filter: blur(8px);
 }
 
 .qualityDropdown:hover, .serverDropdown:hover {
@@ -368,15 +470,11 @@
 }
 
 .serverSelector {
-  position: absolute;
-  top: clamp(8px, 2vmin, 12px);
-  left: clamp(8px, 2vmin, 12px);
+  /* Remove absolute positioning - now in topControls flex container */
 }
 
 .streamInfo {
-  position: absolute;
-  bottom: clamp(8px, 2vmin, 12px);
-  left: clamp(8px, 2vmin, 12px);
+  /* Remove absolute positioning - now in bottomControls flex container */
   display: flex;
   gap: clamp(4px, 1vmin, 8px);
   align-items: center;
@@ -446,13 +544,13 @@
 }
 
 .episodeInfo {
-  padding: clamp(4px, 1vmin, 6px) clamp(8px, 2vmin, 12px);
-  background: rgba(59, 130, 246, 0.15);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: clamp(2px, 0.5vmin, 4px);
   color: white;
-  font-size: clamp(0.65rem, 1.5vmin, 0.85rem);
-  font-weight: 500;
+  font-size: clamp(0.7rem, 1.6vmin, 0.9rem);
+  font-weight: 600;
+  padding: clamp(2px, 0.5vmin, 4px) clamp(4px, 1vmin, 8px);
+  background: rgba(59, 130, 246, 0.2);
+  border-radius: clamp(3px, 0.8vmin, 4px);
+  font-family: system-ui, -apple-system, sans-serif;
   white-space: nowrap;
 }
 
@@ -532,6 +630,26 @@
     flex-direction: column;
   }
   
+  .topControls, .bottomControls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: clamp(6px, 1.5vmin, 8px);
+  }
+  
+  .episodeNavigation {
+    justify-content: center;
+  }
+  
+  .navigationControls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: clamp(6px, 1.5vmin, 8px);
+  }
+  
+  .navButton {
+    min-width: auto;
+  }
+  
   .errorActions {
     flex-direction: column;
     align-items: stretch;
@@ -559,6 +677,16 @@
   
   .enhancedLoadingInterface {
     gap: clamp(6px, 1.5vmin, 10px);
+  }
+  
+  .navigationControls {
+    padding: clamp(6px, 1.5vmin, 8px);
+    margin-top: clamp(6px, 1.5vmin, 8px);
+  }
+  
+  .episodeNavigation {
+    flex-direction: column;
+    gap: clamp(4px, 1vmin, 6px);
   }
 }
 

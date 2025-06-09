@@ -37,52 +37,6 @@ const MediaPlayer = ({
   
   const videoRef = useRef(null);
 
-  // Reset all states to initial values
-  const resetPlayerState = () => {
-    console.log('🔄 Resetting player state...');
-    
-    // Clean up HLS instance first (most important)
-    if (hlsInstance) {
-      console.log('🧹 Destroying HLS instance...');
-      hlsInstance.destroy();
-      setHlsInstance(null);
-    }
-    
-    // Clean up event source
-    if (progressEventSource) {
-      console.log('🧹 Closing progress event source...');
-      progressEventSource.close();
-      setProgressEventSource(null);
-    }
-    
-    // Clean up video element
-    if (videoRef.current) {
-      console.log('🧹 Cleaning up video element...');
-      videoRef.current.pause();
-      videoRef.current.src = '';
-      videoRef.current.load();
-    }
-    
-    // Reset all state variables
-    setStreamUrl(null);
-    setLoading(true);
-    setError(null);
-    setExtractionStep("");
-    setRequestId(null);
-    setStreamType(null);
-    setQualities([]);
-    setSelectedQuality(-1);
-    setAutoSwitching(false);
-    setVideoDuration(0);
-    setLoadingProgress(0);
-    setLoadingPhase('initializing');
-    setTimeElapsed(0);
-    setEstimatedTimeRemaining(20);
-    setLoadingStartTime(null);
-    setCurrentFactIndex(0);
-    setExtractionCompleted(false);
-  };
-
   // Fun facts to rotate through during loading
   const funFacts = [
     "💡 We're using advanced browser automation to extract your stream securely!",
@@ -290,33 +244,9 @@ const MediaPlayer = ({
         
         setQualities(qualityLevels);
         
-        // Auto-play after HLS is fully ready
+        // Auto-play if possible
         if (videoRef.current) {
-          console.log('🎬 Manifest parsed, preparing for auto-play...');
-          
-          // Wait for video to be ready to play
-          const attemptPlay = () => {
-            if (videoRef.current && videoRef.current.readyState >= 2) {
-              console.log('🎬 Video ready, attempting auto-play...');
-              console.log('🎬 Video element state:', {
-                readyState: videoRef.current.readyState,
-                networkState: videoRef.current.networkState,
-                currentSrc: videoRef.current.currentSrc,
-                duration: videoRef.current.duration
-              });
-              
-              videoRef.current.play().catch(e => {
-                console.log('Auto-play prevented:', e);
-                console.log('User interaction required for playback');
-              });
-            } else {
-              console.log('🎬 Video not ready yet, waiting...');
-              setTimeout(attemptPlay, 200);
-            }
-          };
-          
-          // Start attempting auto-play after a short delay
-          setTimeout(attemptPlay, 1000);
+          videoRef.current.play().catch(e => console.log('Auto-play prevented:', e));
         }
       });
 
@@ -353,17 +283,11 @@ const MediaPlayer = ({
         console.log(`Fragment loaded via ${loadMethod}:`, data.frag.url?.substring(0, 100));
       });
 
-      // Store HLS instance first to prevent race conditions
-      setHlsInstance(hls);
-      
       // Load the stream
-      console.log('🔗 Loading HLS source:', streamUrl.substring(0, 100) + '...');
       hls.loadSource(streamUrl);
-      
-      console.log('📺 Attaching HLS to video element:', !!videoRef.current);
       hls.attachMedia(videoRef.current);
       
-      console.log('✅ HLS instance created and attached');
+      setHlsInstance(hls);
       
     } catch (error) {
       console.error('Failed to initialize HLS player:', error);
@@ -390,11 +314,25 @@ const MediaPlayer = ({
 
   // Main stream extraction and setup
   useEffect(() => {
+    // Only start extraction if we have valid content to extract
+    if (!movieId || (mediaType === 'tv' && (!seasonId || !episodeId))) {
+      console.log('⏸️ Skipping extraction - missing required parameters:', {
+        movieId, mediaType, seasonId, episodeId
+      });
+      return;
+    }
+    
+    let isMounted = true; // Track if component is still mounted
     const timeoutId = setTimeout(() => {
-      extractAndSetupStream();
+      if (isMounted) {
+        extractAndSetupStream();
+      }
     }, 100);
 
     const extractAndSetupStream = async () => {
+      // Check if component is still mounted before starting
+      if (!isMounted) return;
+      
       setLoading(true);
       setError(null);
       setStreamUrl(null);
@@ -436,14 +374,9 @@ const MediaPlayer = ({
         params.append('movieId', movieId.toString());
         params.append('server', server === "Vidsrc.xyz" ? "vidsrc.xyz" : "embed.su");
         
-        if (mediaType === 'tv' && seasonId && episodeId) {
+        if (mediaType === 'tv') {
           params.append('seasonId', seasonId.toString());
           params.append('episodeId', episodeId.toString());
-        } else if (mediaType === 'tv') {
-          console.error('❌ TV show without valid season/episode IDs:', { seasonId, episodeId });
-          setError('Invalid episode data - missing season or episode ID');
-          setLoading(false);
-          return;
         }
         
         // Create Server-Sent Events connection for real-time progress
@@ -458,13 +391,13 @@ const MediaPlayer = ({
         
         // Set a timeout to prevent infinite loading
         const timeoutId = setTimeout(() => {
-          if (localProgress < 100 && !localExtractionCompleted) {
+          if (localProgress < 100 && !localExtractionCompleted && isMounted) {
             console.error('❌ Extraction timeout after 90 seconds');
             setError('Extraction timeout - please try again or switch servers');
             setLoading(false);
-            eventSource.close();
             setProgressEventSource(null);
           }
+          eventSource.close();
         }, 90000); // 90 second timeout
         
         eventSource.onopen = () => {
@@ -482,10 +415,12 @@ const MediaPlayer = ({
               localProgress = data.progress;
             }
             
-            // Update UI based on real-time VM progress
-            if (data.phase) setLoadingPhase(data.phase);
-            if (typeof data.progress === 'number') setLoadingProgress(data.progress);
-            if (data.message) setExtractionStep(data.message);
+            // Update UI based on real-time VM progress (only if component is mounted)
+            if (isMounted) {
+              if (data.phase) setLoadingPhase(data.phase);
+              if (typeof data.progress === 'number') setLoadingProgress(data.progress);
+              if (data.message) setExtractionStep(data.message);
+            }
             
             // Time remaining is calculated by the timer useEffect, no need to duplicate here
             
@@ -496,6 +431,12 @@ const MediaPlayer = ({
               // Mark completion immediately in local variable
               localExtractionCompleted = true;
               localProgress = 100;
+              
+              // Only proceed if component is still mounted
+              if (!isMounted) {
+                eventSource.close();
+                return;
+              }
               
               if (!data.result) {
                 console.error('❌ No result data in completion event:', data);
@@ -521,8 +462,6 @@ const MediaPlayer = ({
                 return;
               }
               
-              setRequestId(extractData.requestId);
-              
               // Process stream URL
               const isVidsrc = extractData.server === 'vidsrc.xyz';
               const isShadowlandschronicles = extractData.streamUrl.includes('shadowlandschronicles');
@@ -540,32 +479,37 @@ const MediaPlayer = ({
               }
               
               console.log('🔗 Setting stream URL:', finalStreamUrl.substring(0, 100) + '...');
-              setStreamUrl(finalStreamUrl);
               
-              // Determine stream type
-              const isHLS = extractData.streamUrl.includes('.m3u8') || extractData.type === 'hls';
-              console.log('🎥 Setting stream type:', isHLS ? 'hls' : 'mp4');
-              setStreamType(isHLS ? 'hls' : 'mp4');
+              // Only update state if component is still mounted
+              if (isMounted) {
+                setStreamUrl(finalStreamUrl);
+                setRequestId(extractData.requestId);
+                
+                // Determine stream type
+                const isHLS = extractData.streamUrl.includes('.m3u8') || extractData.type === 'hls';
+                console.log('🎥 Setting stream type:', isHLS ? 'hls' : 'mp4');
+                setStreamType(isHLS ? 'hls' : 'mp4');
+                setExtractionCompleted(true);
+              }
               
               console.log('✅ Stream extraction completed successfully:', {
                 server,
                 originalUrl: extractData.streamUrl,
                 finalUrl: finalStreamUrl,
-                streamType: isHLS ? 'hls' : 'mp4',
+                streamType: extractData.streamUrl.includes('.m3u8') || extractData.type === 'hls' ? 'hls' : 'mp4',
                 requestId: extractData.requestId,
                 totalFound: extractData.totalFound,
                 m3u8Count: extractData.m3u8Count
               });
               
-              // Mark extraction as completed
-              setExtractionCompleted(true);
-              
               // Complete loading after brief delay
               setTimeout(() => {
                 clearTimeout(timeoutId);
-                setLoading(false);
+                if (isMounted) {
+                  setLoading(false);
+                  setProgressEventSource(null);
+                }
                 eventSource.close();
-                setProgressEventSource(null);
               }, 800);
               
               return; // Exit handler after successful completion
@@ -574,16 +518,21 @@ const MediaPlayer = ({
             // Handle auto-switch scenario
             if (data.phase === 'autoswitch') {
               console.log('🔄 Auto-switching server:', data);
-              setAutoSwitching(true);
-              setExtractionStep(data.message);
+              
+              if (isMounted) {
+                setAutoSwitching(true);
+                setExtractionStep(data.message);
+              }
               
               // Switch to embed.su after brief delay
               setTimeout(() => {
                 clearTimeout(timeoutId);
-                setAutoSwitching(false);
-                setServer("Embed.su");
+                if (isMounted) {
+                  setAutoSwitching(false);
+                  setServer("Embed.su");
+                  setProgressEventSource(null);
+                }
                 eventSource.close();
-                setProgressEventSource(null);
               }, 2000);
               return;
             }
@@ -592,10 +541,14 @@ const MediaPlayer = ({
             if (data.error) {
               console.error('❌ Real-time progress error:', data);
               clearTimeout(timeoutId);
-              setError(data.message || 'Stream extraction failed');
-              setLoading(false);
+              
+              if (isMounted) {
+                setError(data.message || 'Stream extraction failed');
+                setLoading(false);
+                setProgressEventSource(null);
+              }
+              
               eventSource.close();
-              setProgressEventSource(null);
             }
             
           } catch (parseError) {
@@ -633,8 +586,11 @@ const MediaPlayer = ({
           if (!localExtractionCompleted && localProgress < 90 && !extractionCompleted && loadingProgress < 90) {
             console.error('❌ Genuine connection error occurred');
             clearTimeout(timeoutId);
-            setError(`Connection lost during extraction (progress: ${localProgress || loadingProgress}%)`);
-            setLoading(false);
+            
+            if (isMounted) {
+              setError(`Connection lost during extraction (progress: ${localProgress || loadingProgress}%)`);
+              setLoading(false);
+            }
           } else {
             console.log('✅ Ignoring error - extraction was successful or nearly complete');
           }
@@ -645,17 +601,21 @@ const MediaPlayer = ({
         
       } catch (err) {
         console.error('Stream extraction setup error:', err);
-        setError('Failed to initialize stream extraction');
-        setLoading(false);
+        
+        if (isMounted) {
+          setError('Failed to initialize stream extraction');
+          setLoading(false);
+        }
       }
     };
 
     return () => {
+      isMounted = false; // Mark component as unmounted
       clearTimeout(timeoutId);
     };
   }, [server, mediaType, movieId, seasonId, episodeId]);
 
-  // Initialize HLS when stream URL and type are available
+  // Initialize HLS when video element becomes available
   useEffect(() => {
     console.log('🎬 HLS initialization useEffect triggered:', {
       streamUrl: streamUrl ? streamUrl.substring(0, 100) + '...' : null,
@@ -669,7 +629,15 @@ const MediaPlayer = ({
       console.log('🎬 Video element ready, initializing HLS...');
       initializeHlsPlayer(streamUrl);
     }
-  }, [streamUrl, streamType]);
+  }, [streamUrl, streamType, videoRef.current]);
+
+  // Additional effect to handle case where video ref becomes available after stream URL is set
+  useEffect(() => {
+    if (videoRef.current && streamUrl && streamType === 'hls' && !hlsInstance) {
+      console.log('🎬 Video ref became available after stream URL was set, initializing HLS...');
+      initializeHlsPlayer(streamUrl);
+    }
+  }, [videoRef.current]);
 
   // Initialize direct video streams
   useEffect(() => {
@@ -687,107 +655,93 @@ const MediaPlayer = ({
     }
   }, [streamUrl, streamType]);
 
-  // Reset state when switching episodes or movies (but not on initial mount)
-  const isInitialMount = useRef(true);
-  
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      console.log('🎯 Initial mount, skipping reset');
-      return;
-    }
-    
-    // Don't reset if we're in the middle of loading/extraction
-    if (loading && (loadingProgress > 0 && loadingProgress < 100)) {
-      console.log('🎯 Skipping reset - extraction in progress:', loadingProgress);
-      return;
-    }
-    
-    console.log('🎯 Content changed, resetting player state...', {
-      mediaType,
-      movieId,
-      seasonId, 
-      episodeId
-    });
-    resetPlayerState();
-  }, [movieId, seasonId, episodeId, mediaType]);
-
-  // Cleanup on unmount
+  // Comprehensive cleanup on unmount only
   useEffect(() => {
     return () => {
-      console.log('🧹 MediaPlayer unmounting, cleaning up...');
+      console.log('🧹 Cleaning up MediaPlayer component on unmount...');
+      
+      // Clean up HLS instance
       if (hlsInstance) {
+        console.log('🧹 Destroying HLS instance on unmount');
         hlsInstance.destroy();
       }
+      
+      // Close EventSource connection
       if (progressEventSource) {
+        console.log('🧹 Closing progress EventSource on unmount');
         progressEventSource.close();
       }
-      // Clean up video element on unmount
+      
+      // Pause and reset video element
       if (videoRef.current) {
+        console.log('🧹 Pausing and resetting video element on unmount');
         videoRef.current.pause();
+        videoRef.current.currentTime = 0;
         videoRef.current.src = '';
+        videoRef.current.load(); // Reset video element
       }
     };
-  }, [hlsInstance, progressEventSource]);
+  }, []); // Empty dependency array - only run on unmount
 
-  const handleServerChange = (event) => {
-    const newServer = event.target.value;
-    console.log(`Switching server from ${server} to ${newServer}`);
+  // Clean up when switching to different content (but don't auto-start extraction)
+  useEffect(() => {
+    console.log('🔄 MediaPlayer props changed, cleaning up previous state...');
     
-    // Reset relevant states when switching servers
-    setStreamUrl(null);
-    setError(null);
-    setLoading(true);
-    setStreamType(null);
-    setQualities([]);
-    setSelectedQuality(-1);
-    setLoadingProgress(0);
-    setLoadingPhase('initializing');
-    setExtractionStep("");
-    setExtractionCompleted(false);
-    
-    // Clean up video
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.src = '';
-    }
-    
-    // Clean up HLS instance
+    // Clean up existing connections/instances
     if (hlsInstance) {
+      console.log('🧹 Destroying existing HLS instance on prop change');
       hlsInstance.destroy();
       setHlsInstance(null);
     }
     
+    if (progressEventSource) {
+      console.log('🧹 Closing existing EventSource on prop change');
+      progressEventSource.close();
+      setProgressEventSource(null);
+    }
+    
+    // Reset video element
+    if (videoRef.current) {
+      console.log('🧹 Resetting video element on prop change');
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+      videoRef.current.src = '';
+      videoRef.current.load();
+    }
+    
+    // Reset stream-related state (but keep loading as false to prevent auto-extraction)
+    setStreamUrl(null);
+    setError(null);
+    setStreamType(null);
+    setQualities([]);
+    setSelectedQuality(-1);
+    setAutoSwitching(false);
+    setVideoDuration(0);
+    setExtractionStep("");
+    setRequestId(null);
+    
+    // Reset enhanced loading state
+    setLoadingProgress(0);
+    setLoadingPhase('initializing');
+    setTimeElapsed(0);
+    setEstimatedTimeRemaining(20);
+    setLoadingStartTime(null);
+    setCurrentFactIndex(0);
+    setExtractionCompleted(false);
+    
+    // Note: We don't reset server or set loading=true here to prevent auto-extraction
+  }, [mediaType, movieId, seasonId, episodeId]); // Clean up when content changes
+
+  const handleServerChange = (event) => {
+    const newServer = event.target.value;
+    console.log(`Switching server from ${server} to ${newServer}`);
     setServer(newServer);
   };
 
   const handleRetry = () => {
     console.log('Retrying stream extraction...');
-    
-    // Reset relevant states for retry
-    setStreamUrl(null);
     setError(null);
     setLoading(true);
-    setStreamType(null);
-    setQualities([]);
-    setSelectedQuality(-1);
-    setLoadingProgress(0);
-    setLoadingPhase('initializing');
-    setExtractionStep("");
-    setExtractionCompleted(false);
-    
-    // Clean up video
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.src = '';
-    }
-    
-    // Clean up HLS instance
-    if (hlsInstance) {
-      hlsInstance.destroy();
-      setHlsInstance(null);
-    }
-    
     // Force re-render to trigger useEffect
     setServer(prev => prev);
   };
@@ -795,6 +749,25 @@ const MediaPlayer = ({
   const handleNextEpisode = () => {
     if (episodeId < maxEpisodes) {
       console.log(`Moving to next episode: S${seasonId}E${episodeId + 1}`);
+      
+      // Clean up current episode state before switching
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
+      
+      // Clean up HLS instance
+      if (hlsInstance) {
+        hlsInstance.destroy();
+        setHlsInstance(null);
+      }
+      
+      // Close EventSource connection
+      if (progressEventSource) {
+        progressEventSource.close();
+        setProgressEventSource(null);
+      }
+      
       onEpisodeChange(seasonId, episodeId + 1);
     }
   };
@@ -802,23 +775,54 @@ const MediaPlayer = ({
   const handlePreviousEpisode = () => {
     if (episodeId > 1) {
       console.log(`Moving to previous episode: S${seasonId}E${episodeId - 1}`);
+      
+      // Clean up current episode state before switching
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
+      
+      // Clean up HLS instance
+      if (hlsInstance) {
+        hlsInstance.destroy();
+        setHlsInstance(null);
+      }
+      
+      // Close EventSource connection
+      if (progressEventSource) {
+        progressEventSource.close();
+        setProgressEventSource(null);
+      }
+      
       onEpisodeChange(seasonId, episodeId - 1);
     }
   };
 
   const handleBackToShowDetails = () => {
     console.log(`Returning to show details for season ${seasonId}`);
-    resetPlayerState();
+    
+    // Clean up current playback state before navigating
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+    
+    // Clean up HLS instance
+    if (hlsInstance) {
+      hlsInstance.destroy();
+      setHlsInstance(null);
+    }
+    
+    // Close EventSource connection
+    if (progressEventSource) {
+      progressEventSource.close();
+      setProgressEventSource(null);
+    }
+    
     onBackToShowDetails(seasonId);
   };
 
   const handleVideoError = (e) => {
-    // Ignore errors if we don't have a valid stream URL or if we're still loading
-    if (!streamUrl || loading || !e.target.src) {
-      console.log('Ignoring video error - no stream URL or still loading');
-      return;
-    }
-    
     console.error('Video playback error:', {
       error: e.target.error,
       networkState: e.target.networkState,
@@ -995,12 +999,12 @@ const MediaPlayer = ({
           </div>
         )}
         
-        {/* Video element - always render to ensure ref is available */}
         <div className={styles.videoContainer} style={{ display: (streamUrl && !loading && !error && !autoSwitching) ? 'block' : 'none' }}>            
           <div className={styles.videoWrapper}>
             <video
               ref={videoRef}
               controls
+              autoPlay
               width="100%"
               height="100%"
               className={styles.videoElement}
@@ -1011,23 +1015,21 @@ const MediaPlayer = ({
               onLoadedMetadata={(e) => {
                 const duration = e.target.duration;
                 setVideoDuration(duration);
-                console.log(`Video duration loaded: ${Math.round(duration / 60)} minutes`);
+                console.log('Video duration loaded: ' + Math.round(duration / 60) + ' minutes');
               }}
               onDurationChange={(e) => {
                 const duration = e.target.duration;
                 setVideoDuration(duration);
-                console.log(`Video duration updated: ${Math.round(duration / 60)} minutes`);
+                console.log('Video duration updated: ' + Math.round(duration / 60) + ' minutes');
               }}
               crossOrigin="anonymous"
-              preload="none"
-              src=""
+              preload="metadata"
             >
               Your browser does not support the video tag.
             </video>
 
-              {/* Overlay Controls */}
-              <div className={styles.videoOverlay}>
-                {/* Quality Selector for HLS streams */}
+            <div className={styles.videoOverlay}>
+              <div className={styles.topControls}>
                 {streamType === 'hls' && qualities.length > 0 && (
                   <div className={styles.qualitySelector}>
                     <select 
@@ -1046,26 +1048,25 @@ const MediaPlayer = ({
                   </div>
                 )}
 
-                {/* Server Selector */}
                 <div className={styles.serverSelector}>
                   <select 
                     id="server" 
                     value={server} 
                     onChange={handleServerChange}
                     disabled={loading || autoSwitching}
-                    title="Select streaming server"
                     className={styles.serverDropdown}
                   >
-                    <option value="Vidsrc.xyz">🎯 Vidsrc.xyz</option>
-                    <option value="Embed.su">🔄 Embed.su</option>
+                    <option value="Vidsrc.xyz">Vidsrc.xyz</option>
+                    <option value="Embed.su">Embed.su</option>
                   </select>
                 </div>
+              </div>
 
-                {/* Compact Stream Info */}
+              <div className={styles.bottomControls}>
                 {streamType && (
                   <div className={styles.streamInfo}>
                     <span className={styles.streamType}>
-                      {streamType === 'hls' ? '📺 HLS' : '🎥 Direct'}
+                      {streamType === 'hls' ? 'HLS' : 'Direct'}
                     </span>
                     {qualities.length > 0 && (
                       <span className={styles.qualityCount}>
@@ -1077,43 +1078,38 @@ const MediaPlayer = ({
               </div>
             </div>
           </div>
-      </div>
-      
-      {/* Compact Controls Bar */}
-      <div className={styles.compactControls}>
-        <button 
-          onClick={handleBackToShowDetails} 
-          className={styles.compactButton}
-          disabled={loading || autoSwitching}
-        >
-          ◄ Back
-        </button>
+        </div>
         
-        {mediaType === "tv" && (
-          <div className={styles.episodeControls}>
-            <button
-              onClick={handlePreviousEpisode}
-              disabled={episodeId <= 1 || loading || autoSwitching}
-              className={`${styles.compactButton} ${episodeId <= 1 ? styles.disabled : ""}`}
-              title={episodeId <= 1 ? "No previous episode" : `Previous Episode`}
+        {streamUrl && !loading && !error && !autoSwitching && (
+          <div className={styles.navigationControls}>
+            <button 
+              onClick={handleBackToShowDetails} 
+              className={styles.navButton}
+              disabled={loading || autoSwitching}
             >
-              ◄
+              Back
             </button>
-            <span className={styles.episodeInfo}>S{seasonId}E{episodeId}</span>
-            <button
-              onClick={handleNextEpisode}
-              disabled={episodeId >= maxEpisodes || loading || autoSwitching}
-              className={`${styles.compactButton} ${episodeId >= maxEpisodes ? styles.disabled : ""}`}
-              title={episodeId >= maxEpisodes ? "No next episode" : `Next Episode`}
-            >
-              ►
-            </button>
+            
+            {mediaType === "tv" && (
+              <div className={styles.episodeNavigation}>
+                <button
+                  onClick={handlePreviousEpisode}
+                  disabled={episodeId <= 1 || loading || autoSwitching}
+                  className={episodeId <= 1 ? styles.navButton + " " + styles.disabled : styles.navButton}
+                >
+                  Previous
+                </button>
+                <span className={styles.episodeInfo}>S{seasonId}E{episodeId}</span>
+                <button
+                  onClick={handleNextEpisode}
+                  disabled={episodeId >= maxEpisodes || loading || autoSwitching}
+                  className={episodeId >= maxEpisodes ? styles.navButton + " " + styles.disabled : styles.navButton}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
-        )}
-
-        {/* Debug Info - Minimal */}
-        {process.env.NODE_ENV === 'development' && requestId && (
-          <span className={styles.debugId}>ID: {requestId.slice(-8)}</span>
         )}
       </div>
     </div>
