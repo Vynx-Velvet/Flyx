@@ -52,7 +52,9 @@ const Recommendations = ({ contentId, contentType, title = "You Might Also Like"
     };
 
     const handleItemClick = (item) => {
-        router.push(`/details/${item.id}`);
+        // Ensure media_type is present, fallback to contentType or detect from data structure
+        const mediaType = item.media_type || contentType || (item.title ? 'movie' : 'tv');
+        router.push(`/details/${item.id}?type=${mediaType}`);
     };
 
     const getTitle = (item) => {

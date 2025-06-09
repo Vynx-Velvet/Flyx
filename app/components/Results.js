@@ -131,9 +131,9 @@ const Results = ({ category, movieClick }) => {
                   <div className="movie-details">
                     <p>{movie.media_type}</p>
                     <p><strong>Title:</strong> {movie.title || movie.name}</p>
-                    <p><strong>Country:</strong> {movie.origin_country[1]  ? <><Flag code={movie.origin_country[0]} style={{width: '12px'}}/> <Flag code={movie.origin_country[1]} style={{width: '12px'}}/> </>: <Flag code={movie.origin_country[0]} style={{width: '24px'}}/>}</p>
-                    <p><strong>Rating:</strong> {`${movie.vote_average}⭐` || 'N/A'}</p>
-                    <p><strong>Release Year:</strong> {movie.first_air_date?.split('-')[0] || 'N/A'}</p>
+                    <p><strong>Country:</strong> {movie.origin_country && movie.origin_country.length > 1 ? <><Flag code={movie.origin_country[0]} style={{width: '12px'}}/> <Flag code={movie.origin_country[1]} style={{width: '12px'}}/> </> : movie.origin_country && movie.origin_country.length > 0 ? <Flag code={movie.origin_country[0]} style={{width: '24px'}}/> : 'N/A'}</p>
+                    <p><strong>Rating:</strong> {movie.vote_average ? `${movie.vote_average}⭐` : 'N/A'}</p>
+                    <p><strong>Release Year:</strong> {(movie.release_date || movie.first_air_date)?.split('-')[0] || 'N/A'}</p>
                   </div>
                 )}
               </div>
