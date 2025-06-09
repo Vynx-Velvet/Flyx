@@ -12,6 +12,8 @@ const ShowDetails = ({ movieId, clearMovie }) => {
   const [selectedSeason, setSelectedSeason] = useState(0); // Tracks which season is selected
   const [selectedEpisode, setSelectedEpisode] = useState(null); // Tracks which episode is selected
 
+  console.log('🎯 ShowDetails rendered with:', { movieId, selectedEpisode, selectedSeason });
+
   useEffect(() => {
     const fetchMovieDetails = async () => {
       try {
@@ -56,6 +58,7 @@ const ShowDetails = ({ movieId, clearMovie }) => {
   };
 
   const handleEpisodeClick = (episode) => {
+    console.log('📺 Episode clicked:', episode);
     setSelectedEpisode(episode); // Set the clicked episode as the selected episode
   };
 
@@ -83,8 +86,10 @@ const ShowDetails = ({ movieId, clearMovie }) => {
 
   const { movie, seasons } = movieDetails;
 
-  // If an episode is selected OR it's a movie that was clicked to play, show the MediaPlayer
+  // Only show MediaPlayer when an episode is explicitly selected
   if (selectedEpisode) {
+    console.log('🎬 Rendering MediaPlayer for selectedEpisode:', selectedEpisode);
+    
     if (movieId.media_type === "movie") {
       // For movies, we don't need season/episode info
       return (
@@ -99,9 +104,16 @@ const ShowDetails = ({ movieId, clearMovie }) => {
           onBackToShowDetails={() => setSelectedEpisode(null)}
         />
       );
-    } else {
-      // For TV shows, use the existing logic
+    } else if (movieId.media_type === "tv" && selectedEpisode.episode_number) {
+      // For TV shows, ensure we have valid episode data
       const maxEpisodes = seasons ? seasons[selectedSeason]?.episodes?.length : null;
+      console.log('🎬 TV MediaPlayer props:', {
+        movieId: movieId.id,
+        seasonId: selectedSeason + 1,
+        episodeId: selectedEpisode.episode_number,
+        maxEpisodes
+      });
+      
       return (
         <MediaPlayer
           key={`tv-${movieId.id}-s${selectedSeason + 1}-e${selectedEpisode.episode_number}`}
@@ -114,6 +126,9 @@ const ShowDetails = ({ movieId, clearMovie }) => {
           onBackToShowDetails={handleBackToShowDetails}
         />
       );
+    } else {
+      console.error('❌ Invalid episode data for MediaPlayer:', selectedEpisode);
+      setSelectedEpisode(null); // Reset if invalid
     }
   }
 

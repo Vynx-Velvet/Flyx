@@ -403,9 +403,14 @@ const MediaPlayer = ({
         params.append('movieId', movieId.toString());
         params.append('server', server === "Vidsrc.xyz" ? "vidsrc.xyz" : "embed.su");
         
-        if (mediaType === 'tv') {
+        if (mediaType === 'tv' && seasonId && episodeId) {
           params.append('seasonId', seasonId.toString());
           params.append('episodeId', episodeId.toString());
+        } else if (mediaType === 'tv') {
+          console.error('❌ TV show without valid season/episode IDs:', { seasonId, episodeId });
+          setError('Invalid episode data - missing season or episode ID');
+          setLoading(false);
+          return;
         }
         
         // Create Server-Sent Events connection for real-time progress
