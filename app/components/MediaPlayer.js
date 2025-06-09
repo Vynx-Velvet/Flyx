@@ -41,23 +41,26 @@ const MediaPlayer = ({
   const resetPlayerState = () => {
     console.log('🔄 Resetting player state...');
     
-    // Clean up video element first
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.src = '';
-      videoRef.current.load();
-    }
-    
-    // Clean up HLS instance
+    // Clean up HLS instance first (most important)
     if (hlsInstance) {
+      console.log('🧹 Destroying HLS instance...');
       hlsInstance.destroy();
       setHlsInstance(null);
     }
     
     // Clean up event source
     if (progressEventSource) {
+      console.log('🧹 Closing progress event source...');
       progressEventSource.close();
       setProgressEventSource(null);
+    }
+    
+    // Clean up video element
+    if (videoRef.current) {
+      console.log('🧹 Cleaning up video element...');
+      videoRef.current.pause();
+      videoRef.current.src = '';
+      videoRef.current.load();
     }
     
     // Reset all state variables
@@ -287,24 +290,33 @@ const MediaPlayer = ({
         
         setQualities(qualityLevels);
         
-        // Auto-play after a brief delay to ensure video element is ready
+        // Auto-play after HLS is fully ready
         if (videoRef.current) {
-          console.log('🎬 Attempting auto-play...');
-          setTimeout(() => {
-            if (videoRef.current) {
-              console.log('🎬 Video element ready state:', videoRef.current.readyState);
-              console.log('🎬 Video element src:', videoRef.current.src || 'no src');
+          console.log('🎬 Manifest parsed, preparing for auto-play...');
+          
+          // Wait for video to be ready to play
+          const attemptPlay = () => {
+            if (videoRef.current && videoRef.current.readyState >= 2) {
+              console.log('🎬 Video ready, attempting auto-play...');
+              console.log('🎬 Video element state:', {
+                readyState: videoRef.current.readyState,
+                networkState: videoRef.current.networkState,
+                currentSrc: videoRef.current.currentSrc,
+                duration: videoRef.current.duration
+              });
+              
               videoRef.current.play().catch(e => {
                 console.log('Auto-play prevented:', e);
-                console.log('Video element state:', {
-                  readyState: videoRef.current.readyState,
-                  networkState: videoRef.current.networkState,
-                  paused: videoRef.current.paused,
-                  currentSrc: videoRef.current.currentSrc
-                });
+                console.log('User interaction required for playback');
               });
+            } else {
+              console.log('🎬 Video not ready yet, waiting...');
+              setTimeout(attemptPlay, 200);
             }
-          }, 500);
+          };
+          
+          // Start attempting auto-play after a short delay
+          setTimeout(attemptPlay, 1000);
         }
       });
 
@@ -341,6 +353,9 @@ const MediaPlayer = ({
         console.log(`Fragment loaded via ${loadMethod}:`, data.frag.url?.substring(0, 100));
       });
 
+      // Store HLS instance first to prevent race conditions
+      setHlsInstance(hls);
+      
       // Load the stream
       console.log('🔗 Loading HLS source:', streamUrl.substring(0, 100) + '...');
       hls.loadSource(streamUrl);
@@ -349,7 +364,6 @@ const MediaPlayer = ({
       hls.attachMedia(videoRef.current);
       
       console.log('✅ HLS instance created and attached');
-      setHlsInstance(hls);
       
     } catch (error) {
       console.error('Failed to initialize HLS player:', error);
@@ -683,6 +697,12 @@ const MediaPlayer = ({
       return;
     }
     
+    // Don't reset if we're in the middle of loading/extraction
+    if (loading && (loadingProgress > 0 && loadingProgress < 100)) {
+      console.log('🎯 Skipping reset - extraction in progress:', loadingProgress);
+      return;
+    }
+    
     console.log('🎯 Content changed, resetting player state...', {
       mediaType,
       movieId,
@@ -981,7 +1001,6 @@ const MediaPlayer = ({
             <video
               ref={videoRef}
               controls
-              autoPlay
               width="100%"
               height="100%"
               className={styles.videoElement}
@@ -1000,7 +1019,8 @@ const MediaPlayer = ({
                 console.log(`Video duration updated: ${Math.round(duration / 60)} minutes`);
               }}
               crossOrigin="anonymous"
-              preload="metadata"
+              preload="none"
+              src=""
             >
               Your browser does not support the video tag.
             </video>
