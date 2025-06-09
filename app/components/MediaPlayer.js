@@ -37,6 +37,47 @@ const MediaPlayer = ({
   
   const videoRef = useRef(null);
 
+  // Reset all states to initial values
+  const resetPlayerState = () => {
+    console.log('🔄 Resetting player state...');
+    setStreamUrl(null);
+    setLoading(true);
+    setError(null);
+    setExtractionStep("");
+    setRequestId(null);
+    setStreamType(null);
+    setQualities([]);
+    setSelectedQuality(-1);
+    setAutoSwitching(false);
+    setVideoDuration(0);
+    setLoadingProgress(0);
+    setLoadingPhase('initializing');
+    setTimeElapsed(0);
+    setEstimatedTimeRemaining(20);
+    setLoadingStartTime(null);
+    setCurrentFactIndex(0);
+    setExtractionCompleted(false);
+    
+    // Clean up video element
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.src = '';
+      videoRef.current.load();
+    }
+    
+    // Clean up HLS instance
+    if (hlsInstance) {
+      hlsInstance.destroy();
+      setHlsInstance(null);
+    }
+    
+    // Clean up event source
+    if (progressEventSource) {
+      progressEventSource.close();
+      setProgressEventSource(null);
+    }
+  };
+
   // Fun facts to rotate through during loading
   const funFacts = [
     "💡 We're using advanced browser automation to extract your stream securely!",
@@ -614,14 +655,31 @@ const MediaPlayer = ({
     }
   }, [streamUrl, streamType]);
 
+  // Reset state when switching episodes or movies
+  useEffect(() => {
+    console.log('🎯 Content changed, resetting player state...', {
+      mediaType,
+      movieId,
+      seasonId, 
+      episodeId
+    });
+    resetPlayerState();
+  }, [movieId, seasonId, episodeId, mediaType]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      console.log('🧹 MediaPlayer unmounting, cleaning up...');
       if (hlsInstance) {
         hlsInstance.destroy();
       }
       if (progressEventSource) {
         progressEventSource.close();
+      }
+      // Clean up video element on unmount
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.src = '';
       }
     };
   }, [hlsInstance, progressEventSource]);
@@ -629,13 +687,61 @@ const MediaPlayer = ({
   const handleServerChange = (event) => {
     const newServer = event.target.value;
     console.log(`Switching server from ${server} to ${newServer}`);
+    
+    // Reset relevant states when switching servers
+    setStreamUrl(null);
+    setError(null);
+    setLoading(true);
+    setStreamType(null);
+    setQualities([]);
+    setSelectedQuality(-1);
+    setLoadingProgress(0);
+    setLoadingPhase('initializing');
+    setExtractionStep("");
+    setExtractionCompleted(false);
+    
+    // Clean up video
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.src = '';
+    }
+    
+    // Clean up HLS instance
+    if (hlsInstance) {
+      hlsInstance.destroy();
+      setHlsInstance(null);
+    }
+    
     setServer(newServer);
   };
 
   const handleRetry = () => {
     console.log('Retrying stream extraction...');
+    
+    // Reset relevant states for retry
+    setStreamUrl(null);
     setError(null);
     setLoading(true);
+    setStreamType(null);
+    setQualities([]);
+    setSelectedQuality(-1);
+    setLoadingProgress(0);
+    setLoadingPhase('initializing');
+    setExtractionStep("");
+    setExtractionCompleted(false);
+    
+    // Clean up video
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.src = '';
+    }
+    
+    // Clean up HLS instance
+    if (hlsInstance) {
+      hlsInstance.destroy();
+      setHlsInstance(null);
+    }
+    
     // Force re-render to trigger useEffect
     setServer(prev => prev);
   };
@@ -656,6 +762,7 @@ const MediaPlayer = ({
 
   const handleBackToShowDetails = () => {
     console.log(`Returning to show details for season ${seasonId}`);
+    resetPlayerState();
     onBackToShowDetails(seasonId);
   };
 

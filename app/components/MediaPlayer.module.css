@@ -338,6 +338,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
+  z-index: 10;
 }
 
 .videoOverlay > * {
@@ -366,6 +367,39 @@
   border-color: rgba(59, 130, 246, 0.5);
 }
 
+.serverSelector {
+  position: absolute;
+  top: clamp(8px, 2vmin, 12px);
+  left: clamp(8px, 2vmin, 12px);
+}
+
+.streamInfo {
+  position: absolute;
+  bottom: clamp(8px, 2vmin, 12px);
+  left: clamp(8px, 2vmin, 12px);
+  display: flex;
+  gap: clamp(4px, 1vmin, 8px);
+  align-items: center;
+}
+
+.streamType {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: clamp(2px, 0.5vmin, 4px) clamp(6px, 1.5vmin, 8px);
+  border-radius: clamp(2px, 0.5vmin, 4px);
+  font-size: clamp(0.6rem, 1.4vmin, 0.8rem);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.qualityCount {
+  background: rgba(0, 0, 0, 0.8);
+  color: rgba(255, 255, 255, 0.8);
+  padding: clamp(2px, 0.5vmin, 4px) clamp(6px, 1.5vmin, 8px);
+  border-radius: clamp(2px, 0.5vmin, 4px);
+  font-size: clamp(0.6rem, 1.4vmin, 0.8rem);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+}
+
 .compactControls {
   display: flex;
   align-items: center;
@@ -378,6 +412,8 @@
   flex-wrap: wrap;
   min-height: clamp(32px, 8vmin, 44px);
   box-sizing: border-box;
+  z-index: 15;
+  position: relative;
 }
 
 .compactButton {
@@ -401,6 +437,33 @@
 .compactButton.disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.episodeControls {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.5vmin, 10px);
+}
+
+.episodeInfo {
+  padding: clamp(4px, 1vmin, 6px) clamp(8px, 2vmin, 12px);
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: clamp(2px, 0.5vmin, 4px);
+  color: white;
+  font-size: clamp(0.65rem, 1.5vmin, 0.85rem);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.debugId {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: clamp(0.5rem, 1.2vmin, 0.7rem);
+  font-family: ui-monospace, 'SF Mono', monospace;
+  background: rgba(75, 85, 99, 0.2);
+  padding: clamp(2px, 0.5vmin, 4px) clamp(4px, 1vmin, 6px);
+  border-radius: clamp(2px, 0.5vmin, 4px);
+  border: 1px solid rgba(75, 85, 99, 0.3);
 }
 
 /* ========================================
