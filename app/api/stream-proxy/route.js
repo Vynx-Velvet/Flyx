@@ -41,23 +41,32 @@ function validateStreamUrl(url, logger) {
 
 // Get appropriate headers for the stream request
 function getStreamHeaders(originalUrl, userAgent, logger, source) {
+  // Check if this is a subtitle file
+  const isSubtitle = originalUrl.includes('.vtt') || originalUrl.includes('.srt');
+  
   // Check if this came from vidsrc.xyz (use clean headers) or shadowlandschronicles (always clean)
   const isVidsrc = source === 'vidsrc';
   const isShadowlands = originalUrl.includes('shadowlandschronicles');
-  const needsCleanHeaders = isVidsrc || isShadowlands;
+  const isCloudnestra = originalUrl.includes('cloudnestra.com');
+  const needsCleanHeaders = isVidsrc || isShadowlands || isCloudnestra || isSubtitle;
   
   if (needsCleanHeaders) {
-    // Minimal headers for vidsrc.xyz sources or shadowlandschronicles - no referer/origin/fetch headers
+    // Minimal headers for vidsrc.xyz sources, shadowlandschronicles, cloudnestra, or subtitle files
     const headers = {
       'User-Agent': userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': '*/*',
+      'Accept': isSubtitle ? 'text/vtt, text/plain, */*' : '*/*',
       'Accept-Language': 'en-US,en;q=0.9'
     };
     
     logger.debug('Using clean headers', {
-      reason: isVidsrc ? 'vidsrc source' : 'shadowlandschronicles URL',
+      reason: isVidsrc ? 'vidsrc source' : 
+               isShadowlands ? 'shadowlandschronicles URL' : 
+               isCloudnestra ? 'cloudnestra URL' :
+               isSubtitle ? 'subtitle file' : 'unknown',
       isVidsrc,
-      isShadowlands
+      isShadowlands,
+      isCloudnestra,
+      isSubtitle
     });
     
     return headers;
@@ -89,6 +98,8 @@ function getStreamHeaders(originalUrl, userAgent, logger, source) {
     headers['Accept'] = 'video/MP2T, */*';
   } else if (originalUrl.includes('.mp4')) {
     headers['Accept'] = 'video/mp4, */*';
+  } else if (originalUrl.includes('.vtt') || originalUrl.includes('.srt')) {
+    headers['Accept'] = 'text/vtt, text/plain, */*';
   }
 
   logger.debug('Request headers prepared', {
@@ -314,6 +325,10 @@ export async function GET(request) {
     const isM3U8 = streamUrl.includes('.m3u8') || 
                    contentType.includes('application/vnd.apple.mpegurl') || 
                    contentType.includes('application/x-mpegURL');
+    
+    // Check if this is a subtitle file
+    const isSubtitle = streamUrl.includes('.vtt') || streamUrl.includes('.srt') ||
+                      contentType.includes('text/vtt') || contentType.includes('text/plain');
 
     if (isM3U8) {
       // Process M3U8 playlist to rewrite URLs
@@ -356,6 +371,55 @@ export async function GET(request) {
         // Fallback to original content
         const fallbackContent = await response.text();
         return new NextResponse(fallbackContent, {
+          status: response.status,
+          headers: responseHeaders
+        });
+      }
+    } else if (isSubtitle) {
+      // Handle subtitle files with proper content-type
+      const subtitleProcessingStart = Date.now();
+      logger.info('Processing subtitle file', {
+        originalUrl: streamUrl.substring(0, 100),
+        contentType,
+        isVTT: streamUrl.includes('.vtt'),
+        isSRT: streamUrl.includes('.srt')
+      });
+
+      try {
+        const subtitleContent = await response.text();
+        
+        // Prepare response headers for subtitle
+        const responseHeaders = getResponseHeaders(response, logger, true);
+        
+        // Set appropriate content-type for subtitles
+        if (streamUrl.includes('.vtt') || contentType.includes('text/vtt')) {
+          responseHeaders.set('content-type', 'text/vtt; charset=utf-8');
+        } else if (streamUrl.includes('.srt')) {
+          responseHeaders.set('content-type', 'text/plain; charset=utf-8');
+        } else {
+          responseHeaders.set('content-type', 'text/plain; charset=utf-8');
+        }
+        
+        // Set correct content-length header
+        const subtitleBuffer = Buffer.from(subtitleContent, 'utf-8');
+        responseHeaders.set('content-length', subtitleBuffer.length.toString());
+        
+        logger.info('Subtitle file processed successfully', {
+          originalLength: subtitleContent.length,
+          processedLength: subtitleBuffer.length,
+          contentType: responseHeaders.get('content-type'),
+          processingTime: Date.now() - subtitleProcessingStart
+        });
+
+        return new NextResponse(subtitleBuffer, {
+          status: response.status,
+          headers: responseHeaders
+        });
+      } catch (subtitleError) {
+        logger.error('Subtitle processing failed', subtitleError);
+        // Fallback to original content
+        const responseHeaders = getResponseHeaders(response, logger);
+        return new NextResponse(response.body, {
           status: response.status,
           headers: responseHeaders
         });
@@ -444,6 +508,7 @@ export async function HEAD(request) {
 
   const { searchParams } = new URL(request.url);
   const streamUrl = searchParams.get('url');
+  const source = searchParams.get('source');
 
   const validation = validateStreamUrl(streamUrl, logger);
   if (!validation.isValid) {
@@ -451,7 +516,7 @@ export async function HEAD(request) {
   }
 
   try {
-    const headers = getStreamHeaders(streamUrl, request.headers.get('user-agent'), logger);
+    const headers = getStreamHeaders(streamUrl, request.headers.get('user-agent'), logger, source);
     
     const response = await fetch(streamUrl, {
       method: 'HEAD',
@@ -460,6 +525,16 @@ export async function HEAD(request) {
     });
 
     const responseHeaders = getResponseHeaders(response, logger);
+    
+    // Set appropriate content-type for subtitle files
+    const isSubtitle = streamUrl.includes('.vtt') || streamUrl.includes('.srt');
+    if (isSubtitle) {
+      if (streamUrl.includes('.vtt')) {
+        responseHeaders.set('content-type', 'text/vtt; charset=utf-8');
+      } else if (streamUrl.includes('.srt')) {
+        responseHeaders.set('content-type', 'text/plain; charset=utf-8');
+      }
+    }
     
     return new NextResponse(null, {
       status: response.status,

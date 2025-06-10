@@ -498,6 +498,44 @@
   border: 1px solid rgba(75, 85, 99, 0.3);
 }
 
+/* ======== SUBTITLE CONTROLS ======== */
+.subtitleSelector {
+  /* Positioned within topControls flex container */
+}
+
+.subtitleDropdown {
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: clamp(2px, 0.5vmin, 4px);
+  color: white;
+  padding: clamp(4px, 1vmin, 6px) clamp(8px, 1.5vmin, 10px);
+  font-size: clamp(0.65rem, 1.5vmin, 0.85rem);
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  backdrop-filter: blur(8px);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.subtitleDropdown:hover {
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.subtitleDropdown:focus {
+  outline: none;
+  border-color: rgba(168, 85, 247, 0.7);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+}
+
+.subtitleCount {
+  background: rgba(0, 0, 0, 0.8);
+  color: rgba(168, 85, 247, 0.9);
+  padding: clamp(2px, 0.5vmin, 4px) clamp(6px, 1.5vmin, 8px);
+  border-radius: clamp(2px, 0.5vmin, 4px);
+  font-size: clamp(0.6rem, 1.4vmin, 0.8rem);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  font-weight: 500;
+}
+
 .compactControls {
   display: flex;
   align-items: center;

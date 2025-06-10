@@ -25,6 +25,11 @@ const MediaPlayer = ({
   const [autoSwitching, setAutoSwitching] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0); // Video duration in seconds
   
+  // Subtitle state
+  const [subtitles, setSubtitles] = useState([]);
+  const [selectedSubtitle, setSelectedSubtitle] = useState('off'); // 'off' or subtitle index
+  const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
+  
   // Enhanced loading state with real-time progress
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingPhase, setLoadingPhase] = useState('initializing');
@@ -312,6 +317,62 @@ const MediaPlayer = ({
     }
   };
 
+  // Handle subtitle change
+  const handleSubtitleChange = (subtitleIndex) => {
+    console.log('🎬 Changing subtitle track:', { from: selectedSubtitle, to: subtitleIndex });
+    
+    if (videoRef.current) {
+      // Remove all existing text tracks
+      const textTracks = videoRef.current.textTracks;
+      for (let i = 0; i < textTracks.length; i++) {
+        textTracks[i].mode = 'disabled';
+      }
+      
+      // Remove all existing track elements
+      const existingTracks = videoRef.current.querySelectorAll('track');
+      existingTracks.forEach(track => track.remove());
+      
+      setSelectedSubtitle(subtitleIndex);
+      
+      if (subtitleIndex === 0 || subtitleIndex === 'off') {
+        // Turn off subtitles
+        console.log('🎬 Subtitles turned off');
+        setShowSubtitleMenu(false);
+        return;
+      }
+      
+      const selectedSub = subtitles[subtitleIndex];
+      if (selectedSub && selectedSub.url) {
+        // Add new subtitle track
+        const track = document.createElement('track');
+        track.kind = 'subtitles';
+        track.src = `/api/stream-proxy?url=${encodeURIComponent(selectedSub.url)}`;
+        track.srclang = selectedSub.code || 'en';
+        track.label = selectedSub.label || selectedSub.language;
+        track.default = true;
+        
+        videoRef.current.appendChild(track);
+        
+        // Enable the track when it loads
+        track.addEventListener('load', () => {
+          if (videoRef.current && videoRef.current.textTracks.length > 0) {
+            const textTrack = videoRef.current.textTracks[videoRef.current.textTracks.length - 1];
+            textTrack.mode = 'showing';
+            console.log('🎬 Subtitle track loaded and enabled:', selectedSub.language);
+          }
+        });
+        
+        console.log('🎬 Added subtitle track:', {
+          language: selectedSub.language,
+          url: selectedSub.url.substring(0, 100) + '...',
+          code: selectedSub.code
+        });
+      }
+    }
+    
+    setShowSubtitleMenu(false);
+  };
+
   // Main stream extraction and setup
   useEffect(() => {
     // Only start extraction if we have valid content to extract
@@ -462,23 +523,56 @@ const MediaPlayer = ({
                 return;
               }
               
-              // Process stream URL
-              const isVidsrc = extractData.server === 'vidsrc.xyz';
-              const isShadowlandschronicles = extractData.streamUrl.includes('shadowlandschronicles');
+              // CRITICAL FIX: Process stream URL - FORCE DIRECT ACCESS FOR VIDSRC.XYZ
+              console.log('🚨🚨🚨 UPDATED CODE LOADED - TIMESTAMP: ' + new Date().toISOString() + ' 🚨🚨🚨');
+              console.log('🚨 STREAM URL PROCESSING - FORCE DIRECT FOR VIDSRC.XYZ', {
+                'server': extractData.server,
+                'url': extractData.streamUrl?.substring(0, 100),
+                'isM3U8': extractData.streamUrl?.includes('.m3u8'),
+                'type': extractData.type
+              });
+              
               let finalStreamUrl;
               
-              if (isVidsrc && !isShadowlandschronicles) {
+              // FORCE DIRECT ACCESS FOR ALL VIDSRC.XYZ URLs - NO PROXY!
+              if (extractData.server === 'vidsrc.xyz') {
                 finalStreamUrl = extractData.streamUrl;
-                console.log('Using direct access for vidsrc.xyz URL');
-              } else if (isVidsrc && isShadowlandschronicles) {
-                finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=vidsrc`;
-                console.log('Using proxy for shadowlandschronicles URL');
+                console.log('🎯🎯🎯 FORCING DIRECT ACCESS FOR VIDSRC.XYZ - NO PROXY!');
+                console.log('🎯 DIRECT URL:', finalStreamUrl);
               } else {
+                // Only use proxy for embed.su
                 finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=embed.su`;
-                console.log('Using proxy for embed.su URL');
+                console.log('🔄 Using proxy for embed.su URL');
               }
               
               console.log('🔗 Setting stream URL:', finalStreamUrl.substring(0, 100) + '...');
+              
+              // Process subtitles
+              const extractedSubtitles = extractData.subtitles || [];
+              console.log('📝 Processing subtitles:', {
+                count: extractedSubtitles.length,
+                hasEnglish: !!extractData.englishSubtitles,
+                languages: extractedSubtitles.slice(0, 5).map(s => s.language)
+              });
+              
+              // Set subtitles with 'off' option first
+              const processedSubtitles = [
+                { language: 'Off', code: 'off', label: 'Off', url: null },
+                ...extractedSubtitles
+              ];
+              
+              if (isMounted) {
+                setSubtitles(processedSubtitles);
+                // Auto-select English subtitles if available, otherwise keep 'off'
+                const englishIndex = processedSubtitles.findIndex(sub => sub.code === 'eng');
+                if (englishIndex !== -1) {
+                  setSelectedSubtitle(englishIndex);
+                  console.log('🎯 Auto-selected English subtitles');
+                } else {
+                  setSelectedSubtitle(0); // 'Off'
+                  console.log('🎯 No English subtitles found, keeping subtitles off');
+                }
+              }
               
               // Only update state if component is still mounted
               if (isMounted) {
@@ -639,6 +733,21 @@ const MediaPlayer = ({
     }
   }, [videoRef.current]);
 
+  // Apply subtitle tracks when video loads or subtitle selection changes
+  useEffect(() => {
+    if (videoRef.current && subtitles.length > 0 && selectedSubtitle !== 'off' && selectedSubtitle !== 0) {
+      const selectedSub = subtitles[selectedSubtitle];
+      if (selectedSub && selectedSub.url) {
+        // Small delay to ensure video is ready
+        const timer = setTimeout(() => {
+          handleSubtitleChange(selectedSubtitle);
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [streamUrl, subtitles, selectedSubtitle]);
+
   // Initialize direct video streams
   useEffect(() => {
     console.log('🎬 Direct video initialization useEffect triggered:', {
@@ -719,6 +828,11 @@ const MediaPlayer = ({
     setVideoDuration(0);
     setExtractionStep("");
     setRequestId(null);
+    
+    // Reset subtitle state
+    setSubtitles([]);
+    setSelectedSubtitle('off');
+    setShowSubtitleMenu(false);
     
     // Reset enhanced loading state
     setLoadingProgress(0);
@@ -1048,6 +1162,23 @@ const MediaPlayer = ({
                   </div>
                 )}
 
+                {subtitles.length > 0 && (
+                  <div className={styles.subtitleSelector}>
+                    <select 
+                      id="subtitles" 
+                      value={selectedSubtitle} 
+                      onChange={(e) => handleSubtitleChange(parseInt(e.target.value))}
+                      className={styles.subtitleDropdown}
+                    >
+                      {subtitles.map((subtitle, index) => (
+                        <option key={index} value={index}>
+                          {subtitle.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className={styles.serverSelector}>
                   <select 
                     id="server" 
@@ -1071,6 +1202,11 @@ const MediaPlayer = ({
                     {qualities.length > 0 && (
                       <span className={styles.qualityCount}>
                         {qualities.length} qualities
+                      </span>
+                    )}
+                    {subtitles.length > 1 && (
+                      <span className={styles.subtitleCount}>
+                        {subtitles.length - 1} subtitles
                       </span>
                     )}
                   </div>

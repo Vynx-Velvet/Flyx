@@ -130,7 +130,10 @@ export async function GET(request) {
       server: vmData.server,
       totalFound: vmData.totalFound,
       requestId: vmData.requestId,
-      vmResponseTime
+      vmResponseTime,
+      hasSubtitles: !!vmData.subtitles,
+      subtitleCount: vmData.subtitleCount || 0,
+      hasEnglishSubtitles: !!vmData.englishSubtitles
     });
 
     // Add proxy metadata to response

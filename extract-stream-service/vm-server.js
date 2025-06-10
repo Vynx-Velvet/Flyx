@@ -216,9 +216,122 @@ async function getBrowserConfig(logger) {
   };
 }
 
-// Setup stream interception to capture m3u8 URLs
+// Process subtitle URL to generate English and other language variants
+function processSubtitleUrl(originalUrl, logger) {
+  const subtitles = [];
+  
+  try {
+    // Check if this looks like a cloudnestra subtitle URL pattern
+    if (originalUrl.includes('/subs/') && originalUrl.includes('.vtt')) {
+      // Extract the base URL and hash
+      // Example: https://cloudnestra.com/subs/d15447dc0714a7f83b92a58f165e306c/Arabic.ara.vtt
+      const urlParts = originalUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1]; // Arabic.ara.vtt
+      const hash = urlParts[urlParts.length - 2]; // d15447dc0714a7f83b92a58f165e306c
+      const baseUrl = urlParts.slice(0, -1).join('/'); // https://cloudnestra.com/subs/d15447dc0714a7f83b92a58f165e306c
+      
+      // Extract language code from filename
+      const fileNameParts = fileName.split('.');
+      if (fileNameParts.length >= 3) {
+        const originalLanguage = fileNameParts[0]; // Arabic
+        const originalCode = fileNameParts[1]; // ara
+        const extension = fileNameParts[2]; // vtt
+        
+        logger.info('Processing subtitle URL', {
+          originalUrl: originalUrl.substring(0, 100),
+          originalLanguage,
+          originalCode,
+          hash: hash.substring(0, 10) + '...'
+        });
+        
+        // Add the original subtitle
+        subtitles.push({
+          url: originalUrl,
+          language: originalLanguage,
+          code: originalCode,
+          label: originalLanguage,
+          isOriginal: true
+        });
+        
+        // Generate English variant
+        const englishUrl = `${baseUrl}/English.eng.${extension}`;
+        subtitles.push({
+          url: englishUrl,
+          language: 'English',
+          code: 'eng',
+          label: 'English',
+          isOriginal: false
+        });
+        
+        // Generate common language variants
+        const commonLanguages = [
+          { name: 'Spanish', code: 'spa' },
+          { name: 'French', code: 'fre' },
+          { name: 'German', code: 'ger' },
+          { name: 'Italian', code: 'ita' },
+          { name: 'Portuguese', code: 'por' },
+          { name: 'Russian', code: 'rus' },
+          { name: 'Chinese', code: 'chi' },
+          { name: 'Japanese', code: 'jpn' },
+          { name: 'Korean', code: 'kor' },
+          { name: 'Hindi', code: 'hin' },
+          { name: 'Dutch', code: 'dut' },
+          { name: 'Swedish', code: 'swe' },
+          { name: 'Turkish', code: 'tur' }
+        ];
+        
+        // Only add variants if they're different from the original
+        commonLanguages.forEach(lang => {
+          if (lang.code !== originalCode) {
+            subtitles.push({
+              url: `${baseUrl}/${lang.name}.${lang.code}.${extension}`,
+              language: lang.name,
+              code: lang.code,
+              label: lang.name,
+              isOriginal: false
+            });
+          }
+        });
+        
+        logger.info('Generated subtitle variants', {
+          total: subtitles.length,
+          original: originalLanguage,
+          variants: subtitles.slice(1, 4).map(s => s.language) // Log first 3 variants
+        });
+      }
+    } else {
+      // For other subtitle patterns, just add as-is
+      subtitles.push({
+        url: originalUrl,
+        language: 'Unknown',
+        code: 'unk',
+        label: 'Subtitles',
+        isOriginal: true
+      });
+    }
+  } catch (error) {
+    logger.warn('Error processing subtitle URL', {
+      url: originalUrl.substring(0, 100),
+      error: error.message
+    });
+    
+    // Fallback: add as-is
+    subtitles.push({
+      url: originalUrl,
+      language: 'Unknown',
+      code: 'unk',
+      label: 'Subtitles',
+      isOriginal: true
+    });
+  }
+  
+  return subtitles;
+}
+
+// Setup stream interception to capture m3u8 URLs and subtitles
 function setupStreamInterception(page, logger, targetUrl = '') {
   const streamUrls = [];
+  const subtitleUrls = [];
   let responseCount = 0;
 
   // Intercept network responses
@@ -239,6 +352,13 @@ function setupStreamInterception(page, logger, targetUrl = '') {
         });
       }
 
+      // Check for subtitle files (VTT)
+      const isSubtitleResponse = 
+        contentType.includes('text/vtt') ||
+        responseUrl.includes('.vtt') ||
+        responseUrl.includes('/subs/') ||
+        (contentType.includes('text/plain') && responseUrl.includes('.vtt'));
+
       // Check for shadowlandschronicles URLs with master playlists
       const isShadowlandschronicles = responseUrl.includes('shadowlandschronicles') && responseUrl.includes('master');
       
@@ -251,6 +371,19 @@ function setupStreamInterception(page, logger, targetUrl = '') {
         responseUrl.includes('.m3u8') ||
         responseUrl.includes('master') ||
         responseUrl.includes('index');
+
+      // Handle subtitle detection
+      if (isSubtitleResponse && status === 200) {
+        logger.info('Subtitle URL detected', {
+          url: responseUrl.substring(0, 150),
+          contentType,
+          status
+        });
+
+        // Process subtitle URL to generate English variant
+        const processedSubtitles = processSubtitleUrl(responseUrl, logger);
+        subtitleUrls.push(...processedSubtitles);
+      }
 
       // Priority for shadowlandschronicles master playlists
       if (isShadowlandschronicles || (isM3U8Response && (status === 200 || (isShadowlandschronicles && status === 403)))) {
@@ -320,7 +453,7 @@ function setupStreamInterception(page, logger, targetUrl = '') {
     }
   });
 
-  return { streamUrls };
+  return { streamUrls, subtitleUrls };
 }
 
 // Interact with the page to trigger stream loading with realistic human behavior
@@ -688,8 +821,8 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       '/health': 'Health check',
-      '/extract': 'Extract stream URLs (JSON response)',
-      '/extract-stream': 'Extract stream URLs with real-time progress (Server-Sent Events)',
+      '/extract': 'Extract stream URLs and subtitles (JSON response)',
+      '/extract-stream': 'Extract stream URLs and subtitles with real-time progress (Server-Sent Events)',
     },
     usage: {
       extract: {
@@ -1152,7 +1285,7 @@ app.get('/extract', async (req, res) => {
     });
     
     // Setup stream interception
-    const { streamUrls } = setupStreamInterception(page, logger, url);
+    const { streamUrls, subtitleUrls } = setupStreamInterception(page, logger, url);
 
     // Navigate to the page
     logger.info('Navigating to target URL');
@@ -1328,14 +1461,27 @@ app.get('/extract', async (req, res) => {
 
     const totalDuration = logger.timing('Total request duration', requestStart);
 
+    // Process subtitles
+    const availableSubtitles = subtitleUrls.length > 0 ? subtitleUrls : [];
+    const englishSubtitle = availableSubtitles.find(sub => sub.code === 'eng');
+    
+    logger.info('Subtitle processing completed', {
+      totalSubtitles: availableSubtitles.length,
+      hasEnglish: !!englishSubtitle,
+      languages: availableSubtitles.slice(0, 5).map(s => s.language)
+    });
+
     // Return successful response
     return res.json({ 
       success: true, 
       streamUrl: selectedStream.url,
       type: 'hls',
       server: server,
+      subtitles: availableSubtitles,
+      englishSubtitles: englishSubtitle ? englishSubtitle.url : null,
       totalFound: streamUrls.length,
       m3u8Count: m3u8Streams.length,
+      subtitleCount: availableSubtitles.length,
       requestId,
       debug: {
         selectedStream: {
@@ -1827,7 +1973,7 @@ app.get('/extract-stream', async (req, res) => {
     sendProgress('bypassing', 45, 'Bypassing anti-bot detection');
     
     // Setup stream interception
-    const { streamUrls } = setupStreamInterception(page, logger, url);
+    const { streamUrls, subtitleUrls } = setupStreamInterception(page, logger, url);
 
     // Navigate to the page
     sendProgress('bypassing', 50, 'Navigating to media page');
@@ -2008,6 +2154,16 @@ app.get('/extract-stream', async (req, res) => {
 
     const totalDuration = logger.timing('Total request duration', requestStart);
 
+    // Process subtitles
+    const availableSubtitles = subtitleUrls.length > 0 ? subtitleUrls : [];
+    const englishSubtitle = availableSubtitles.find(sub => sub.code === 'eng');
+    
+    logger.info('Subtitle processing completed', {
+      totalSubtitles: availableSubtitles.length,
+      hasEnglish: !!englishSubtitle,
+      languages: availableSubtitles.slice(0, 5).map(s => s.language)
+    });
+
     // Send final completion with stream data
     sendProgress('complete', 100, 'Stream ready!', {
       result: {
@@ -2015,8 +2171,11 @@ app.get('/extract-stream', async (req, res) => {
         streamUrl: selectedStream.url,
         type: 'hls',
         server: server,
+        subtitles: availableSubtitles,
+        englishSubtitles: englishSubtitle ? englishSubtitle.url : null,
         totalFound: streamUrls.length,
         m3u8Count: m3u8Streams.length,
+        subtitleCount: availableSubtitles.length,
         requestId,
         debug: {
           selectedStream: {
