@@ -5,22 +5,75 @@
 .mediaContainer {
   position: relative;
   width: 100%;
-  max-width: min(95vw, 1200px);
-  height: clamp(300px, 60vh, 600px);
+  max-width: 1400px;
+  height: clamp(500px, 75vh, 800px);
   margin: clamp(8px, 2vh, 20px) auto;
   background: linear-gradient(135deg, 
-    rgba(15, 23, 42, 0.95) 0%,
-    rgba(30, 41, 59, 0.9) 100%
-  );
-  border-radius: clamp(8px, 2vmin, 16px);
+    rgba(5, 8, 25, 0.95) 0%, 
+    rgba(15, 25, 50, 0.9) 50%, 
+    rgba(25, 35, 70, 0.85) 100%);
+  border-radius: 24px;
+  padding: 8px;
   overflow: hidden;
   box-shadow: 
-    0 0 20px rgba(59, 130, 246, 0.15),
-    0 5px 25px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(59, 130, 246, 0.1);
-  display: flex;
-  flex-direction: column;
+    0 0 60px rgba(0, 255, 255, 0.3),
+    0 0 120px rgba(0, 100, 255, 0.2),
+    inset 0 0 80px rgba(0, 255, 255, 0.1);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  
+  /* Animated holographic border */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    padding: 2px;
+    background: conic-gradient(from 180deg at 50% 50%, 
+      #00ffff 0deg, 
+      #0080ff 60deg, 
+      #8000ff 120deg, 
+      #ff0080 180deg, 
+      #ff8000 240deg, 
+      #80ff00 300deg, 
+      #00ffff 360deg);
+    border-radius: 26px;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: xor;
+    animation: holoBorder 4s linear infinite;
+    z-index: -1;
+  }
+  
+  /* Floating particles effect */
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+      radial-gradient(2px 2px at 20px 30px, rgba(0, 255, 255, 0.8), transparent),
+      radial-gradient(2px 2px at 40px 70px, rgba(255, 0, 255, 0.6), transparent),
+      radial-gradient(1px 1px at 90px 40px, rgba(0, 255, 150, 0.9), transparent),
+      radial-gradient(1px 1px at 130px 80px, rgba(255, 255, 0, 0.7), transparent),
+      radial-gradient(2px 2px at 160px 30px, rgba(0, 100, 255, 0.8), transparent);
+    background-repeat: repeat;
+    background-size: 200px 100px;
+    animation: particles 20s linear infinite;
+    pointer-events: none;
+    opacity: 0.4;
+    z-index: 1;
+  }
+}
+
+@keyframes holoBorder {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes particles {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(-200px, -100px); }
 }
 
 .mediaPlayer {
@@ -29,8 +82,13 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: clamp(8px, 2vmin, 16px);
-  box-sizing: border-box;
+  background: rgba(2, 6, 23, 0.8);
+  border-radius: 20px;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  z-index: 2;
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  box-shadow: inset 0 0 50px rgba(0, 255, 255, 0.1);
 }
 
 /* ======== LOADING INTERFACE - CLEAN ======== */
@@ -311,27 +369,65 @@
   filter: brightness(1.1);
 }
 
-/* ======== VIDEO CONTAINER ======== */
+/* ======== VIDEO CONTAINER WITH HOLOGRAPHIC FRAME ======== */
 .videoContainer {
-  width: 100%;
-  height: 100%;
-  border-radius: clamp(4px, 1vmin, 8px);
-  overflow: hidden;
-  background: #000;
+  position: relative;
+  flex: 1;
   display: flex;
+  flex-direction: column;
+  background: linear-gradient(45deg, 
+    rgba(0, 20, 40, 0.9) 0%, 
+    rgba(0, 40, 80, 0.8) 50%, 
+    rgba(0, 20, 60, 0.9) 100%);
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+  margin: 8px 8px 0 8px;
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  box-shadow: 
+    0 0 40px rgba(0, 255, 255, 0.2),
+    inset 0 0 30px rgba(0, 255, 255, 0.1);
+  
+  /* Scanning line effect */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      rgba(0, 255, 255, 0.8) 50%, 
+      transparent 100%);
+    animation: scanLine 3s linear infinite;
+    z-index: 10;
+  }
+}
+
+@keyframes scanLine {
+  0% { left: -100%; }
+  100% { left: 100%; }
 }
 
 .videoWrapper {
   position: relative;
-  width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border-radius: 12px;
+  margin: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
 }
 
 .videoElement {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  border-radius: 8px;
 }
 
 .videoOverlay {
@@ -339,30 +435,18 @@
   inset: 0;
   pointer-events: none;
   z-index: 10;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: clamp(8px, 2vmin, 16px);
+  display: none;
 }
 
 .videoOverlay > * {
   pointer-events: auto;
 }
 
-/* Top controls row */
-.topControls {
-  display: flex;
-  align-items: center;
-  gap: clamp(6px, 1.5vmin, 12px);
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-/* Bottom controls row */
+/* Bottom controls row - for stream info only */
 .bottomControls {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: clamp(8px, 2vmin, 16px);
   flex-wrap: wrap;
 }
@@ -406,72 +490,108 @@
   cursor: not-allowed;
 }
 
-/* Navigation Controls Below Video */
+/* ======== FUTURISTIC NAVIGATION CONTROLS ======== */
 .navigationControls {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: clamp(8px, 2vmin, 12px);
-  background: rgba(15, 23, 42, 0.9);
-  border-radius: clamp(4px, 1vmin, 8px);
-  margin-top: clamp(8px, 2vmin, 12px);
-  gap: clamp(8px, 2vmin, 16px);
+  padding: 20px 24px;
+  background: linear-gradient(135deg, 
+    rgba(2, 8, 32, 0.95) 0%, 
+    rgba(8, 15, 40, 0.9) 50%, 
+    rgba(15, 25, 50, 0.95) 100%);
+  border-radius: 16px;
+  gap: 16px;
   flex-wrap: wrap;
-  border: 1px solid rgba(59, 130, 246, 0.1);
-  backdrop-filter: blur(8px);
+  border: 2px solid rgba(0, 255, 255, 0.2);
+  backdrop-filter: blur(20px);
+  flex-shrink: 0;
+  margin: 12px 8px 8px 8px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 
+    0 0 30px rgba(0, 255, 255, 0.15),
+    inset 0 0 20px rgba(0, 255, 255, 0.05);
+    
+  /* Circuit pattern overlay */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: 
+      linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 15px 15px;
+    pointer-events: none;
+    opacity: 0.5;
+  }
 }
 
 .navButton {
-  padding: clamp(6px, 1.5vmin, 10px) clamp(12px, 3vmin, 18px);
-  background: rgba(59, 130, 246, 0.15);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: clamp(4px, 1vmin, 6px);
-  color: white;
-  font-size: clamp(0.75rem, 1.8vmin, 1rem);
-  font-weight: 500;
+  padding: 8px 16px;
+  background: #1e50a0;
+  border: 2px solid rgba(0, 255, 255, 0.6);
+  border-radius: 12px;
+  color: #ffffff;
+  font-family: 'SF Pro Display', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: clamp(70px, 18vmin, 100px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 80px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  font-family: system-ui, -apple-system, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: relative;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  
+  box-shadow: 
+    0 4px 15px rgba(0, 255, 255, 0.2);
 }
 
 .navButton:hover:not(.disabled) {
-  background: rgba(59, 130, 246, 0.25);
-  border-color: rgba(59, 130, 246, 0.5);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+  border-color: rgba(0, 255, 255, 0.9);
+  background: #2868c0;
+  transform: none;
+  box-shadow: 
+    0 6px 20px rgba(0, 255, 255, 0.3);
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
 }
 
 .navButton.disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  border-color: rgba(100, 100, 100, 0.3);
+  background: #505050;
+  color: rgba(200, 200, 200, 0.8);
+  text-shadow: none;
 }
 
-/* ======== CONTROLS ======== */
-.qualitySelector {
-  /* Remove absolute positioning - now in topControls flex container */
+.navigationButtons .episodeInfo {
+  color: #ffffff;
+  font-family: 'SF Pro Display', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  padding: 8px 16px;
+  background: #0096ff;
+  border: 2px solid rgba(0, 200, 255, 0.8);
+  border-radius: 12px;
+  white-space: nowrap;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
 }
 
-.qualityDropdown, .serverDropdown {
-  background: rgba(0, 0, 0, 0.8);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: clamp(2px, 0.5vmin, 4px);
-  color: white;
-  padding: clamp(4px, 1vmin, 6px) clamp(8px, 1.5vmin, 10px);
-  font-size: clamp(0.65rem, 1.5vmin, 0.85rem);
-  cursor: pointer;
-  transition: border-color 0.2s ease;
-  backdrop-filter: blur(8px);
-}
-
-.qualityDropdown:hover, .serverDropdown:hover {
-  border-color: rgba(59, 130, 246, 0.5);
-}
-
-.serverSelector {
-  /* Remove absolute positioning - now in topControls flex container */
-}
+/* ======== STREAM INFO (IN OVERLAY) ======== */
 
 .streamInfo {
   /* Remove absolute positioning - now in bottomControls flex container */
@@ -498,33 +618,7 @@
   border: 1px solid rgba(75, 85, 99, 0.3);
 }
 
-/* ======== SUBTITLE CONTROLS ======== */
-.subtitleSelector {
-  /* Positioned within topControls flex container */
-}
-
-.subtitleDropdown {
-  background: rgba(0, 0, 0, 0.8);
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  border-radius: clamp(2px, 0.5vmin, 4px);
-  color: white;
-  padding: clamp(4px, 1vmin, 6px) clamp(8px, 1.5vmin, 10px);
-  font-size: clamp(0.65rem, 1.5vmin, 0.85rem);
-  cursor: pointer;
-  transition: border-color 0.2s ease;
-  backdrop-filter: blur(8px);
-  font-family: system-ui, -apple-system, sans-serif;
-}
-
-.subtitleDropdown:hover {
-  border-color: rgba(168, 85, 247, 0.5);
-}
-
-.subtitleDropdown:focus {
-  outline: none;
-  border-color: rgba(168, 85, 247, 0.7);
-  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
-}
+/* Old subtitle styles removed - now handled in .mediaControls section */
 
 .subtitleCount {
   background: rgba(0, 0, 0, 0.8);
@@ -602,6 +696,226 @@
   border: 1px solid rgba(75, 85, 99, 0.3);
 }
 
+/* ======== FUTURISTIC CONTROLS PANEL ======== */
+.mediaControls {
+  background: linear-gradient(135deg, 
+    rgba(2, 8, 32, 0.95) 0%, 
+    rgba(8, 15, 40, 0.9) 50%, 
+    rgba(15, 25, 50, 0.95) 100%);
+  backdrop-filter: blur(25px);
+  padding: 12px 16px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  border-top: 2px solid rgba(0, 255, 255, 0.3);
+  border-radius: 0 0 16px 16px;
+  margin: 0 8px 8px 8px;
+  position: relative;
+  overflow: visible;
+  z-index: 5;
+  box-shadow: 
+    0 -4px 30px rgba(0, 255, 255, 0.2),
+    inset 0 2px 20px rgba(0, 255, 255, 0.1);
+  
+  /* Circuit pattern overlay */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: 
+      linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+    pointer-events: none;
+    opacity: 0.3;
+  }
+  
+  /* Energy pulse effect */
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      rgba(0, 255, 255, 0.1) 50%, 
+      transparent 100%);
+    animation: energyPulse 6s linear infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes energyPulse {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+.controlGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  z-index: 10;
+  min-height: 60px;
+  overflow: visible;
+  
+  /* Holographic glow around each control group */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -12px;
+    background: radial-gradient(circle at center, 
+      rgba(0, 255, 255, 0.1) 0%, 
+      transparent 70%);
+    border-radius: 12px;
+    z-index: -1;
+    transition: all 0.3s ease;
+  }
+  
+  &:hover::before {
+    background: radial-gradient(circle at center, 
+      rgba(0, 255, 255, 0.2) 0%, 
+      transparent 70%);
+    transform: scale(1.1);
+  }
+}
+
+.controlLabel {
+  color: rgba(0, 255, 255, 0.9);
+  font-family: 'Orbitron', 'SF Pro Display', monospace, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-align: center;
+  text-shadow: 
+    0 0 10px rgba(0, 255, 255, 0.8),
+    0 0 20px rgba(0, 255, 255, 0.4);
+  position: relative;
+  
+  /* Animated underline */
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      rgba(0, 255, 255, 1) 50%, 
+      transparent 100%);
+    transition: width 0.4s ease;
+    box-shadow: 0 0 5px rgba(0, 255, 255, 0.8);
+  }
+  
+  &:hover::after {
+    width: 120%;
+  }
+}
+
+.subtitleLabel {
+  color: rgba(255, 0, 255, 0.9);
+  text-shadow: 
+    0 0 10px rgba(255, 0, 255, 0.8),
+    0 0 20px rgba(255, 0, 255, 0.4);
+}
+
+/* Navigation buttons container */
+.navigationButtons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.subtitleLabel::after {
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(255, 0, 255, 1) 50%, 
+    transparent 100%);
+  box-shadow: 0 0 5px rgba(255, 0, 255, 0.8);
+}
+
+/* ======== SIMPLE WORKING DROPDOWNS ======== */
+.qualityDropdown,
+.subtitleDropdown,
+.serverDropdown {
+  background: rgba(0, 30, 60, 0.95);
+  border: 2px solid rgba(0, 255, 255, 0.6);
+  border-radius: 8px;
+  color: white;
+  padding: 8px 12px;
+  font-family: 'Orbitron', 'SF Pro Display', monospace, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 180px;
+  height: 40px;
+  backdrop-filter: blur(10px);
+}
+
+.qualityDropdown:hover,
+.serverDropdown:hover {
+  border-color: rgba(0, 255, 255, 1);
+  background: rgba(0, 50, 100, 0.95);
+}
+
+.subtitleDropdown {
+  border-color: rgba(255, 0, 255, 0.6);
+  background: rgba(30, 0, 30, 0.95);
+}
+
+.subtitleDropdown:hover {
+  border-color: rgba(255, 0, 255, 1);
+  background: rgba(50, 0, 50, 0.95);
+}
+
+/* Option styling that actually works */
+.qualityDropdown option,
+.serverDropdown option {
+  background: rgba(0, 30, 60, 1);
+  color: white;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.subtitleDropdown option {
+  background: rgba(30, 0, 30, 1);
+  color: white;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.qualityDropdown:hover,
+.serverDropdown:hover {
+  border-color: rgba(0, 255, 255, 0.8);
+  background: linear-gradient(135deg, 
+    rgba(0, 40, 80, 0.95) 0%, 
+    rgba(0, 60, 120, 0.9) 50%, 
+    rgba(0, 50, 100, 0.95) 100%);
+  transform: none;
+  box-shadow: 
+    0 8px 30px rgba(0, 255, 255, 0.4),
+    inset 0 0 30px rgba(0, 255, 255, 0.2),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+
+
+
+
+
+
 /* ========================================
    RESPONSIVE BREAKPOINTS - CLEAN
    ======================================== */
@@ -645,7 +959,7 @@
 @media (max-width: 767px) {
   .mediaContainer {
     max-width: 98vw;
-    height: clamp(250px, 50vh, 400px);
+    height: clamp(300px, 60vh, 450px);
     margin: clamp(4px, 1vh, 8px) auto;
   }
   
@@ -668,10 +982,41 @@
     flex-direction: column;
   }
   
-  .topControls, .bottomControls {
+  .bottomControls {
     flex-direction: column;
     align-items: stretch;
     gap: clamp(6px, 1.5vmin, 8px);
+  }
+  
+  .mediaControls {
+    gap: clamp(4px, 1vmin, 8px);
+    padding: clamp(4px, 1vmin, 8px);
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .navigationButtons {
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .qualitySelector,
+  .subtitleSelector,
+  .serverSelector {
+    flex-direction: column;
+    align-items: stretch;
+    gap: clamp(2px, 0.5vmin, 4px);
+  }
+  
+  .controlLabel {
+    font-size: clamp(0.65rem, 1.3vmin, 0.8rem);
+  }
+  
+  .qualityDropdown,
+  .subtitleDropdown,
+  .serverDropdown {
+    min-width: auto;
+    width: 100%;
   }
   
   .episodeNavigation {
@@ -701,7 +1046,7 @@
 /* Small mobile */
 @media (max-width: 480px) {
   .mediaContainer {
-    height: clamp(220px, 45vh, 350px);
+    height: clamp(250px, 55vh, 400px);
   }
   
   .progressSpinnerContainer {

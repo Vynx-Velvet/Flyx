@@ -13,6 +13,7 @@ export default function DetailsPage() {
   const searchParams = useSearchParams();
   const [movieData, setMovieData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isMediaPlayerActive, setIsMediaPlayerActive] = useState(false);
 
   useEffect(() => {
     const fetchMovieData = async () => {
@@ -76,13 +77,17 @@ export default function DetailsPage() {
     router.push('/');
   };
 
+  const handleMediaPlayerStateChange = (isActive) => {
+    setIsMediaPlayerActive(isActive);
+  };
+
   if (loading) {
     return (
       <MediaProvider>
         <div className="app">
           <NavBar onClearSearch={handleNavBarClear} />
           <div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>
-          <Footer />
+          {!isMediaPlayerActive && <Footer />}
         </div>
       </MediaProvider>
     );
@@ -100,7 +105,7 @@ export default function DetailsPage() {
               Back to Home
             </button>
           </div>
-          <Footer />
+          {!isMediaPlayerActive && <Footer />}
         </div>
       </MediaProvider>
     );
@@ -110,8 +115,12 @@ export default function DetailsPage() {
     <MediaProvider>
       <div className="app">
         <NavBar onClearSearch={handleNavBarClear} />
-        <ShowDetails movieId={movieData} clearMovie={handleClearMovie} />
-        <Footer />
+        <ShowDetails 
+          movieId={movieData} 
+          clearMovie={handleClearMovie} 
+          onMediaPlayerStateChange={handleMediaPlayerStateChange}
+        />
+        {!isMediaPlayerActive && <Footer />}
       </div>
     </MediaProvider>
   );

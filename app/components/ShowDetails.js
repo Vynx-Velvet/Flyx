@@ -6,11 +6,18 @@ import Recommendations from "./Recommendations"; // Import the Recommendations c
 import "./ShowDetails.css"; // Custom styles for the compact design
 
 
-const ShowDetails = ({ movieId, clearMovie }) => {
+const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
   const [movieDetails, setMovieDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedSeason, setSelectedSeason] = useState(0); // Tracks which season is selected
   const [selectedEpisode, setSelectedEpisode] = useState(null); // Tracks which episode is selected
+
+  // Notify parent when media player state changes
+  useEffect(() => {
+    if (onMediaPlayerStateChange) {
+      onMediaPlayerStateChange(!!selectedEpisode);
+    }
+  }, [selectedEpisode, onMediaPlayerStateChange]);
 
   useEffect(() => {
     const fetchMovieDetails = async () => {

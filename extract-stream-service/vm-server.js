@@ -216,7 +216,78 @@ async function getBrowserConfig(logger) {
   };
 }
 
-// Process subtitle URL to generate English and other language variants
+// Validate subtitle URLs to ensure they actually exist
+async function validateSubtitleUrls(subtitles, logger) {
+  const validatedSubtitles = [];
+  const maxConcurrent = 5; // Limit concurrent requests
+  
+  logger.info('Starting subtitle validation', {
+    totalSubtitles: subtitles.length
+  });
+  
+  // Process subtitles in batches to avoid overwhelming the server
+  for (let i = 0; i < subtitles.length; i += maxConcurrent) {
+    const batch = subtitles.slice(i, i + maxConcurrent);
+    
+    const validationPromises = batch.map(async (subtitle) => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        const response = await fetch(subtitle.url, {
+          method: 'HEAD',
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          logger.debug('Subtitle validation successful', {
+            language: subtitle.language,
+            code: subtitle.code,
+            status: response.status,
+            contentType: response.headers.get('content-type')
+          });
+          return subtitle;
+        } else {
+          logger.debug('Subtitle validation failed', {
+            language: subtitle.language,
+            code: subtitle.code,
+            status: response.status
+          });
+          return null;
+        }
+      } catch (error) {
+        logger.debug('Subtitle validation error', {
+          language: subtitle.language,
+          code: subtitle.code,
+          error: error.message
+        });
+        return null;
+      }
+    });
+    
+    const batchResults = await Promise.all(validationPromises);
+    validatedSubtitles.push(...batchResults.filter(Boolean));
+    
+    // Small delay between batches to be respectful
+    if (i + maxConcurrent < subtitles.length) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  }
+  
+  logger.info('Subtitle validation completed', {
+    originalCount: subtitles.length,
+    validatedCount: validatedSubtitles.length,
+    validLanguages: validatedSubtitles.map(s => s.language)
+  });
+  
+  return validatedSubtitles;
+}
+
 function processSubtitleUrl(originalUrl, logger) {
   const subtitles = [];
   
@@ -263,25 +334,18 @@ function processSubtitleUrl(originalUrl, logger) {
           isOriginal: false
         });
         
-        // Generate common language variants
-        const commonLanguages = [
+        // Generate only the most common language variants that are likely to exist
+        const priorityLanguages = [
           { name: 'Spanish', code: 'spa' },
           { name: 'French', code: 'fre' },
           { name: 'German', code: 'ger' },
           { name: 'Italian', code: 'ita' },
           { name: 'Portuguese', code: 'por' },
-          { name: 'Russian', code: 'rus' },
-          { name: 'Chinese', code: 'chi' },
-          { name: 'Japanese', code: 'jpn' },
-          { name: 'Korean', code: 'kor' },
-          { name: 'Hindi', code: 'hin' },
-          { name: 'Dutch', code: 'dut' },
-          { name: 'Swedish', code: 'swe' },
-          { name: 'Turkish', code: 'tur' }
+          { name: 'Russian', code: 'rus' }
         ];
         
-        // Only add variants if they're different from the original
-        commonLanguages.forEach(lang => {
+        // Only add priority variants if they're different from the original
+        priorityLanguages.forEach(lang => {
           if (lang.code !== originalCode) {
             subtitles.push({
               url: `${baseUrl}/${lang.name}.${lang.code}.${extension}`,
@@ -1462,7 +1526,7 @@ app.get('/extract', async (req, res) => {
     const totalDuration = logger.timing('Total request duration', requestStart);
 
     // Process subtitles
-    const availableSubtitles = subtitleUrls.length > 0 ? subtitleUrls : [];
+    const availableSubtitles = subtitleUrls.length > 0 ? await validateSubtitleUrls(subtitleUrls, logger) : [];
     const englishSubtitle = availableSubtitles.find(sub => sub.code === 'eng');
     
     logger.info('Subtitle processing completed', {
@@ -2155,7 +2219,7 @@ app.get('/extract-stream', async (req, res) => {
     const totalDuration = logger.timing('Total request duration', requestStart);
 
     // Process subtitles
-    const availableSubtitles = subtitleUrls.length > 0 ? subtitleUrls : [];
+    const availableSubtitles = subtitleUrls.length > 0 ? await validateSubtitleUrls(subtitleUrls, logger) : [];
     const englishSubtitle = availableSubtitles.find(sub => sub.code === 'eng');
     
     logger.info('Subtitle processing completed', {

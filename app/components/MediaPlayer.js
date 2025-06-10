@@ -30,6 +30,11 @@ const MediaPlayer = ({
   const [selectedSubtitle, setSelectedSubtitle] = useState('off'); // 'off' or subtitle index
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   
+  // Custom dropdown states
+  const [qualityDropdownOpen, setQualityDropdownOpen] = useState(false);
+  const [subtitleDropdownOpen, setSubtitleDropdownOpen] = useState(false);
+  const [serverDropdownOpen, setServerDropdownOpen] = useState(false);
+  
   // Enhanced loading state with real-time progress
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingPhase, setLoadingPhase] = useState('initializing');
@@ -105,6 +110,20 @@ const MediaPlayer = ({
       return () => clearInterval(factTimer);
     }
   }, [loading, funFacts.length]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('[class*="customDropdown"]')) {
+        setQualityDropdownOpen(false);
+        setSubtitleDropdownOpen(false);
+        setServerDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Remove conflicting progress updates that cause flickering
 
@@ -523,26 +542,20 @@ const MediaPlayer = ({
                 return;
               }
               
-              // CRITICAL FIX: Process stream URL - FORCE DIRECT ACCESS FOR VIDSRC.XYZ
-              console.log('🚨🚨🚨 UPDATED CODE LOADED - TIMESTAMP: ' + new Date().toISOString() + ' 🚨🚨🚨');
-              console.log('🚨 STREAM URL PROCESSING - FORCE DIRECT FOR VIDSRC.XYZ', {
-                'server': extractData.server,
-                'url': extractData.streamUrl?.substring(0, 100),
-                'isM3U8': extractData.streamUrl?.includes('.m3u8'),
-                'type': extractData.type
-              });
-              
+              // Process stream URL
+              const isVidsrc = extractData.server === 'vidsrc.xyz';
+              const isShadowlandschronicles = extractData.streamUrl.includes('shadowlandschronicles');
               let finalStreamUrl;
               
-              // FORCE DIRECT ACCESS FOR ALL VIDSRC.XYZ URLs - NO PROXY!
-              if (extractData.server === 'vidsrc.xyz') {
+              if (isVidsrc && !isShadowlandschronicles) {
                 finalStreamUrl = extractData.streamUrl;
-                console.log('🎯🎯🎯 FORCING DIRECT ACCESS FOR VIDSRC.XYZ - NO PROXY!');
-                console.log('🎯 DIRECT URL:', finalStreamUrl);
+                console.log('Using direct access for vidsrc.xyz URL');
+              } else if (isVidsrc && isShadowlandschronicles) {
+                finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=vidsrc`;
+                console.log('Using proxy for shadowlandschronicles URL');
               } else {
-                // Only use proxy for embed.su
                 finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=embed.su`;
-                console.log('🔄 Using proxy for embed.su URL');
+                console.log('Using proxy for embed.su URL');
               }
               
               console.log('🔗 Setting stream URL:', finalStreamUrl.substring(0, 100) + '...');
@@ -846,8 +859,7 @@ const MediaPlayer = ({
     // Note: We don't reset server or set loading=true here to prevent auto-extraction
   }, [mediaType, movieId, seasonId, episodeId]); // Clean up when content changes
 
-  const handleServerChange = (event) => {
-    const newServer = event.target.value;
+  const handleServerChange = (newServer) => {
     console.log(`Switching server from ${server} to ${newServer}`);
     setServer(newServer);
   };
@@ -1113,7 +1125,7 @@ const MediaPlayer = ({
           </div>
         )}
         
-        <div className={styles.videoContainer} style={{ display: (streamUrl && !loading && !error && !autoSwitching) ? 'block' : 'none' }}>            
+        <div className={styles.videoContainer} style={{ display: (streamUrl && !loading && !error && !autoSwitching) ? 'flex' : 'none' }}>            
           <div className={styles.videoWrapper}>
             <video
               ref={videoRef}
@@ -1143,110 +1155,102 @@ const MediaPlayer = ({
             </video>
 
             <div className={styles.videoOverlay}>
-              <div className={styles.topControls}>
-                {streamType === 'hls' && qualities.length > 0 && (
-                  <div className={styles.qualitySelector}>
-                    <select 
-                      id="quality" 
-                      value={selectedQuality} 
-                      onChange={(e) => handleQualityChange(parseInt(e.target.value))}
-                      className={styles.qualityDropdown}
-                    >
-                      <option value={-1}>Auto</option>
-                      {qualities.map((quality, index) => (
-                        <option key={index} value={index}>
-                          {formatQualityLabel(quality)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {subtitles.length > 0 && (
-                  <div className={styles.subtitleSelector}>
-                    <select 
-                      id="subtitles" 
-                      value={selectedSubtitle} 
-                      onChange={(e) => handleSubtitleChange(parseInt(e.target.value))}
-                      className={styles.subtitleDropdown}
-                    >
-                      {subtitles.map((subtitle, index) => (
-                        <option key={index} value={index}>
-                          {subtitle.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className={styles.serverSelector}>
-                  <select 
-                    id="server" 
-                    value={server} 
-                    onChange={handleServerChange}
-                    disabled={loading || autoSwitching}
-                    className={styles.serverDropdown}
-                  >
-                    <option value="Vidsrc.xyz">Vidsrc.xyz</option>
-                    <option value="Embed.su">Embed.su</option>
-                  </select>
-                </div>
+              {/* Remove stream info overlay since it's now in the controls section below */}
+            </div>
+          </div>
+          
+          {/* Combined Media Controls and Navigation - Below Video */}
+          {streamUrl && !loading && !error && !autoSwitching && (
+            <div className={styles.mediaControls}>
+            {streamType === 'hls' && qualities.length > 0 && (
+              <div className={styles.controlGroup}>
+                <label htmlFor="quality" className={styles.controlLabel}>Quality</label>
+                <select 
+                  id="quality" 
+                  value={selectedQuality} 
+                  onChange={(e) => handleQualityChange(parseInt(e.target.value))}
+                  className={styles.qualityDropdown}
+                >
+                  <option value={-1}>Auto</option>
+                  {qualities.map((quality, index) => (
+                    <option key={index} value={index}>
+                      {formatQualityLabel(quality)}
+                    </option>
+                  ))}
+                </select>
               </div>
+            )}
 
-              <div className={styles.bottomControls}>
-                {streamType && (
-                  <div className={styles.streamInfo}>
-                    <span className={styles.streamType}>
-                      {streamType === 'hls' ? 'HLS' : 'Direct'}
-                    </span>
-                    {qualities.length > 0 && (
-                      <span className={styles.qualityCount}>
-                        {qualities.length} qualities
-                      </span>
-                    )}
-                    {subtitles.length > 1 && (
-                      <span className={styles.subtitleCount}>
-                        {subtitles.length - 1} subtitles
-                      </span>
-                    )}
-                  </div>
+            {subtitles.length > 0 && (
+              <div className={styles.controlGroup}>
+                <label htmlFor="subtitles" className={`${styles.controlLabel} ${styles.subtitleLabel}`}>Subtitles</label>
+                <select 
+                  id="subtitles" 
+                  value={selectedSubtitle} 
+                  onChange={(e) => handleSubtitleChange(parseInt(e.target.value))}
+                  className={styles.subtitleDropdown}
+                >
+                  {subtitles.map((subtitle, index) => (
+                    <option key={index} value={index}>
+                      {subtitle.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Server selector is always visible */}
+            <div className={styles.controlGroup}>
+              <label htmlFor="server" className={styles.controlLabel}>Server</label>
+              <select 
+                id="server" 
+                value={server} 
+                onChange={(e) => handleServerChange(e.target.value)}
+                disabled={loading || autoSwitching}
+                className={styles.serverDropdown}
+              >
+                <option value="Vidsrc.xyz">Vidsrc.xyz</option>
+                <option value="Embed.su">Embed.su</option>
+              </select>
+            </div>
+
+            {/* Navigation Controls combined in same row */}
+            <div className={styles.controlGroup}>
+              <label className={styles.controlLabel}>Navigation</label>
+              <div className={styles.navigationButtons}>
+                <button 
+                  onClick={handleBackToShowDetails} 
+                  className={styles.navButton}
+                  disabled={loading || autoSwitching}
+                >
+                  Back
+                </button>
+                
+                {mediaType === "tv" && (
+                  <>
+                    <button
+                      onClick={handlePreviousEpisode}
+                      disabled={episodeId <= 1 || loading || autoSwitching}
+                      className={episodeId <= 1 ? styles.navButton + " " + styles.disabled : styles.navButton}
+                    >
+                      Previous
+                    </button>
+                    <span className={styles.episodeInfo}>S{seasonId}E{episodeId}</span>
+                    <button
+                      onClick={handleNextEpisode}
+                      disabled={episodeId >= maxEpisodes || loading || autoSwitching}
+                      className={episodeId >= maxEpisodes ? styles.navButton + " " + styles.disabled : styles.navButton}
+                    >
+                      Next
+                    </button>
+                  </>
                 )}
               </div>
             </div>
-          </div>
+            </div>
+          )}
         </div>
-        
-        {streamUrl && !loading && !error && !autoSwitching && (
-          <div className={styles.navigationControls}>
-            <button 
-              onClick={handleBackToShowDetails} 
-              className={styles.navButton}
-              disabled={loading || autoSwitching}
-            >
-              Back
-            </button>
-            
-            {mediaType === "tv" && (
-              <div className={styles.episodeNavigation}>
-                <button
-                  onClick={handlePreviousEpisode}
-                  disabled={episodeId <= 1 || loading || autoSwitching}
-                  className={episodeId <= 1 ? styles.navButton + " " + styles.disabled : styles.navButton}
-                >
-                  Previous
-                </button>
-                <span className={styles.episodeInfo}>S{seasonId}E{episodeId}</span>
-                <button
-                  onClick={handleNextEpisode}
-                  disabled={episodeId >= maxEpisodes || loading || autoSwitching}
-                  className={episodeId >= maxEpisodes ? styles.navButton + " " + styles.disabled : styles.navButton}
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+
       </div>
     </div>
   );
