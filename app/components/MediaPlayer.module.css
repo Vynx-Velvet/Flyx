@@ -490,56 +490,24 @@
   cursor: not-allowed;
 }
 
-/* ======== FUTURISTIC NAVIGATION CONTROLS ======== */
+/* Hide the old separate navigation controls - now integrated into mediaControls */
 .navigationControls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-  background: linear-gradient(135deg, 
-    rgba(2, 8, 32, 0.95) 0%, 
-    rgba(8, 15, 40, 0.9) 50%, 
-    rgba(15, 25, 50, 0.95) 100%);
-  border-radius: 16px;
-  gap: 16px;
-  flex-wrap: wrap;
-  border: 2px solid rgba(0, 255, 255, 0.2);
-  backdrop-filter: blur(20px);
-  flex-shrink: 0;
-  margin: 12px 8px 8px 8px;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 
-    0 0 30px rgba(0, 255, 255, 0.15),
-    inset 0 0 20px rgba(0, 255, 255, 0.05);
-    
-  /* Circuit pattern overlay */
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image: 
-      linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px);
-    background-size: 15px 15px;
-    pointer-events: none;
-    opacity: 0.5;
-  }
+  display: none;
 }
 
 .navButton {
-  padding: 8px 16px;
-  background: #1e50a0;
-  border: 2px solid rgba(0, 255, 255, 0.6);
-  border-radius: 12px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, rgba(30, 80, 160, 0.9), rgba(40, 104, 192, 0.9));
+  border: 2px solid rgba(0, 255, 255, 0.4);
+  border-radius: 8px;
   color: #ffffff;
   font-family: 'SF Pro Display', system-ui, sans-serif;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  min-width: 80px;
-  height: 36px;
+  min-width: 90px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -547,19 +515,22 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   position: relative;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
   
   box-shadow: 
-    0 4px 15px rgba(0, 255, 255, 0.2);
+    0 4px 15px rgba(0, 255, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .navButton:hover:not(.disabled) {
-  border-color: rgba(0, 255, 255, 0.9);
-  background: #2868c0;
-  transform: none;
+  border-color: rgba(0, 255, 255, 0.7);
+  background: linear-gradient(135deg, rgba(40, 104, 192, 1), rgba(59, 130, 246, 1));
+  transform: translateY(-1px);
   box-shadow: 
-    0 6px 20px rgba(0, 255, 255, 0.3);
-  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+    0 6px 20px rgba(0, 255, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
 }
 
 .navButton.disabled {
@@ -575,20 +546,24 @@
   color: #ffffff;
   font-family: 'SF Pro Display', system-ui, sans-serif;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-  padding: 8px 16px;
-  background: #0096ff;
-  border: 2px solid rgba(0, 200, 255, 0.8);
-  border-radius: 12px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+  padding: 10px 18px;
+  background: linear-gradient(135deg, rgba(0, 150, 255, 0.9), rgba(59, 130, 246, 0.9));
+  border: 2px solid rgba(0, 200, 255, 0.6);
+  border-radius: 8px;
   white-space: nowrap;
-  height: 36px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 60px;
+  min-width: 70px;
+  backdrop-filter: blur(10px);
+  box-shadow: 
+    0 4px 15px rgba(0, 150, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 /* ======== STREAM INFO (IN OVERLAY) ======== */
@@ -703,9 +678,9 @@
     rgba(8, 15, 40, 0.9) 50%, 
     rgba(15, 25, 50, 0.95) 100%);
   backdrop-filter: blur(25px);
-  padding: 12px 16px;
+  padding: 16px 20px;
   display: flex;
-  gap: 16px;
+  gap: 20px;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
@@ -715,6 +690,7 @@
   position: relative;
   overflow: visible;
   z-index: 5;
+  min-height: 80px;
   box-shadow: 
     0 -4px 30px rgba(0, 255, 255, 0.2),
     inset 0 2px 20px rgba(0, 255, 255, 0.1);
@@ -759,7 +735,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   position: relative;
   z-index: 10;
   min-height: 60px;
@@ -910,11 +886,101 @@
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
 }
 
+/* Enhanced subtitle control styles */
+.loadingIndicator {
+  display: inline-block;
+  margin-left: 8px;
+  animation: spin 1s linear infinite;
+  color: #3b82f6;
+  font-size: 12px;
+}
 
+.errorIndicator {
+  display: inline-block;
+  margin-left: 8px;
+  color: #ef4444;
+  font-size: 12px;
+}
 
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 
+.subtitleInfo {
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+}
 
+.subtitleMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 3px;
+  backdrop-filter: blur(4px);
+}
 
+.subtitleDropdown:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.subtitleDropdown option:disabled {
+  color: #666;
+  font-style: italic;
+}
+
+/* Enhanced control group for subtitles */
+.controlGroup .subtitleLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.noImdbIndicator {
+  display: inline-block;
+  margin-left: 8px;
+  color: #f59e0b;
+  font-size: 12px;
+  title: "No IMDB ID found - subtitle search unavailable";
+}
+
+.subtitleStats {
+  margin-top: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.statText {
+  font-style: italic;
+}
+
+/* Enhanced subtitle dropdown styling */
+.subtitleDropdown optgroup {
+  font-weight: bold;
+  color: #f3f4f6;
+  background-color: #374151;
+}
+
+.subtitleDropdown option[disabled] {
+  font-weight: bold;
+  background-color: #374151 !important;
+  color: #f3f4f6 !important;
+  font-style: normal;
+}
+
+.subtitleDropdown option:not([disabled]) {
+  padding-left: 12px;
+  background-color: #1f2937;
+  color: #d1d5db;
+}
+
+.subtitleDropdown option:not([disabled]):hover {
+  background-color: #374151;
+}
 
 /* ========================================
    RESPONSIVE BREAKPOINTS - CLEAN
@@ -924,7 +990,7 @@
 @media (min-width: 1200px) {
   .mediaContainer {
     max-width: 1300px;
-    height: clamp(400px, 65vh, 700px);
+    height: clamp(500px, 80vh, 800px);
   }
   
   .progressSpinnerContainer {
@@ -937,7 +1003,7 @@
 @media (max-width: 1023px) {
   .mediaContainer {
     max-width: min(96vw, 900px);
-    height: clamp(280px, 55vh, 500px);
+    height: clamp(350px, 70vh, 600px);
   }
   
   .progressSpinnerContainer {
@@ -959,7 +1025,7 @@
 @media (max-width: 767px) {
   .mediaContainer {
     max-width: 98vw;
-    height: clamp(300px, 60vh, 450px);
+    height: clamp(400px, 75vh, 550px);
     margin: clamp(4px, 1vh, 8px) auto;
   }
   
@@ -989,8 +1055,8 @@
   }
   
   .mediaControls {
-    gap: clamp(4px, 1vmin, 8px);
-    padding: clamp(4px, 1vmin, 8px);
+    gap: clamp(8px, 2vmin, 12px);
+    padding: clamp(8px, 2vmin, 12px);
     flex-direction: column;
     align-items: stretch;
   }

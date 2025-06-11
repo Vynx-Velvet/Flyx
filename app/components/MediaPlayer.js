@@ -2,6 +2,127 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import styles from "./MediaPlayer.module.css";
+import { useSubtitleManager } from '../hooks/useSubtitleManager';
+import { useMediaContext } from '../context/MediaContext';
+
+// Language-first subtitle selector component
+const SubtitleSelector = ({ subtitles, activeSubtitle, onSubtitleSelect, loading, className }) => {
+  const [selectedValue, setSelectedValue] = useState('off');
+  
+  // Build options with language grouping
+  const buildOptions = () => {
+    const options = [{ value: 'off', label: 'Off', type: 'off' }];
+    
+    if (!subtitles?.languages) return options;
+    
+    // Common languages first
+    const commonLanguages = ['eng', 'spa', 'fre', 'ger', 'ita'];
+    const languageOrder = [];
+    
+    // Add common languages first (if available)
+    commonLanguages.forEach(langCode => {
+      if (subtitles.languages[langCode]?.subtitles?.length > 0) {
+        languageOrder.push(langCode);
+      }
+    });
+    
+    // Add remaining languages alphabetically
+    Object.keys(subtitles.languages)
+      .filter(langCode => !commonLanguages.includes(langCode) && subtitles.languages[langCode]?.subtitles?.length > 0)
+      .sort()
+      .forEach(langCode => languageOrder.push(langCode));
+    
+    // Build grouped options
+    languageOrder.forEach(langCode => {
+      const langData = subtitles.languages[langCode];
+      if (!langData?.subtitles?.length) return;
+      
+      const languageName = langData.subtitles[0]?.languageName || langCode.toUpperCase();
+      
+      // Add language header
+      options.push({
+        value: `header-${langCode}`,
+        label: `── ${languageName} (${langData.subtitles.length}) ──`,
+        type: 'header',
+        disabled: true
+      });
+      
+      // Add top 3 subtitles for this language
+      langData.subtitles.slice(0, 3).forEach((subtitle, index) => {
+        const subtitleKey = `${subtitle.language}_${subtitle.id}`;
+        const qualityIndicator = subtitle.qualityScore >= 80 ? '⭐' : 
+                               subtitle.qualityScore >= 60 ? '✓' : '';
+        const trustIndicator = subtitle.fromTrusted ? '🛡️' : '';
+        const hdIndicator = subtitle.isHD ? 'HD' : '';
+        
+        const indicators = [qualityIndicator, trustIndicator, hdIndicator].filter(Boolean).join(' ');
+        const subtitleName = subtitle.movieReleaseName || subtitle.fileName || `Subtitle ${index + 1}`;
+        const shortName = subtitleName.length > 40 ? subtitleName.substring(0, 37) + '...' : subtitleName;
+        
+        options.push({
+          value: subtitleKey,
+          label: `  ${shortName} ${indicators}`,
+          type: 'subtitle',
+          subtitle: subtitle,
+          downloads: subtitle.downloadCount,
+          rating: subtitle.rating
+        });
+      });
+    });
+    
+    return options;
+  };
+  
+  const options = buildOptions();
+  
+  const handleChange = async (e) => {
+    const value = e.target.value;
+    setSelectedValue(value);
+    
+    if (value === 'off') {
+      await onSubtitleSelect(null);
+    } else {
+      const option = options.find(opt => opt.value === value);
+      if (option?.subtitle) {
+        await onSubtitleSelect(option.subtitle);
+      }
+    }
+  };
+  
+  // Update selected value when active subtitle changes
+  useEffect(() => {
+    if (!activeSubtitle) {
+      setSelectedValue('off');
+    } else {
+      const subtitleKey = `${activeSubtitle.language}_${activeSubtitle.id}`;
+      setSelectedValue(subtitleKey);
+    }
+  }, [activeSubtitle]);
+  
+  return (
+    <select 
+      value={selectedValue}
+      onChange={handleChange}
+      className={className}
+      disabled={loading}
+    >
+      {options.map((option) => (
+        <option 
+          key={option.value} 
+          value={option.value}
+          disabled={option.disabled || option.type === 'header'}
+          style={option.type === 'header' ? { 
+            fontWeight: 'bold', 
+            backgroundColor: '#374151',
+            color: '#f3f4f6'
+          } : {}}
+        >
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+};
 
 const MediaPlayer = ({
   mediaType,
@@ -25,10 +146,8 @@ const MediaPlayer = ({
   const [autoSwitching, setAutoSwitching] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0); // Video duration in seconds
   
-  // Subtitle state
-  const [subtitles, setSubtitles] = useState([]);
+  // Legacy subtitle state (kept for compatibility with old UI elements)
   const [selectedSubtitle, setSelectedSubtitle] = useState('off'); // 'off' or subtitle index
-  const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   
   // Custom dropdown states
   const [qualityDropdownOpen, setQualityDropdownOpen] = useState(false);
@@ -46,6 +165,35 @@ const MediaPlayer = ({
   const [extractionCompleted, setExtractionCompleted] = useState(false);
   
   const videoRef = useRef(null);
+
+  // Get media context for IMDB ID
+  const { getMedia, fetchDetailedMedia } = useMediaContext();
+  const [currentMedia, setCurrentMedia] = useState(null);
+  const [imdbId, setImdbId] = useState(null);
+  
+  // Enhanced subtitle management with OpenSubtitles integration
+  const {
+    selectSubtitle,
+    selectBestSubtitle,
+    getSubtitleOptions,
+    activeSubtitle,
+    loading: subtitlesLoading,
+    error: subtitlesError,
+    getStats,
+    clearCache,
+    preloadPopularSubtitles,
+    subtitles,
+    hasLanguage
+  } = useSubtitleManager(imdbId, {
+    videoRef,
+    languages: ['eng', 'spa', 'fre', 'ger', 'ita', 'por', 'dut', 'nor', 'swe'],
+    season: mediaType === 'tv' ? seasonId : null,
+    episode: mediaType === 'tv' ? episodeId : null,
+    autoLoad: true,
+    preferHD: true,
+    qualityFilter: 'good',
+    preloadSubtitles: true
+  });
 
   // Fun facts to rotate through during loading
   const funFacts = [
@@ -110,6 +258,30 @@ const MediaPlayer = ({
       return () => clearInterval(factTimer);
     }
   }, [loading, funFacts.length]);
+
+  // Fetch IMDB ID for subtitle integration
+  useEffect(() => {
+    const fetchMediaData = async () => {
+      if (!movieId) return;
+      
+      try {
+        console.log('🎬 Fetching media data for subtitles:', { movieId, mediaType });
+        const mediaData = await fetchDetailedMedia(movieId, mediaType);
+        
+        if (mediaData && mediaData.imdb_id) {
+          console.log('🎬 IMDB ID found for subtitles:', mediaData.imdb_id);
+          setCurrentMedia(mediaData);
+          setImdbId(mediaData.imdb_id);
+        } else {
+          console.warn('🎬 No IMDB ID found for subtitles');
+        }
+      } catch (error) {
+        console.error('🎬 Failed to fetch media data for subtitles:', error);
+      }
+    };
+
+    fetchMediaData();
+  }, [movieId, mediaType, fetchDetailedMedia]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -336,61 +508,16 @@ const MediaPlayer = ({
     }
   };
 
-  // Handle subtitle change
-  const handleSubtitleChange = (subtitleIndex) => {
-    console.log('🎬 Changing subtitle track:', { from: selectedSubtitle, to: subtitleIndex });
-    
-    if (videoRef.current) {
-      // Remove all existing text tracks
-      const textTracks = videoRef.current.textTracks;
-      for (let i = 0; i < textTracks.length; i++) {
-        textTracks[i].mode = 'disabled';
-      }
-      
-      // Remove all existing track elements
-      const existingTracks = videoRef.current.querySelectorAll('track');
-      existingTracks.forEach(track => track.remove());
-      
-      setSelectedSubtitle(subtitleIndex);
-      
-      if (subtitleIndex === 0 || subtitleIndex === 'off') {
-        // Turn off subtitles
-        console.log('🎬 Subtitles turned off');
-        setShowSubtitleMenu(false);
-        return;
-      }
-      
-      const selectedSub = subtitles[subtitleIndex];
-      if (selectedSub && selectedSub.url) {
-        // Add new subtitle track
-        const track = document.createElement('track');
-        track.kind = 'subtitles';
-        track.src = `/api/stream-proxy?url=${encodeURIComponent(selectedSub.url)}`;
-        track.srclang = selectedSub.code || 'en';
-        track.label = selectedSub.label || selectedSub.language;
-        track.default = true;
-        
-        videoRef.current.appendChild(track);
-        
-        // Enable the track when it loads
-        track.addEventListener('load', () => {
-          if (videoRef.current && videoRef.current.textTracks.length > 0) {
-            const textTrack = videoRef.current.textTracks[videoRef.current.textTracks.length - 1];
-            textTrack.mode = 'showing';
-            console.log('🎬 Subtitle track loaded and enabled:', selectedSub.language);
-          }
-        });
-        
-        console.log('🎬 Added subtitle track:', {
-          language: selectedSub.language,
-          url: selectedSub.url.substring(0, 100) + '...',
-          code: selectedSub.code
-        });
-      }
+  // Auto-select English subtitles when available
+  useEffect(() => {
+    if (subtitles && !activeSubtitle && hasLanguage('eng')) {
+      const timer = setTimeout(() => {
+        console.log('🎬 Auto-selecting English subtitles');
+        selectBestSubtitle('eng');
+      }, 2000);
+      return () => clearTimeout(timer);
     }
-    
-    setShowSubtitleMenu(false);
-  };
+  }, [subtitles, activeSubtitle, hasLanguage, selectBestSubtitle]);
 
   // Main stream extraction and setup
   useEffect(() => {
@@ -560,31 +687,14 @@ const MediaPlayer = ({
               
               console.log('🔗 Setting stream URL:', finalStreamUrl.substring(0, 100) + '...');
               
-              // Process subtitles
-              const extractedSubtitles = extractData.subtitles || [];
-              console.log('📝 Processing subtitles:', {
-                count: extractedSubtitles.length,
-                hasEnglish: !!extractData.englishSubtitles,
-                languages: extractedSubtitles.slice(0, 5).map(s => s.language)
-              });
+              // Note: Legacy subtitle processing removed
+              // Now using OpenSubtitles API integration for high-quality subtitles
+              console.log('📝 Stream extraction completed - OpenSubtitles will handle subtitles');
               
-              // Set subtitles with 'off' option first
-              const processedSubtitles = [
-                { language: 'Off', code: 'off', label: 'Off', url: null },
-                ...extractedSubtitles
-              ];
-              
+              // Initialize subtitle selection as off - OpenSubtitles will provide options
               if (isMounted) {
-                setSubtitles(processedSubtitles);
-                // Auto-select English subtitles if available, otherwise keep 'off'
-                const englishIndex = processedSubtitles.findIndex(sub => sub.code === 'eng');
-                if (englishIndex !== -1) {
-                  setSelectedSubtitle(englishIndex);
-                  console.log('🎯 Auto-selected English subtitles');
-                } else {
-                  setSelectedSubtitle(0); // 'Off'
-                  console.log('🎯 No English subtitles found, keeping subtitles off');
-                }
+                setSelectedSubtitle('off');
+                console.log('🎯 Subtitles initialized - OpenSubtitles integration will provide quality options');
               }
               
               // Only update state if component is still mounted
@@ -746,20 +856,8 @@ const MediaPlayer = ({
     }
   }, [videoRef.current]);
 
-  // Apply subtitle tracks when video loads or subtitle selection changes
-  useEffect(() => {
-    if (videoRef.current && subtitles.length > 0 && selectedSubtitle !== 'off' && selectedSubtitle !== 0) {
-      const selectedSub = subtitles[selectedSubtitle];
-      if (selectedSub && selectedSub.url) {
-        // Small delay to ensure video is ready
-        const timer = setTimeout(() => {
-          handleSubtitleChange(selectedSubtitle);
-        }, 1000);
-        
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [streamUrl, subtitles, selectedSubtitle]);
+  // Note: Subtitle application is now handled by the useSubtitleManager hook
+  // The old subtitle processing code has been removed
 
   // Initialize direct video streams
   useEffect(() => {
@@ -843,9 +941,7 @@ const MediaPlayer = ({
     setRequestId(null);
     
     // Reset subtitle state
-    setSubtitles([]);
     setSelectedSubtitle('off');
-    setShowSubtitleMenu(false);
     
     // Reset enhanced loading state
     setLoadingProgress(0);
@@ -1181,23 +1277,54 @@ const MediaPlayer = ({
               </div>
             )}
 
-            {subtitles.length > 0 && (
-              <div className={styles.controlGroup}>
-                <label htmlFor="subtitles" className={`${styles.controlLabel} ${styles.subtitleLabel}`}>Subtitles</label>
-                <select 
-                  id="subtitles" 
-                  value={selectedSubtitle} 
-                  onChange={(e) => handleSubtitleChange(parseInt(e.target.value))}
-                  className={styles.subtitleDropdown}
-                >
-                  {subtitles.map((subtitle, index) => (
-                    <option key={index} value={index}>
-                      {subtitle.label}
-                    </option>
-                  ))}
+            {/* OpenSubtitles API Integration - Language-first subtitle selection */}
+            <div className={styles.controlGroup}>
+              <label htmlFor="subtitles" className={`${styles.controlLabel} ${styles.subtitleLabel}`}>
+                Subtitles (OpenSubtitles)
+                {subtitlesLoading && <span className={styles.loadingIndicator}>⟳</span>}
+                {subtitlesError && <span className={styles.errorIndicator}>⚠</span>}
+                {!imdbId && <span className={styles.noImdbIndicator}>📋</span>}
+              </label>
+              
+              {!imdbId ? (
+                <select disabled className={styles.subtitleDropdown}>
+                  <option>Loading IMDB data...</option>
                 </select>
-              </div>
-            )}
+              ) : !subtitles ? (
+                <select disabled className={styles.subtitleDropdown}>
+                  <option>Loading subtitles...</option>
+                </select>
+              ) : (
+                <SubtitleSelector 
+                  subtitles={subtitles}
+                  activeSubtitle={activeSubtitle}
+                  onSubtitleSelect={selectSubtitle}
+                  loading={subtitlesLoading}
+                  className={styles.subtitleDropdown}
+                />
+              )}
+              
+              {activeSubtitle && (
+                <div className={styles.subtitleInfo}>
+                  <span className={styles.subtitleMeta}>
+                    🎬 {activeSubtitle.languageName}
+                    {activeSubtitle.hearingImpaired && ' (HI)'}
+                    {activeSubtitle.foreignPartsOnly && ' (Foreign)'}
+                    {activeSubtitle.fromTrusted && ' ✓'}
+                    {activeSubtitle.isHD && ' HD'}
+                    {activeSubtitle.rating && ` ⭐ ${activeSubtitle.rating}/10`}
+                  </span>
+                </div>
+              )}
+              
+              {subtitles && (
+                <div className={styles.subtitleStats}>
+                  <span className={styles.statText}>
+                    {Object.keys(subtitles.languages || {}).length} languages • {subtitles.totalCount || 0} subtitles available
+                  </span>
+                </div>
+              )}
+            </div>
 
             {/* Server selector is always visible */}
             <div className={styles.controlGroup}>

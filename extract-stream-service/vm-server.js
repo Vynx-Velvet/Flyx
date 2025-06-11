@@ -216,186 +216,13 @@ async function getBrowserConfig(logger) {
   };
 }
 
-// Validate subtitle URLs to ensure they actually exist
-async function validateSubtitleUrls(subtitles, logger) {
-  const validatedSubtitles = [];
-  const maxConcurrent = 5; // Limit concurrent requests
-  
-  logger.info('Starting subtitle validation', {
-    totalSubtitles: subtitles.length
-  });
-  
-  // Process subtitles in batches to avoid overwhelming the server
-  for (let i = 0; i < subtitles.length; i += maxConcurrent) {
-    const batch = subtitles.slice(i, i + maxConcurrent);
-    
-    const validationPromises = batch.map(async (subtitle) => {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-        
-        const response = await fetch(subtitle.url, {
-          method: 'HEAD',
-          signal: controller.signal,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-          }
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          logger.debug('Subtitle validation successful', {
-            language: subtitle.language,
-            code: subtitle.code,
-            status: response.status,
-            contentType: response.headers.get('content-type')
-          });
-          return subtitle;
-        } else {
-          logger.debug('Subtitle validation failed', {
-            language: subtitle.language,
-            code: subtitle.code,
-            status: response.status
-          });
-          return null;
-        }
-      } catch (error) {
-        logger.debug('Subtitle validation error', {
-          language: subtitle.language,
-          code: subtitle.code,
-          error: error.message
-        });
-        return null;
-      }
-    });
-    
-    const batchResults = await Promise.all(validationPromises);
-    validatedSubtitles.push(...batchResults.filter(Boolean));
-    
-    // Small delay between batches to be respectful
-    if (i + maxConcurrent < subtitles.length) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-  }
-  
-  logger.info('Subtitle validation completed', {
-    originalCount: subtitles.length,
-    validatedCount: validatedSubtitles.length,
-    validLanguages: validatedSubtitles.map(s => s.language)
-  });
-  
-  return validatedSubtitles;
-}
+// Note: Subtitle extraction has been moved to a dedicated API route using OpenSubtitles API
 
-function processSubtitleUrl(originalUrl, logger) {
-  const subtitles = [];
-  
-  try {
-    // Check if this looks like a cloudnestra subtitle URL pattern
-    if (originalUrl.includes('/subs/') && originalUrl.includes('.vtt')) {
-      // Extract the base URL and hash
-      // Example: https://cloudnestra.com/subs/d15447dc0714a7f83b92a58f165e306c/Arabic.ara.vtt
-      const urlParts = originalUrl.split('/');
-      const fileName = urlParts[urlParts.length - 1]; // Arabic.ara.vtt
-      const hash = urlParts[urlParts.length - 2]; // d15447dc0714a7f83b92a58f165e306c
-      const baseUrl = urlParts.slice(0, -1).join('/'); // https://cloudnestra.com/subs/d15447dc0714a7f83b92a58f165e306c
-      
-      // Extract language code from filename
-      const fileNameParts = fileName.split('.');
-      if (fileNameParts.length >= 3) {
-        const originalLanguage = fileNameParts[0]; // Arabic
-        const originalCode = fileNameParts[1]; // ara
-        const extension = fileNameParts[2]; // vtt
-        
-        logger.info('Processing subtitle URL', {
-          originalUrl: originalUrl.substring(0, 100),
-          originalLanguage,
-          originalCode,
-          hash: hash.substring(0, 10) + '...'
-        });
-        
-        // Add the original subtitle
-        subtitles.push({
-          url: originalUrl,
-          language: originalLanguage,
-          code: originalCode,
-          label: originalLanguage,
-          isOriginal: true
-        });
-        
-        // Generate English variant
-        const englishUrl = `${baseUrl}/English.eng.${extension}`;
-        subtitles.push({
-          url: englishUrl,
-          language: 'English',
-          code: 'eng',
-          label: 'English',
-          isOriginal: false
-        });
-        
-        // Generate only the most common language variants that are likely to exist
-        const priorityLanguages = [
-          { name: 'Spanish', code: 'spa' },
-          { name: 'French', code: 'fre' },
-          { name: 'German', code: 'ger' },
-          { name: 'Italian', code: 'ita' },
-          { name: 'Portuguese', code: 'por' },
-          { name: 'Russian', code: 'rus' }
-        ];
-        
-        // Only add priority variants if they're different from the original
-        priorityLanguages.forEach(lang => {
-          if (lang.code !== originalCode) {
-            subtitles.push({
-              url: `${baseUrl}/${lang.name}.${lang.code}.${extension}`,
-              language: lang.name,
-              code: lang.code,
-              label: lang.name,
-              isOriginal: false
-            });
-          }
-        });
-        
-        logger.info('Generated subtitle variants', {
-          total: subtitles.length,
-          original: originalLanguage,
-          variants: subtitles.slice(1, 4).map(s => s.language) // Log first 3 variants
-        });
-      }
-    } else {
-      // For other subtitle patterns, just add as-is
-      subtitles.push({
-        url: originalUrl,
-        language: 'Unknown',
-        code: 'unk',
-        label: 'Subtitles',
-        isOriginal: true
-      });
-    }
-  } catch (error) {
-    logger.warn('Error processing subtitle URL', {
-      url: originalUrl.substring(0, 100),
-      error: error.message
-    });
-    
-    // Fallback: add as-is
-    subtitles.push({
-      url: originalUrl,
-      language: 'Unknown',
-      code: 'unk',
-      label: 'Subtitles',
-      isOriginal: true
-    });
-  }
-  
-  return subtitles;
-}
+// Note: Subtitle processing has been moved to OpenSubtitles API integration
 
-// Setup stream interception to capture m3u8 URLs and subtitles
+// Setup stream interception to capture m3u8 URLs
 function setupStreamInterception(page, logger, targetUrl = '') {
   const streamUrls = [];
-  const subtitleUrls = [];
   let responseCount = 0;
 
   // Intercept network responses
@@ -416,12 +243,7 @@ function setupStreamInterception(page, logger, targetUrl = '') {
         });
       }
 
-      // Check for subtitle files (VTT)
-      const isSubtitleResponse = 
-        contentType.includes('text/vtt') ||
-        responseUrl.includes('.vtt') ||
-        responseUrl.includes('/subs/') ||
-        (contentType.includes('text/plain') && responseUrl.includes('.vtt'));
+      // Note: Subtitle detection removed - now handled by OpenSubtitles API
 
       // Check for shadowlandschronicles URLs with master playlists
       const isShadowlandschronicles = responseUrl.includes('shadowlandschronicles') && responseUrl.includes('master');
@@ -436,18 +258,7 @@ function setupStreamInterception(page, logger, targetUrl = '') {
         responseUrl.includes('master') ||
         responseUrl.includes('index');
 
-      // Handle subtitle detection
-      if (isSubtitleResponse && status === 200) {
-        logger.info('Subtitle URL detected', {
-          url: responseUrl.substring(0, 150),
-          contentType,
-          status
-        });
-
-        // Process subtitle URL to generate English variant
-        const processedSubtitles = processSubtitleUrl(responseUrl, logger);
-        subtitleUrls.push(...processedSubtitles);
-      }
+      // Note: Subtitle processing removed - now handled by OpenSubtitles API
 
       // Priority for shadowlandschronicles master playlists
       if (isShadowlandschronicles || (isM3U8Response && (status === 200 || (isShadowlandschronicles && status === 403)))) {
@@ -517,7 +328,7 @@ function setupStreamInterception(page, logger, targetUrl = '') {
     }
   });
 
-  return { streamUrls, subtitleUrls };
+  return { streamUrls };
 }
 
 // Interact with the page to trigger stream loading with realistic human behavior
@@ -1349,7 +1160,7 @@ app.get('/extract', async (req, res) => {
     });
     
     // Setup stream interception
-    const { streamUrls, subtitleUrls } = setupStreamInterception(page, logger, url);
+    const { streamUrls } = setupStreamInterception(page, logger, url);
 
     // Navigate to the page
     logger.info('Navigating to target URL');
@@ -1525,15 +1336,7 @@ app.get('/extract', async (req, res) => {
 
     const totalDuration = logger.timing('Total request duration', requestStart);
 
-    // Process subtitles
-    const availableSubtitles = subtitleUrls.length > 0 ? await validateSubtitleUrls(subtitleUrls, logger) : [];
-    const englishSubtitle = availableSubtitles.find(sub => sub.code === 'eng');
-    
-    logger.info('Subtitle processing completed', {
-      totalSubtitles: availableSubtitles.length,
-      hasEnglish: !!englishSubtitle,
-      languages: availableSubtitles.slice(0, 5).map(s => s.language)
-    });
+    // Note: Subtitle processing moved to OpenSubtitles API integration
 
     // Return successful response
     return res.json({ 
@@ -1541,11 +1344,8 @@ app.get('/extract', async (req, res) => {
       streamUrl: selectedStream.url,
       type: 'hls',
       server: server,
-      subtitles: availableSubtitles,
-      englishSubtitles: englishSubtitle ? englishSubtitle.url : null,
       totalFound: streamUrls.length,
       m3u8Count: m3u8Streams.length,
-      subtitleCount: availableSubtitles.length,
       requestId,
       debug: {
         selectedStream: {
@@ -2037,7 +1837,7 @@ app.get('/extract-stream', async (req, res) => {
     sendProgress('bypassing', 45, 'Bypassing anti-bot detection');
     
     // Setup stream interception
-    const { streamUrls, subtitleUrls } = setupStreamInterception(page, logger, url);
+    const { streamUrls } = setupStreamInterception(page, logger, url);
 
     // Navigate to the page
     sendProgress('bypassing', 50, 'Navigating to media page');
@@ -2218,15 +2018,7 @@ app.get('/extract-stream', async (req, res) => {
 
     const totalDuration = logger.timing('Total request duration', requestStart);
 
-    // Process subtitles
-    const availableSubtitles = subtitleUrls.length > 0 ? await validateSubtitleUrls(subtitleUrls, logger) : [];
-    const englishSubtitle = availableSubtitles.find(sub => sub.code === 'eng');
-    
-    logger.info('Subtitle processing completed', {
-      totalSubtitles: availableSubtitles.length,
-      hasEnglish: !!englishSubtitle,
-      languages: availableSubtitles.slice(0, 5).map(s => s.language)
-    });
+    // Note: Subtitle processing moved to OpenSubtitles API integration
 
     // Send final completion with stream data
     sendProgress('complete', 100, 'Stream ready!', {
@@ -2235,11 +2027,8 @@ app.get('/extract-stream', async (req, res) => {
         streamUrl: selectedStream.url,
         type: 'hls',
         server: server,
-        subtitles: availableSubtitles,
-        englishSubtitles: englishSubtitle ? englishSubtitle.url : null,
         totalFound: streamUrls.length,
         m3u8Count: m3u8Streams.length,
-        subtitleCount: availableSubtitles.length,
         requestId,
         debug: {
           selectedStream: {
