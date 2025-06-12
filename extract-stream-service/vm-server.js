@@ -48,94 +48,7 @@ function generateRequestId() {
   return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Helper function to take screenshots with unix timestamp filenames
-async function takeScreenshot(page, logger, prefix = 'screenshot') {
-  logger.info(`SCREENSHOT DEBUG: Attempting to take screenshot with prefix: ${prefix}`);
-  
-  try {
-    // Check if page is valid
-    if (!page) {
-      logger.error('SCREENSHOT ERROR: Page object is null or undefined');
-      return { success: false, error: 'Page object is null or undefined' };
-    }
-
-    const timestamp = Math.floor(Date.now() / 1000); // Unix timestamp
-    const filename = `${prefix}_${timestamp}.png`;
-    
-    // Use absolute path to be sure
-    const screenshotsDir = path.resolve(__dirname, 'screenshots');
-    const filepath = path.join(screenshotsDir, filename);
-    
-    logger.info('SCREENSHOT DEBUG: Paths calculated', {
-      __dirname: __dirname,
-      screenshotsDir,
-      filename,
-      filepath
-    });
-    
-    // Ensure screenshots directory exists with detailed logging
-    if (!fs.existsSync(screenshotsDir)) {
-      logger.info(`SCREENSHOT DEBUG: Creating screenshots directory: ${screenshotsDir}`);
-      try {
-        fs.mkdirSync(screenshotsDir, { recursive: true });
-        logger.info('SCREENSHOT DEBUG: Screenshots directory created successfully');
-      } catch (mkdirError) {
-        logger.error('SCREENSHOT ERROR: Failed to create screenshots directory', {
-          error: mkdirError.message,
-          directory: screenshotsDir
-        });
-        return { success: false, error: `Failed to create directory: ${mkdirError.message}` };
-      }
-    } else {
-      logger.info('SCREENSHOT DEBUG: Screenshots directory already exists');
-    }
-    
-    // Check directory permissions
-    try {
-      fs.accessSync(screenshotsDir, fs.constants.W_OK);
-      logger.info('SCREENSHOT DEBUG: Directory is writable');
-    } catch (accessError) {
-      logger.error('SCREENSHOT ERROR: Directory is not writable', {
-        error: accessError.message,
-        directory: screenshotsDir
-      });
-      return { success: false, error: `Directory not writable: ${accessError.message}` };
-    }
-    
-    logger.info('SCREENSHOT DEBUG: About to take screenshot with page.screenshot()');
-    
-    await page.screenshot({
-      path: filepath,
-      fullPage: true,
-      type: 'png'
-    });
-    
-    // Verify file was created
-    if (fs.existsSync(filepath)) {
-      const stats = fs.statSync(filepath);
-      logger.info('✅ SCREENSHOT SUCCESS: Screenshot taken and verified', {
-        filename,
-        filepath,
-        timestamp,
-        prefix,
-        fileSize: stats.size,
-        exists: true
-      });
-    } else {
-      logger.error('❌ SCREENSHOT ERROR: File was not created after screenshot call');
-      return { success: false, error: 'Screenshot file was not created' };
-    }
-    
-    return { success: true, filename, filepath, timestamp };
-  } catch (error) {
-    logger.error('❌ SCREENSHOT ERROR: Exception during screenshot', {
-      error: error.message,
-      stack: error.stack,
-      prefix
-    });
-    return { success: false, error: error.message };
-  }
-}
+// Screenshot functionality removed - VM-server now focuses only on stream extraction
 
 // Validate request parameters and construct URLs
 function validateParameters(query, logger) {
@@ -333,8 +246,6 @@ function setupStreamInterception(page, logger, targetUrl = '') {
         });
       }
 
-      // Subtitle detection removed - now handled by frontend OpenSubtitles API
-
       // Check for shadowlandschronicles URLs with master playlists
       const isShadowlandschronicles = responseUrl.includes('shadowlandschronicles') && responseUrl.includes('master');
       
@@ -347,8 +258,6 @@ function setupStreamInterception(page, logger, targetUrl = '') {
         responseUrl.includes('.m3u8') ||
         responseUrl.includes('master') ||
         responseUrl.includes('index');
-
-      // Note: Subtitle processing removed - now handled by OpenSubtitles API
 
       // Priority for shadowlandschronicles master playlists
       if (isShadowlandschronicles || (isM3U8Response && (status === 200 || (isShadowlandschronicles && status === 403)))) {
@@ -421,237 +330,15 @@ function setupStreamInterception(page, logger, targetUrl = '') {
   return { streamUrls };
 }
 
-// Subtitle interception removed - now handled by frontend OpenSubtitles API
-// This allows the VM-server to focus purely on stream extraction
-          });
-          if (!requestHandled) {
-            requestHandled = true;
-            await request.continue();
-          }
-        }
-      } catch (error) {
-        logger.warn('Error intercepting subtitle request', {
-          url: requestUrl.substring(0, 100),
-          error: error.message
-        });
-        if (!requestHandled) {
-          requestHandled = true;
-          await request.continue();
-        }
-      }
-    } else {
-      // Continue with non-subtitle requests normally
-      if (!requestHandled) {
-        requestHandled = true;
-        await request.continue();
-      }
-    }
-  });
-
-  // Intercept network responses for subtitle files
-  page.on('response', async (response) => {
-    const responseUrl = response.url();
-    const contentType = response.headers()['content-type'] || '';
-    const status = response.status();
-
-    try {
-      // Check for VTT/subtitle content
-      const isSubtitleResponse = 
-        contentType.includes('text/vtt') ||
-        contentType.includes('text/plain') ||
-        responseUrl.includes('.vtt') ||
-        responseUrl.includes('subtitle') ||
-        responseUrl.includes('caption') ||
-        responseUrl.toLowerCase().includes('sub') ||
-        responseUrl.includes('cloudnestra.com') ||
-        responseUrl.includes('subtitles_pjs');
-
-      if (isSubtitleResponse && status === 200) {
-        vttResponseCount++;
-        logger.info('Subtitle/VTT URL detected', {
-          url: responseUrl.substring(0, 150),
-          contentType,
-          status,
-          vttResponseCount
-        });
-
-        try {
-          const responseText = await response.text();
-          
-          // Check if it's actually VTT content or subtitle-related
-          const isActualVTT = responseText.includes('WEBVTT') || 
-                             responseUrl.includes('.vtt') ||
-                             contentType.includes('text/vtt');
-                             
-          const isSubtitleJS = responseText.includes('showSubtitles') ||
-                              responseText.includes('addSubtitle') ||
-                              responseUrl.includes('subtitles_pjs') ||
-                              responseUrl.includes('pjs_main_drv_cast.js') ||
-                              responseUrl.includes('.js') ||
-                              responseText.includes('function') ||
-                              responseText.includes('var ') ||
-                              responseText.includes('document.') ||
-                              responseText.includes('window.');
-
-          // ONLY process actual VTT files, not JavaScript
-          if (isActualVTT && !isSubtitleJS) {
-            logger.info('🎯 VTT DEBUG: Found actual VTT content', {
-              url: responseUrl.substring(0, 150),
-              contentLength: responseText.length,
-              startsWithWEBVTT: responseText.includes('WEBVTT'),
-              contentType
-            });
-            
-            // Fetch the actual VTT content to avoid CORS issues in frontend
-            let vttContent = responseText;
-            
-            // If we only got a partial response or need to fetch the full content
-            if (!vttContent || (vttContent.length < 100 && isActualVTT)) {
-              try {
-                logger.info('Fetching full VTT content to avoid CORS', { url: responseUrl.substring(0, 100) });
-                
-                const vttResponse = await fetch(responseUrl, {
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                    'Accept': 'text/vtt, text/plain, */*',
-                    'Referer': page.url(),
-                    'Origin': new URL(page.url()).origin
-                  }
-                });
-                
-                if (vttResponse.ok) {
-                  vttContent = await vttResponse.text();
-                  logger.info('Successfully fetched full VTT content', { 
-                    url: responseUrl.substring(0, 100),
-                    contentLength: vttContent.length 
-                  });
-                } else {
-                  logger.warn('Failed to fetch VTT content', { 
-                    url: responseUrl.substring(0, 100),
-                    status: vttResponse.status 
-                  });
-                }
-              } catch (fetchError) {
-                logger.warn('Error fetching VTT content', {
-                  url: responseUrl.substring(0, 100),
-                  error: fetchError.message
-                });
-                // Use the original response text as fallback
-              }
-            }
-
-            // Only store actual VTT content with WEBVTT header
-            if (vttContent.includes('WEBVTT')) {
-              const detectedLanguage = detectLanguageFromUrl(responseUrl);
-              
-              subtitleUrls.push({
-                url: responseUrl,
-                contentType,
-                status,
-                language: detectedLanguage,
-                isVTT: true,
-                contentLength: vttContent.length,
-                content: vttContent, // Store the actual VTT content
-                preview: vttContent.substring(0, 200)
-              });
-
-              logger.info('✅ VALID VTT SUBTITLE STORED', {
-                url: responseUrl.substring(0, 150),
-                language: detectedLanguage,
-                contentLength: vttContent.length,
-                hasContent: !!vttContent,
-                isOpenSubtitles: responseUrl.includes('opensubtitles'),
-                hasWEBVTT: vttContent.includes('WEBVTT')
-              });
-            } else {
-              logger.warn('🚫 VTT DEBUG: Content does not contain WEBVTT header', {
-                url: responseUrl.substring(0, 100),
-                contentPreview: vttContent.substring(0, 100)
-              });
-            }
-          } else if (isSubtitleJS) {
-            logger.info('🚫 VTT DEBUG: Skipping JavaScript file', {
-              url: responseUrl.substring(0, 100),
-              contentType,
-              contentPreview: responseText.substring(0, 100)
-            });
-          } else {
-            logger.info('🚫 VTT DEBUG: Not VTT content', {
-              url: responseUrl.substring(0, 100),
-              contentType,
-              isActualVTT,
-              isSubtitleJS,
-              contentLength: responseText.length
-            });
-          }
-                  } catch (contentError) {
-            logger.warn('Could not read subtitle response content', {
-              url: responseUrl.substring(0, 100),
-              error: contentError.message
-            });
-          }
-        } else {
-          logger.info('🚫 VTT DEBUG: Response not matching subtitle criteria', {
-            url: responseUrl.substring(0, 100),
-            contentType,
-            status,
-            isSubtitleResponse
-          });
-      }
-    } catch (error) {
-      logger.warn('Error processing subtitle response', {
-        url: responseUrl.substring(0, 100),
-        error: error.message
-      });
-    }
-  });
-
-  return { subtitleUrls, vttResponseCount: () => vttResponseCount, interceptedRequests };
-}
-
-// Helper function to detect language from URL
-function detectLanguageFromUrl(url) {
-  const urlLower = url.toLowerCase();
-  
-  if (urlLower.includes('english') || urlLower.includes('en')) return 'english';
-  if (urlLower.includes('spanish') || urlLower.includes('es')) return 'spanish';
-  if (urlLower.includes('french') || urlLower.includes('fr')) return 'french';
-  if (urlLower.includes('german') || urlLower.includes('de')) return 'german';
-  if (urlLower.includes('italian') || urlLower.includes('it')) return 'italian';
-  if (urlLower.includes('portuguese') || urlLower.includes('pt')) return 'portuguese';
-  
-  return 'unknown';
-}
-
 // Interact with the page to trigger stream loading with realistic human behavior
-async function interactWithPage(page, logger, subtitleUrls = []) {
+async function interactWithPage(page, logger) {
   const interactionStart = Date.now();
   
   try {
     // Wait for page to be ready with realistic timing
     await page.waitForSelector('body', { timeout: 15000 });
     
-    // Set localStorage for subtitle preferences BEFORE any video player loads
-    await page.evaluate(() => {
-      try {
-        // Set subtitle preference to English for various video players
-        localStorage.setItem('pljssubtitle', 'English');
-        localStorage.setItem('pljs_subtitle', 'English');
-        localStorage.setItem('subtitle_lang', 'English');
-        localStorage.setItem('subtitle_language', 'English');
-        localStorage.setItem('captions_lang', 'English');
-        localStorage.setItem('video_subtitle_lang', 'en');
-        localStorage.setItem('player_subtitle', 'English');
-        
-        console.log('✅ LOCAL STORAGE: Set subtitle preferences to English', {
-          pljssubtitle: localStorage.getItem('pljssubtitle'),
-          pljs_subtitle: localStorage.getItem('pljs_subtitle'),
-          subtitle_lang: localStorage.getItem('subtitle_lang')
-        });
-      } catch (e) {
-        console.warn('⚠️ LOCAL STORAGE: Error setting subtitle preferences', e);
-      }
-    });
+    // Subtitle localStorage settings removed - now handled by frontend OpenSubtitles API
     
     // Simulate human-like page reading time
     await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
@@ -988,7 +675,7 @@ async function interactWithPage(page, logger, subtitleUrls = []) {
 
     // Subtitle automation no longer needed - localStorage sets English preference automatically
     logger.info('✅ SUBTITLE AUTOMATION: Using localStorage approach - English subtitles should load automatically', {
-      subtitleUrlsFound: subtitleUrls ? subtitleUrls.length : 0
+      subtitleUrlsFound: 0 // Subtitles now handled by frontend OpenSubtitles API
     });
 
     logger.timing('Page interaction completed', interactionStart);
@@ -1501,13 +1188,8 @@ app.get('/extract', async (req, res) => {
       request.continue({ headers });
           });
       
-      // Setup stream interception
+      // Setup stream interception only - subtitles now handled by frontend OpenSubtitles API
       const { streamUrls } = setupStreamInterception(page, logger, url);
-  
-      // Subtitle interception removed - now handled by frontend OpenSubtitles API
-      const subtitleUrls = [];
-      const vttResponseCount = () => 0;
-      const interceptedRequests = new Map();
 
     // Navigate to the page
     logger.info('Navigating to target URL');
@@ -1569,7 +1251,7 @@ app.get('/extract', async (req, res) => {
     logger.timing('Navigation took', navigationStart);
 
     // Interact with page to trigger stream loading
-    await interactWithPage(page, logger, subtitleUrls);
+    await interactWithPage(page, logger);
 
     // Wait additional time for streams to be captured with progressive checking
     let checkCount = 0;
@@ -1683,9 +1365,7 @@ app.get('/extract', async (req, res) => {
 
     const totalDuration = logger.timing('Total request duration', requestStart);
 
-    // Note: Subtitle processing moved to OpenSubtitles API integration
-
-    // Return successful response
+    // Return successful response - subtitles now handled by frontend OpenSubtitles API
     return res.json({ 
       success: true, 
       streamUrl: selectedStream.url,
@@ -1693,16 +1373,7 @@ app.get('/extract', async (req, res) => {
       server: server,
       totalFound: streamUrls.length,
       m3u8Count: m3u8Streams.length,
-      subtitles: {
-        found: subtitleUrls.length,
-        urls: subtitleUrls.map(sub => ({
-          url: sub.url,
-          language: sub.language,
-          isVTT: sub.isVTT,
-          contentLength: sub.contentLength,
-          content: sub.content // Include actual VTT content to avoid CORS
-        }))
-      },
+      subtitles: [], // Empty - now handled by frontend OpenSubtitles API
       requestId,
       debug: {
         selectedStream: {
@@ -1712,8 +1383,7 @@ app.get('/extract', async (req, res) => {
           needsCleanHeaders: selectedStream.needsCleanHeaders
         },
         totalDuration,
-        server,
-        subtitleAutomation: subtitleUrls.length > 0 ? 'enabled' : 'no_subtitles_found'
+        server
       }
     });
 
@@ -2194,12 +1864,8 @@ app.get('/extract-stream', async (req, res) => {
     
     sendProgress('bypassing', 45, 'Bypassing anti-bot detection');
     
-    // Setup stream interception
-    const { streamUrls } = setupStreamInterception(page, logger, url);
-
-    // Subtitle interception removed - now handled by frontend OpenSubtitles API
-    const subtitleUrls = [];
-    const vttResponseCount = () => 0;
+          // Setup stream interception only - subtitles now handled by frontend OpenSubtitles API
+      const { streamUrls } = setupStreamInterception(page, logger, url);
     const interceptedRequests = new Map();
 
     // Navigate to the page
@@ -2260,7 +1926,7 @@ app.get('/extract-stream', async (req, res) => {
     sendProgress('extracting', 65, 'Interacting with page elements');
     
     // Interact with page to trigger stream loading
-    await interactWithPageWithProgress(page, logger, sendProgress, subtitleUrls);
+    await interactWithPageWithProgress(page, logger, sendProgress);
 
     sendProgress('extracting', 80, 'Capturing stream URLs');
 
@@ -2381,9 +2047,7 @@ app.get('/extract-stream', async (req, res) => {
 
     const totalDuration = logger.timing('Total request duration', requestStart);
 
-    // Note: Subtitle processing moved to OpenSubtitles API integration
-
-    // Send final completion with stream data
+    // Send final completion with stream data - subtitles now handled by frontend OpenSubtitles API
     sendProgress('complete', 100, 'Stream ready!', {
       result: {
         success: true, 
@@ -2392,16 +2056,7 @@ app.get('/extract-stream', async (req, res) => {
         server: server,
         totalFound: streamUrls.length,
         m3u8Count: m3u8Streams.length,
-        subtitles: {
-          found: subtitleUrls.length,
-          urls: subtitleUrls.map(sub => ({
-            url: sub.url,
-            language: sub.language,
-            isVTT: sub.isVTT,
-            contentLength: sub.contentLength,
-            content: sub.content // Include actual VTT content to avoid CORS
-          }))
-        },
+        subtitles: [], // Empty - now handled by frontend OpenSubtitles API
         requestId,
         debug: {
           selectedStream: {
@@ -2411,8 +2066,7 @@ app.get('/extract-stream', async (req, res) => {
             needsCleanHeaders: selectedStream.needsCleanHeaders
           },
           totalDuration,
-          server,
-          subtitleAutomation: subtitleUrls.length > 0 ? 'enabled' : 'no_subtitles_found'
+          server
         }
       }
     });
@@ -2449,7 +2103,7 @@ app.get('/extract-stream', async (req, res) => {
 });
 
 // Enhanced page interaction function with progress updates
-async function interactWithPageWithProgress(page, logger, sendProgress, subtitleUrls = []) {
+async function interactWithPageWithProgress(page, logger, sendProgress) {
   const interactionStart = Date.now();
   
   try {
@@ -2801,7 +2455,7 @@ async function interactWithPageWithProgress(page, logger, sendProgress, subtitle
 
     // Subtitle automation no longer needed - localStorage sets English preference automatically
     logger.info('✅ SUBTITLE AUTOMATION: Using localStorage approach - English subtitles should load automatically', {
-      subtitleUrlsFound: subtitleUrls ? subtitleUrls.length : 0
+      subtitleUrlsFound: 0 // Subtitles now handled by frontend OpenSubtitles API
     });
     
     if (sendProgress) {

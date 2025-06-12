@@ -1240,4 +1240,64 @@
     animation: none;
     transition: none;
   }
+}
+
+/* Ensure video element properly displays subtitles */
+.videoPlayer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: black;
+}
+
+.videoPlayer video {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+/* Force subtitle display */
+.videoPlayer video.subtitles-enabled::cue {
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 1.2em;
+  font-family: Arial, sans-serif;
+  line-height: 1.4;
+  padding: 0.2em 0.4em;
+  border-radius: 0.2em;
+  text-align: center;
+  position: relative;
+  z-index: 999;
+}
+
+.videoPlayer video::cue {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  color: white !important;
+  font-size: 1.2em !important;
+  font-family: Arial, sans-serif !important;
+  line-height: 1.4 !important;
+  padding: 0.2em 0.4em !important;
+  border-radius: 0.2em !important;
+  text-align: center !important;
+  white-space: pre-line !important;
+}
+
+/* Additional fallback styles */
+.videoPlayer video::-webkit-media-text-track-display {
+  color: white !important;
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  font-size: 1.2em !important;
+  font-family: Arial, sans-serif !important;
+  text-align: center !important;
+  padding: 0.2em 0.4em !important;
+  border-radius: 0.2em !important;
+  z-index: 999 !important;
+}
+
+/* Ensure subtitles appear above everything */
+.videoPlayer video::-webkit-media-text-track-container {
+  position: relative !important;
+  z-index: 999 !important;
+  pointer-events: none !important;
 } 

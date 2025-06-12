@@ -8,43 +8,80 @@ import { useMediaContext } from '../context/MediaContext';
 // Enhanced subtitle selector component for both frontend and vm-server subtitles
 const SubtitleSelector = ({ subtitles, activeSubtitle, onSubtitleSelect, loading, className }) => {
   const [selectedValue, setSelectedValue] = useState('off');
+  const [isManualSelection, setIsManualSelection] = useState(false);
   
   // Build options from subtitle data (works with both frontend and vm-server formats)
   const buildOptions = () => {
     const options = [{ value: 'off', label: 'Off', type: 'off' }];
     
     if (!subtitles?.subtitles || subtitles.subtitles.length === 0) {
+      console.log('📋 Dropdown built with only OFF option (no subtitles available)');
       return options;
     }
     
-    // Add subtitles with enhanced labeling
+    // Group subtitles by language and pick the best one for each
+    const languageGroups = {};
+    
     subtitles.subtitles.forEach((subtitle, index) => {
-      const subtitleKey = `${subtitle.language || subtitle.languageName}_${index}`;
-      const languageLabel = subtitle.languageName || subtitle.language || 'Unknown';
+      const languageKey = (subtitle.languageName || subtitle.language || 'Unknown').toLowerCase();
       
-      // Quality indicators for different sources
-      let qualityIndicator = '';
-      if (subtitle.isVTT) {
-        qualityIndicator += '✓ VTT';
+      if (!languageGroups[languageKey]) {
+        languageGroups[languageKey] = [];
       }
-      if (subtitle.qualityScore) {
-        qualityIndicator += ` (${subtitle.qualityScore}/100)`;
+      
+      languageGroups[languageKey].push({
+        ...subtitle,
+        originalIndex: index
+      });
+    });
+    
+    // For each language, pick the best subtitle (highest quality score)
+    Object.keys(languageGroups).forEach(languageKey => {
+      const subtitlesForLanguage = languageGroups[languageKey];
+      
+      // Sort by quality score (highest first), then by downloads
+      const bestSubtitle = subtitlesForLanguage.sort((a, b) => {
+        const scoreA = a.qualityScore || a.rating || 0;
+        const scoreB = b.qualityScore || b.rating || 0;
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        
+        const downloadsA = a.downloads || a.downloadCount || 0;
+        const downloadsB = b.downloads || b.downloadCount || 0;
+        return downloadsB - downloadsA;
+      })[0];
+      
+      const subtitleKey = `${bestSubtitle.language || bestSubtitle.languageName}_${bestSubtitle.originalIndex}`;
+      const languageLabel = bestSubtitle.languageName || bestSubtitle.language || 'Unknown';
+      
+      // Clean label - just show language name and quality score
+      let label = languageLabel;
+      if (bestSubtitle.qualityScore) {
+        label += ` (${bestSubtitle.qualityScore}/100)`;
+      } else if (bestSubtitle.rating) {
+        label += ` (${bestSubtitle.rating}/10)`;
       }
-      if (subtitle.source === 'opensubtitles') {
-        qualityIndicator += ' 🌐 OpenSubtitles';
-      } else if (subtitle.source === 'vm-server') {
-        qualityIndicator += ' 🤖 VM-Server';
-      }
-      if (subtitle.downloads && subtitle.downloads > 0) {
-        qualityIndicator += ` • ${subtitle.downloads} downloads`;
-      }
+      
+      console.log('🔍 Building dropdown option:', {
+        language: bestSubtitle.language || bestSubtitle.languageName,
+        originalIndex: bestSubtitle.originalIndex,
+        generatedKey: subtitleKey,
+        label
+      });
       
       options.push({
         value: subtitleKey,
-        label: `${languageLabel} ${qualityIndicator}`.trim(),
+        label: label,
         type: 'subtitle',
-        subtitle: subtitle
+        subtitle: bestSubtitle
       });
+    });
+    
+    console.log('📋 Dropdown options built:', {
+      totalOptions: options.length - 1, // -1 for 'off' option
+      optionKeys: options.filter(opt => opt.type === 'subtitle').map(opt => opt.value),
+      optionLabels: options.filter(opt => opt.type === 'subtitle').map(opt => opt.label),
+      hasOffOption: options.some(opt => opt.value === 'off'),
+      offOptionLabel: options.find(opt => opt.value === 'off')?.label
     });
     
     return options;
@@ -54,27 +91,97 @@ const SubtitleSelector = ({ subtitles, activeSubtitle, onSubtitleSelect, loading
   
   const handleChange = async (e) => {
     const value = e.target.value;
+    console.log('🎛️ Subtitle dropdown changed:', {
+      selectedValue: value,
+      isOff: value === 'off'
+    });
+    
+    // Mark as manual selection to prevent useEffect from overriding
+    setIsManualSelection(true);
     setSelectedValue(value);
     
     if (value === 'off') {
+      console.log('🔄 User manually selected OFF - turning off subtitles');
       await onSubtitleSelect(null);
     } else {
       const option = options.find(opt => opt.value === value);
       if (option?.subtitle) {
+        console.log('🎬 User selected subtitle:', {
+          language: option.subtitle.languageName || option.subtitle.language,
+          value: value
+        });
         await onSubtitleSelect(option.subtitle);
+      } else {
+        console.warn('⚠️ Selected option not found:', value);
       }
     }
+    
+    // Reset manual selection flag after a delay
+    setTimeout(() => setIsManualSelection(false), 2000); // Extended to 2 seconds
   };
   
-  // Update selected value when active subtitle changes
+  // Update selected value when active subtitle changes (but not during manual selection)
   useEffect(() => {
+    if (isManualSelection) {
+      console.log('🚫 Skipping auto-sync due to manual selection in progress');
+      return;
+    }
+    
     if (!activeSubtitle) {
       setSelectedValue('off');
+      console.log('✅ Auto-synced dropdown to OFF (no active subtitle)');
     } else {
-      const subtitleKey = `${activeSubtitle.language}_${activeSubtitle.index || 0}`;
-      setSelectedValue(subtitleKey);
+      // Use the same key generation logic as buildOptions
+      const language = activeSubtitle.language || activeSubtitle.languageName;
+      const index = activeSubtitle.originalIndex || activeSubtitle.index || 0;
+      const subtitleKey = `${language}_${index}`;
+      
+      // Check if this key exists in our options
+      const optionExists = options.some(opt => opt.value === subtitleKey);
+      
+      if (optionExists) {
+        setSelectedValue(subtitleKey);
+        console.log('✅ Dropdown synced with active subtitle:', subtitleKey);
+      } else {
+        // Fallback: try to find by language only
+        const languageMatch = options.find(opt => 
+          opt.subtitle && 
+          (opt.subtitle.language === language || opt.subtitle.languageName === language)
+        );
+        
+        if (languageMatch) {
+          setSelectedValue(languageMatch.value);
+          console.log('🔄 Dropdown synced using language fallback:', {
+            attemptedKey: subtitleKey,
+            fallbackKey: languageMatch.value,
+            reason: 'Exact key not found, matched by language'
+          });
+        } else {
+          console.warn('⚠️ Could not sync dropdown - no matching option found:', {
+            activeSubtitle: {
+              language: activeSubtitle.language,
+              languageName: activeSubtitle.languageName,
+              index: activeSubtitle.index,
+              originalIndex: activeSubtitle.originalIndex
+            },
+            attemptedKey: subtitleKey,
+            availableKeys: options.filter(opt => opt.type === 'subtitle').map(opt => opt.value)
+          });
+        }
+      }
+      
+      console.log('🔄 Updating dropdown selection:', {
+        activeSubtitle: {
+          language: activeSubtitle.language,
+          languageName: activeSubtitle.languageName,
+          index: activeSubtitle.index,
+          originalIndex: activeSubtitle.originalIndex
+        },
+        generatedKey: subtitleKey,
+        availableOptions: options.map(opt => opt.value)
+      });
     }
-  }, [activeSubtitle]);
+  }, [activeSubtitle, options, isManualSelection]);
   
   return (
     <select 
@@ -124,6 +231,9 @@ const MediaPlayer = ({
   // Legacy subtitle state (kept for compatibility with old UI elements)
   const [selectedSubtitle, setSelectedSubtitle] = useState('off'); // 'off' or subtitle index
   
+  // User preference to remember when subtitles are explicitly disabled
+  const [userDisabledSubtitles, setUserDisabledSubtitles] = useState(false);
+  
   // Custom dropdown states
   const [qualityDropdownOpen, setQualityDropdownOpen] = useState(false);
   const [subtitleDropdownOpen, setSubtitleDropdownOpen] = useState(false);
@@ -141,16 +251,36 @@ const MediaPlayer = ({
   
   const videoRef = useRef(null);
 
-  // Get media context for storing subtitle data
+  // Get media context
   const { 
     getMedia, 
     fetchDetailedMedia, 
-    storeSubtitlesFromExtraction,
     getVideoPlayerSubtitles,
     hasSubtitleData
   } = useMediaContext();
   
   const [currentMedia, setCurrentMedia] = useState(null);
+
+  // Debug helper for text tracks
+  const debugTextTracks = useCallback((context = '') => {
+    if (!videoRef?.current) return;
+    
+    const video = videoRef.current;
+    console.log(`🔍 Text Tracks Debug [${context}]:`, {
+      totalTracks: video.textTracks.length,
+      trackElements: video.querySelectorAll('track').length,
+      tracks: Array.from(video.textTracks).map((track, index) => ({
+        index,
+        kind: track.kind,
+        label: track.label,
+        language: track.language,
+        mode: track.mode,
+        cues: track.cues ? track.cues.length : 'loading...',
+        activeCues: track.activeCues ? track.activeCues.length : 'none',
+        readyState: track.readyState || 'unknown'
+      }))
+    });
+  }, []);
 
   // Use the new frontend-based subtitle system with IMDB ID
   const {
@@ -172,7 +302,7 @@ const MediaPlayer = ({
     episode: mediaType === 'tv' ? episodeId : null,
     imdbId: currentMedia?.imdb_id, // IMDB ID for OpenSubtitles API
     preferredLanguage: 'english',
-    preferredLanguages: ['eng', 'spa', 'fre'], // Multi-language support
+    preferredLanguages: ['eng', 'spa', 'por', 'ara', 'rus', 'pol', 'fre', 'ger'], // Multi-language support
     useFrontendSubtitles: true, // Enable new frontend approach
     autoLoad: !!currentMedia?.imdb_id // Auto-load when IMDB ID is available
   });
@@ -189,7 +319,7 @@ const MediaPlayer = ({
     "🔄 If one server fails, we'll automatically try backup sources.",
     "📺 HLS streams provide adaptive quality based on your connection.",
     "🚀 Our VM service ensures consistent performance and reliability.",
-    "📝 VM-server now automatically extracts subtitles from video players!"
+    "📝 Subtitles are now fetched from OpenSubtitles API for maximum compatibility!"
   ];
 
   // Loading phases with estimated durations
@@ -199,7 +329,7 @@ const MediaPlayer = ({
     navigating: { label: 'Setting up browser environment', progress: 35 },
     bypassing: { label: 'Bypassing security measures', progress: 50 },
     extracting: { label: 'Extracting stream URLs', progress: 80 },
-    subtitles: { label: 'Extracting subtitles', progress: 90 },
+    processing: { label: 'Processing stream data', progress: 90 },
     validating: { label: 'Validating stream quality', progress: 93 },
     finalizing: { label: 'Preparing playback', progress: 95 },
     complete: { label: 'Stream ready!', progress: 100 }
@@ -213,60 +343,208 @@ const MediaPlayer = ({
     }
     
     try {
-      console.log('🎬 Applying subtitle to video:', {
+      console.log('🎬 Applying subtitle to HLS player:', {
         language: subtitle.languageName || subtitle.language,
         format: subtitle.format,
         source: subtitle.source,
         hasContent: !!subtitle.content,
         hasBlobUrl: !!subtitle.blobUrl,
-        isProcessed: !!subtitle.processed
+        hasHlsInstance: !!hlsInstance
       });
       
-      // Remove existing tracks
-      const existingTracks = videoRef.current.querySelectorAll('track');
-      existingTracks.forEach(track => track.remove());
+      const video = videoRef.current;
+      
+      // For HLS streams, integrate directly with HLS.js
+      if (hlsInstance && streamType === 'm3u8') {
+        return await applySubtitleToHls(subtitle);
+      }
+      
+      // Fallback to HTML track elements for direct MP4 streams
+      return await applySubtitleToHtmlVideo(subtitle);
+      
+    } catch (error) {
+      console.error('❌ Failed to apply subtitle:', error);
+      return false;
+    }
+  }, [videoRef, hlsInstance, streamType]);
+
+  // Apply subtitle directly to HLS.js player
+  const applySubtitleToHls = useCallback(async (subtitle) => {
+    if (!hlsInstance) {
+      console.error('❌ HLS instance not available');
+      return false;
+    }
+
+    try {
+      console.log('🎯 Adding subtitle directly to HLS player');
       
       let processedSubtitle = subtitle;
       
-      // For frontend subtitles that aren't processed yet, process them first
+      // Process subtitle if needed
       if (subtitle.source === 'opensubtitles' && !subtitle.processed && !subtitle.content && processSubtitle) {
         try {
-          console.log('🔄 Processing frontend subtitle before applying...');
+          console.log('🔄 Processing frontend subtitle for HLS...');
           processedSubtitle = await processSubtitle(subtitle);
-          console.log('✅ Frontend subtitle processed successfully');
+          console.log('✅ Frontend subtitle processed for HLS');
         } catch (processError) {
           console.error('❌ Failed to process frontend subtitle:', processError);
-          // Continue with original subtitle
+          return false;
         }
       }
-      
-      // Determine the source URL - prefer blob URL to avoid CORS
-      let subtitleSrc = null;
-      
-      if (processedSubtitle.content) {
-        // Create blob URL from VTT content to avoid CORS issues
-        try {
-          const blob = new Blob([processedSubtitle.content], { type: 'text/vtt' });
-          subtitleSrc = URL.createObjectURL(blob);
-          console.log('✅ Created blob URL for subtitle content');
-        } catch (blobError) {
-          console.error('❌ Failed to create blob URL:', blobError);
-          // Fallback to original URL (may cause CORS issues)
-          subtitleSrc = processedSubtitle.url || processedSubtitle.downloadLink;
-        }
-      } else if (processedSubtitle.blobUrl) {
-        // Use existing blob URL
-        subtitleSrc = processedSubtitle.blobUrl;
-        console.log('✅ Using existing blob URL');
-      } else if (processedSubtitle.url || processedSubtitle.downloadLink) {
-        // Fallback to original URL (may cause CORS issues)
-        subtitleSrc = processedSubtitle.url || processedSubtitle.downloadLink;
-        console.warn('⚠️ Using original URL (may cause CORS issues)');
-      }
-      
-      if (!subtitleSrc) {
-        console.error('❌ No valid subtitle source available');
+
+      if (!processedSubtitle.content) {
+        console.error('❌ No VTT content available for HLS integration');
         return false;
+      }
+
+      // Create a data URL for the VTT content (HLS.js can handle data URLs)
+      const vttDataUrl = `data:text/vtt;charset=utf-8,${encodeURIComponent(processedSubtitle.content)}`;
+      
+      console.log('🎯 Adding subtitle track to HLS:', {
+        language: processedSubtitle.languageName || processedSubtitle.language,
+        contentLength: processedSubtitle.content.length,
+        dataUrlLength: vttDataUrl.length
+      });
+
+      // Add subtitle track to HLS.js
+      // Note: HLS.js doesn't have a direct addSubtitleTrack method, so we need to use a different approach
+      // We'll add it as an external subtitle track
+      
+      // Remove existing subtitle tracks first
+      const video = videoRef.current;
+      const existingTracks = video.querySelectorAll('track[data-hls-subtitle]');
+      existingTracks.forEach(track => track.remove());
+      
+      // Create track element for HLS.js to manage
+      const track = document.createElement('track');
+      track.kind = 'subtitles';
+      track.src = vttDataUrl;
+      track.srclang = processedSubtitle.iso639 || 'en';
+      track.label = processedSubtitle.languageName || processedSubtitle.language || 'Subtitles';
+      track.default = true;
+      track.setAttribute('data-hls-subtitle', 'true'); // Mark as HLS-managed
+      
+      // Add to video element
+      video.appendChild(track);
+      
+      // Force HLS.js to recognize the new track
+      setTimeout(() => {
+        if (video.textTracks && video.textTracks.length > 0) {
+          const textTrack = video.textTracks[video.textTracks.length - 1];
+          textTrack.mode = 'showing';
+          
+          console.log('✅ HLS subtitle track enabled:', {
+            label: textTrack.label,
+            language: textTrack.language,
+            mode: textTrack.mode,
+            cues: textTrack.cues ? textTrack.cues.length : 'loading...'
+          });
+          
+          // Verify cues are loaded
+          const checkCues = () => {
+            if (textTrack.cues && textTrack.cues.length > 0) {
+              console.log('✅ HLS subtitle cues loaded:', {
+                cueCount: textTrack.cues.length,
+                firstCue: {
+                  startTime: textTrack.cues[0].startTime,
+                  endTime: textTrack.cues[0].endTime,
+                  text: textTrack.cues[0].text.substring(0, 50) + '...'
+                }
+              });
+            } else {
+              console.warn('⚠️ HLS subtitle cues not loaded yet, retrying...');
+              setTimeout(checkCues, 500);
+            }
+          };
+          
+          setTimeout(checkCues, 100);
+        }
+      }, 100);
+      
+      setActiveSubtitle({
+        ...processedSubtitle,
+        appliedSrc: vttDataUrl,
+        method: 'hls-direct'
+      });
+      
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Failed to apply subtitle to HLS:', error);
+      return false;
+    }
+  }, [hlsInstance, processSubtitle]);
+
+  // Apply subtitle to HTML video element (fallback for MP4 streams)
+  const applySubtitleToHtmlVideo = useCallback(async (subtitle) => {
+    try {
+      console.log('🎯 Adding subtitle to HTML video element');
+      
+      const video = videoRef.current;
+      
+      // Remove existing tracks and disable all text tracks first
+      const existingTracks = video.querySelectorAll('track');
+      existingTracks.forEach(track => track.remove());
+      
+      // Disable all existing text tracks
+      for (let i = 0; i < video.textTracks.length; i++) {
+        video.textTracks[i].mode = 'disabled';
+      }
+      
+      let processedSubtitle = subtitle;
+      
+      // Process subtitle if needed
+      if (subtitle.source === 'opensubtitles' && !subtitle.processed && !subtitle.content && processSubtitle) {
+        try {
+          console.log('🔄 Processing frontend subtitle for HTML video...');
+          processedSubtitle = await processSubtitle(subtitle);
+          console.log('✅ Frontend subtitle processed for HTML video');
+        } catch (processError) {
+          console.error('❌ Failed to process frontend subtitle:', processError);
+          return false;
+        }
+      }
+      
+      // ALWAYS use content directly - ignore any blob URLs
+      if (!processedSubtitle.content) {
+        console.error('❌ No VTT content available for HTML video');
+        console.log('🔍 Subtitle debug:', {
+          hasContent: !!processedSubtitle.content,
+          hasBlobUrl: !!processedSubtitle.blobUrl,
+          contentLength: processedSubtitle.content ? processedSubtitle.content.length : 0,
+          useDirectContent: processedSubtitle.useDirectContent
+        });
+        return false;
+      }
+      
+      console.log('✅ Using VTT content directly (no blob URLs):', {
+        contentLength: processedSubtitle.content.length,
+        startsWithWebVTT: processedSubtitle.content.startsWith('WEBVTT'),
+        ignoringBlobUrl: !!processedSubtitle.blobUrl
+      });
+      
+      // Try data URL first, with blob URL fallback
+      let subtitleSrc;
+      let usingMethod;
+      
+      try {
+        // Method 1: Data URL (preferred)
+        subtitleSrc = `data:text/vtt;charset=utf-8,${encodeURIComponent(processedSubtitle.content)}`;
+        usingMethod = 'data-url';
+        console.log('🎯 Using data URL method');
+      } catch (dataUrlError) {
+        console.warn('⚠️ Data URL failed, trying blob URL fallback:', dataUrlError);
+        
+        // Method 2: Blob URL (fallback)
+        try {
+          const blob = new Blob([processedSubtitle.content], { type: 'text/vtt; charset=utf-8' });
+          subtitleSrc = URL.createObjectURL(blob);
+          usingMethod = 'blob-url';
+          console.log('🎯 Using blob URL fallback method');
+        } catch (blobError) {
+          console.error('❌ Both data URL and blob URL failed:', blobError);
+          return false;
+        }
       }
       
       // Create new track element
@@ -274,66 +552,210 @@ const MediaPlayer = ({
       track.kind = 'subtitles';
       track.src = subtitleSrc;
       track.srclang = processedSubtitle.iso639 || 'en';
-      track.label = processedSubtitle.languageName || processedSubtitle.language;
+      track.label = processedSubtitle.languageName || processedSubtitle.language || 'Subtitles';
       track.default = true;
       
-      console.log('🎯 Adding subtitle track to video:', {
+      console.log('🎯 Adding subtitle track to HTML video:', {
         language: track.label,
         srcLang: track.srclang,
-        usedBlobUrl: subtitleSrc.startsWith('blob:'),
-        source: processedSubtitle.source
+        contentLength: processedSubtitle.content.length,
+        srcLength: subtitleSrc.length,
+        method: usingMethod
       });
       
       // Add track to video element
-      videoRef.current.appendChild(track);
+      video.appendChild(track);
+      
+      // Create a manual cue checker
+      const checkActiveCues = () => {
+        if (video.textTracks && video.textTracks.length > 0) {
+          const track = video.textTracks[0];
+          console.log('🔍 Manual cue check:', {
+            currentTime: video.currentTime,
+            totalCues: track.cues ? track.cues.length : 0,
+            activeCues: track.activeCues ? track.activeCues.length : 0,
+            trackMode: track.mode,
+            activeCueTexts: track.activeCues ? Array.from(track.activeCues).map(cue => cue.text.substring(0, 50)) : []
+          });
+        }
+      };
       
       // Enable the track
       setTimeout(() => {
-        if (videoRef.current?.textTracks?.length > 0) {
-          const addedTrack = videoRef.current.textTracks[videoRef.current.textTracks.length - 1];
+        if (video.textTracks && video.textTracks.length > 0) {
+          const addedTrack = video.textTracks[video.textTracks.length - 1];
           addedTrack.mode = 'showing';
-          console.log('✅ Subtitle track enabled:', track.label);
+          console.log('✅ HTML video subtitle track enabled:', track.label, {
+            mode: addedTrack.mode,
+            cues: addedTrack.cues ? addedTrack.cues.length : 'loading...'
+          });
+          
+          // FORCE subtitle display by checking video element properties
+          console.log('🔍 Video element debug:', {
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight,
+            clientWidth: video.clientWidth,
+            clientHeight: video.clientHeight,
+            currentTime: video.currentTime,
+            duration: video.duration,
+            readyState: video.readyState,
+            hasControls: video.controls,
+            style: {
+              position: getComputedStyle(video).position,
+              zIndex: getComputedStyle(video).zIndex,
+              display: getComputedStyle(video).display
+            }
+          });
+          
+          // Check if cues loaded properly and force CSS
+          setTimeout(() => {
+            if (addedTrack.cues && addedTrack.cues.length > 0) {
+              console.log('🎯 Subtitles should now be visible:', {
+                cueCount: addedTrack.cues.length,
+                trackMode: addedTrack.mode,
+                firstCue: {
+                  startTime: addedTrack.cues[0].startTime,
+                  endTime: addedTrack.cues[0].endTime,
+                  text: addedTrack.cues[0].text
+                },
+                currentVideoTime: video.currentTime
+              });
+              
+              // FORCE CSS properties to ensure subtitles are visible
+              const videoStyle = video.style;
+              if (!videoStyle.position || videoStyle.position === 'static') {
+                videoStyle.position = 'relative';
+                console.log('🔧 Fixed video position to relative');
+              }
+              
+              // Ensure video has proper z-index
+              if (!videoStyle.zIndex) {
+                videoStyle.zIndex = '1';
+                console.log('🔧 Set video z-index to 1');
+              }
+              
+              // Force subtitle display by adding CSS class
+              video.classList.add('subtitles-enabled');
+              
+              // Try to manually trigger cue display by seeking slightly
+              if (video.currentTime > 0) {
+                const currentTime = video.currentTime;
+                video.currentTime = currentTime + 0.01;
+                setTimeout(() => {
+                  video.currentTime = currentTime;
+                  console.log('🔄 Forced subtitle refresh by seeking');
+                  
+                  // Check active cues after seeking
+                  setTimeout(checkActiveCues, 100);
+                }, 100);
+              }
+              
+              // Set up periodic cue checking
+              const cueCheckInterval = setInterval(() => {
+                checkActiveCues();
+              }, 5000); // Check every 5 seconds
+              
+              // Clean up interval after 30 seconds
+              setTimeout(() => {
+                clearInterval(cueCheckInterval);
+              }, 30000);
+              
+            } else {
+              console.error('❌ No cues loaded - subtitle won\'t display');
+              
+              // Debug the source URL
+              console.log('🔍 Source URL debug:', {
+                srcStart: subtitleSrc.substring(0, 100),
+                isDataUrl: subtitleSrc.startsWith('data:'),
+                isBlobUrl: subtitleSrc.startsWith('blob:'),
+                method: usingMethod,
+                contentType: subtitleSrc.startsWith('data:') ? subtitleSrc.split(',')[0] : 'blob',
+                contentPreview: subtitleSrc.startsWith('data:') ? 
+                  decodeURIComponent(subtitleSrc.split(',')[1] || '').substring(0, 200) : 
+                  'blob content'
+              });
+            }
+          }, 500);
         }
       }, 100);
-      
-      // Track error handling
-      track.addEventListener('error', (error) => {
-        console.error('❌ Subtitle track error:', error);
-      });
-      
-      track.addEventListener('load', () => {
-        console.log('✅ Subtitle track loaded successfully');
-      });
       
       setActiveSubtitle({
         ...processedSubtitle,
         appliedSrc: subtitleSrc,
-        usedBlobUrl: subtitleSrc.startsWith('blob:')
+        method: 'html-direct',
+        usingMethod: usingMethod
       });
       
       return true;
+      
     } catch (error) {
-      console.error('❌ Failed to apply subtitle:', error);
+      console.error('❌ Failed to apply subtitle to HTML video:', error);
       return false;
     }
-  }, [videoRef, processSubtitle]);
+  }, [processSubtitle]);
 
   // Handle subtitle selection
   const handleSubtitleSelect = useCallback(async (subtitle) => {
     if (!subtitle) {
-      // Turn off subtitles
-      if (videoRef?.current) {
-        const existingTracks = videoRef.current.querySelectorAll('track');
-        existingTracks.forEach(track => track.remove());
+      // Turn off subtitles completely
+      const video = videoRef?.current;
+      if (video) {
+        console.log('🔄 Turning off subtitles...');
+        
+        // Remove all track elements
+        const existingTracks = video.querySelectorAll('track');
+        existingTracks.forEach(track => {
+          track.remove();
+          console.log('🗑️ Removed track element:', track.label);
+        });
+        
+        // Disable all text tracks
+        for (let i = 0; i < video.textTracks.length; i++) {
+          video.textTracks[i].mode = 'disabled';
+          console.log('🔇 Disabled text track:', video.textTracks[i].label);
+        }
+        
+        // Force remove any subtitle styling classes
+        video.classList.remove('subtitles-enabled');
+        
+        console.log('✅ All subtitles turned off:', {
+          trackElementsRemoved: existingTracks.length,
+          textTracksDisabled: video.textTracks.length,
+          videoClassesRemoved: true
+        });
       }
+      
       setActiveSubtitle(null);
       setSelectedSubtitle('off');
+      setUserDisabledSubtitles(true); // Remember user choice
+      console.log('🔄 Subtitle state reset to OFF - user preference saved');
       return true;
     }
     
-    const success = applySubtitleToVideo(subtitle);
+    // User is selecting a subtitle, so they want subtitles enabled
+    setUserDisabledSubtitles(false);
+    
+    console.log('🎬 Subtitle selected from dropdown:', {
+      language: subtitle.language || subtitle.languageName,
+      originalIndex: subtitle.originalIndex,
+      index: subtitle.index,
+      format: subtitle.format,
+      clearingUserDisabled: true
+    });
+    
+    const success = await applySubtitleToVideo(subtitle);
     if (success) {
-      setSelectedSubtitle(`${subtitle.language}_${subtitle.index || 0}`);
+      // Ensure we maintain the key information for dropdown sync
+      const language = subtitle.language || subtitle.languageName;
+      const index = subtitle.originalIndex || subtitle.index || 0;
+      const subtitleKey = `${language}_${index}`;
+      setSelectedSubtitle(subtitleKey);
+      
+      console.log('✅ Subtitle selection successful:', {
+        subtitleKey,
+        dropdownShouldShow: subtitleKey,
+        userDisabledCleared: true
+      });
     }
     return success;
   }, [applySubtitleToVideo]);
@@ -403,45 +825,122 @@ const MediaPlayer = ({
       if (!subtitles?.subtitles?.length || !videoRef.current || activeSubtitle) {
         return; // No subtitles available, no video element, or subtitles already active
       }
+      
+      // Don't auto-initialize if user explicitly disabled subtitles
+      if (userDisabledSubtitles) {
+        console.log('🚫 Skipping auto-initialization - user explicitly disabled subtitles');
+        return;
+      }
+
+      const video = videoRef.current;
+      
+      // CHECK VIDEO READINESS BEFORE APPLYING SUBTITLES
+      console.log('🎬 Checking video readiness for subtitle initialization:', {
+        readyState: video.readyState,
+        hasSource: !!video.src || !!video.currentSrc,
+        networkState: video.networkState,
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight,
+        duration: video.duration,
+        paused: video.paused,
+        userDisabledSubtitles
+      });
+      
+      // Don't apply subtitles until video is at least HAVE_METADATA (readyState 1) or higher
+      if (video.readyState < 1) {
+        console.log('⏳ Video not ready yet (readyState: ' + video.readyState + '), waiting...');
+        return; // Exit and let the next check handle it
+      }
+      
+      // Also check if video has dimensions (more reliable indicator)
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        console.log('⏳ Video dimensions not available yet, waiting...');
+        return;
+      }
 
       try {
-        console.log('🎬 Auto-initializing subtitles:', {
+        console.log('🎬 Auto-initializing subtitles (video is ready, user has not disabled):', {
           subtitlesCount: subtitles.subtitles.length,
           source: subtitles.source,
           hasImdbId,
-          useFrontendSubtitles
+          useFrontendSubtitles,
+          videoReadyState: video.readyState,
+          videoDimensions: `${video.videoWidth}x${video.videoHeight}`,
+          userDisabledSubtitles
         });
 
-        // Get the best English subtitle
-        const bestSubtitle = await getBestSubtitleForPlayer('english');
+        // Get the best subtitle in order of language preference
+        const languagePreferences = ['english', 'spanish', 'portuguese', 'arabic', 'russian', 'polish', 'french', 'german'];
+        let bestSubtitle = null;
+        
+        console.log('🌍 Searching for subtitles in preferred languages:', languagePreferences);
+        
+        for (const language of languagePreferences) {
+          try {
+            bestSubtitle = await getBestSubtitleForPlayer(language);
+            if (bestSubtitle) {
+              console.log(`✅ Found best subtitle for auto-initialization in ${language}:`, {
+                language: bestSubtitle.languageName,
+                format: bestSubtitle.format,
+                quality: bestSubtitle.qualityScore,
+                hasContent: !!bestSubtitle.content,
+                hasBlobUrl: !!bestSubtitle.blobUrl,
+                source: bestSubtitle.source
+              });
+              break; // Found a subtitle, stop searching
+            }
+          } catch (error) {
+            console.log(`⚠️ No ${language} subtitle available, trying next language...`);
+          }
+        }
         
         if (bestSubtitle) {
-          console.log('✅ Found best subtitle for auto-initialization:', {
-            language: bestSubtitle.languageName,
-            format: bestSubtitle.format,
-            quality: bestSubtitle.qualityScore,
-            hasContent: !!bestSubtitle.content,
-            hasBlobUrl: !!bestSubtitle.blobUrl,
-            source: bestSubtitle.source
-          });
-
-          // Apply the subtitle to video
+          // Apply the subtitle to video using handleSubtitleSelect for proper state sync
           const success = await handleSubtitleSelect(bestSubtitle);
           if (success) {
-            console.log('🎯 Subtitles auto-initialized successfully');
+            console.log('🎯 Subtitles auto-initialized successfully (video was ready)');
           }
         } else {
-          console.log('⚠️ No suitable subtitle found for auto-initialization');
+          console.log('⚠️ No suitable subtitle found in any preferred language for auto-initialization');
         }
       } catch (error) {
         console.error('❌ Failed to auto-initialize subtitles:', error);
       }
     };
 
-    // Small delay to ensure video element is ready
-    const timer = setTimeout(initializeSubtitles, 1000);
-    return () => clearTimeout(timer);
-  }, [subtitles, getBestSubtitleForPlayer, handleSubtitleSelect, activeSubtitle, hasImdbId]);
+    // Check immediately
+    initializeSubtitles();
+    
+    // Also listen for video events to retry when video becomes ready
+    const video = videoRef.current;
+    if (video) {
+      const handleVideoReady = () => {
+        console.log('📺 Video ready event fired, attempting subtitle initialization');
+        setTimeout(initializeSubtitles, 100); // Small delay to ensure video is fully ready
+      };
+      
+      const handleLoadedMetadata = () => {
+        console.log('📺 Video loadedmetadata event fired');
+        setTimeout(initializeSubtitles, 100);
+      };
+      
+      const handleCanPlay = () => {
+        console.log('📺 Video canplay event fired');
+        setTimeout(initializeSubtitles, 100);
+      };
+      
+      // Listen for various video ready events
+      video.addEventListener('loadedmetadata', handleLoadedMetadata);
+      video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener('canplaythrough', handleVideoReady);
+      
+      return () => {
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('canplaythrough', handleVideoReady);
+      };
+    }
+  }, [subtitles, getBestSubtitleForPlayer, handleSubtitleSelect, activeSubtitle, hasImdbId, userDisabledSubtitles]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -836,56 +1335,8 @@ const MediaPlayer = ({
               
               console.log('🔗 Setting stream URL:', finalStreamUrl.substring(0, 100) + '...');
               
-              // Store subtitle data from vm-server in MediaContext
-              const cacheKey = `${movieId}_${mediaType === 'tv' ? seasonId : 'movie'}_${mediaType === 'tv' ? episodeId : '0'}`;
-              
-              if (extractData.subtitles && extractData.subtitles.found > 0) {
-                console.log('📝 Storing subtitle data from vm-server:', extractData.subtitles);
-                storeSubtitlesFromExtraction(extractData, cacheKey);
-                
-                // Auto-select English subtitle if available
-                setTimeout(() => {
-                  if (extractData.subtitles.urls && extractData.subtitles.urls.length > 0) {
-                    const englishSubtitle = extractData.subtitles.urls.find(sub => 
-                      sub.language === 'english' || sub.language === 'en'
-                    );
-                    
-                    if (englishSubtitle) {
-                      console.log('🎬 Auto-selecting English subtitle from vm-server');
-                      // Create a formatted subtitle object for the video player
-                      const formattedSubtitle = {
-                        ...englishSubtitle,
-                        languageName: 'English',
-                        iso639: 'en'
-                      };
-                      handleSubtitleSelect(formattedSubtitle);
-                    } else {
-                      // Fallback to first available subtitle
-                      console.log('🎬 Auto-selecting first available subtitle from vm-server');
-                      const firstSubtitle = {
-                        ...extractData.subtitles.urls[0],
-                        languageName: extractData.subtitles.urls[0].language === 'spanish' ? 'Spanish' : 
-                                    extractData.subtitles.urls[0].language === 'french' ? 'French' : 
-                                    extractData.subtitles.urls[0].language || 'Unknown',
-                        iso639: extractData.subtitles.urls[0].language === 'spanish' ? 'es' : 
-                               extractData.subtitles.urls[0].language === 'french' ? 'fr' : 'en'
-                      };
-                      handleSubtitleSelect(firstSubtitle);
-                    }
-                  }
-                }, 2000); // Wait for video to be ready
-              } else {
-                console.log('📝 No subtitles found in vm-server response');
-              }
-              
-              // Note: Now using vm-server subtitle data instead of OpenSubtitles API
-              console.log('📝 VM-server subtitle extraction completed');
-              
-              // Initialize subtitle selection as off - vm-server subtitles will be available if found
-              if (isMounted) {
-                setSelectedSubtitle('off');
-                console.log('🎯 Subtitles initialized - vm-server subtitles available if extracted');
-              }
+              // Note: Subtitle processing now handled by frontend OpenSubtitles API
+              console.log('📝 Stream extraction completed - subtitles handled separately via OpenSubtitles API');
               
               // Only update state if component is still mounted
               if (isMounted) {
@@ -1065,45 +1516,11 @@ const MediaPlayer = ({
     }
   }, [streamUrl, streamType]);
 
-  // Comprehensive cleanup on unmount only
-  useEffect(() => {
-    return () => {
-      console.log('🧹 Cleaning up MediaPlayer component on unmount...');
-      
-      // Clean up HLS instance
-      if (hlsInstance) {
-        console.log('🧹 Destroying HLS instance on unmount');
-        hlsInstance.destroy();
-      }
-      
-      // Close EventSource connection
-      if (progressEventSource) {
-        console.log('🧹 Closing progress EventSource on unmount');
-        progressEventSource.close();
-      }
-      
-      // Pause and reset video element
-      if (videoRef.current) {
-        console.log('🧹 Pausing and resetting video element on unmount');
-        videoRef.current.pause();
-        videoRef.current.currentTime = 0;
-        videoRef.current.src = '';
-        videoRef.current.load(); // Reset video element
-      }
-    };
-  }, []); // Empty dependency array - only run on unmount
-
-  // Clean up when switching to different content (but don't auto-start extraction)
+  // Comprehensive cleanup and reset when content changes
   useEffect(() => {
     console.log('🔄 MediaPlayer props changed, cleaning up previous state...');
     
-    // Clean up existing connections/instances
-    if (hlsInstance) {
-      console.log('🧹 Destroying existing HLS instance on prop change');
-      hlsInstance.destroy();
-      setHlsInstance(null);
-    }
-    
+    // Close any existing EventSource connections
     if (progressEventSource) {
       console.log('🧹 Closing existing EventSource on prop change');
       progressEventSource.close();
@@ -1132,6 +1549,8 @@ const MediaPlayer = ({
     
     // Reset subtitle state
     setSelectedSubtitle('off');
+    setActiveSubtitle(null);
+    setUserDisabledSubtitles(false); // Reset user preference for new content
     
     // Reset enhanced loading state
     setLoadingProgress(0);
@@ -1142,8 +1561,38 @@ const MediaPlayer = ({
     setCurrentFactIndex(0);
     setExtractionCompleted(false);
     
+    console.log('🧹 All state reset for new content, including subtitle preferences');
+    
     // Note: We don't reset server or set loading=true here to prevent auto-extraction
   }, [mediaType, movieId, seasonId, episodeId]); // Clean up when content changes
+
+  // Comprehensive cleanup on unmount only
+  useEffect(() => {
+    return () => {
+      console.log('🧹 Cleaning up MediaPlayer component on unmount...');
+      
+      // Clean up HLS instance
+      if (hlsInstance) {
+        console.log('🧹 Destroying HLS instance on unmount');
+        hlsInstance.destroy();
+      }
+      
+      // Close EventSource connection
+      if (progressEventSource) {
+        console.log('🧹 Closing progress EventSource on unmount');
+        progressEventSource.close();
+      }
+      
+      // Pause and reset video element
+      if (videoRef.current) {
+        console.log('🧹 Pausing and resetting video element on unmount');
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+        videoRef.current.src = '';
+        videoRef.current.load(); // Reset video element
+      }
+    };
+  }, []); // Empty dependency array - only run on unmount
 
   const handleServerChange = (newServer) => {
     console.log(`Switching server from ${server} to ${newServer}`);
@@ -1512,52 +1961,6 @@ const MediaPlayer = ({
                   </button>
                 )}
               </div>
-              
-              {/* Active subtitle info */}
-              {activeSubtitle && (
-                <div className={styles.subtitleInfo}>
-                  <span className={styles.subtitleMeta}>
-                    🎬 {activeSubtitle.languageName || activeSubtitle.language}
-                    {activeSubtitle.isVTT && ' ✓ VTT'}
-                    {activeSubtitle.qualityScore && ` (${activeSubtitle.qualityScore}/100)`}
-                    {activeSubtitle.source === 'opensubtitles' && ' • OpenSubtitles'}
-                    {activeSubtitle.source === 'vm-server' && ' • VM-Server'}
-                    {activeSubtitle.usedBlobUrl && ' • CORS-Free'}
-                  </span>
-                </div>
-              )}
-              
-              {/* Subtitle statistics */}
-              {subtitles && subtitles.subtitles && subtitles.subtitles.length > 0 && (
-                <div className={styles.subtitleStats}>
-                  <span className={styles.statText}>
-                    {subtitles.subtitles.length} subtitle{subtitles.subtitles.length !== 1 ? 's' : ''} 
-                    {subtitles.source?.includes('opensubtitles') ? ' from OpenSubtitles API' : 
-                     subtitles.source?.includes('vm-server') ? ' from VM-Server' : ' available'}
-                  </span>
-                  {currentMedia?.imdb_id && (
-                    <span className={styles.imdbInfo}>
-                      • IMDB: {currentMedia.imdb_id}
-                    </span>
-                  )}
-                </div>
-              )}
-              
-              {/* Debug info for development */}
-              {process.env.NODE_ENV === 'development' && getSubtitleInfo && (
-                <div className={styles.debugInfo}>
-                  {(() => {
-                    const info = getSubtitleInfo();
-                    return info ? (
-                      <span className={styles.debugText}>
-                        Debug: {info.isFromFrontend ? 'Frontend' : 'VM-Server'} • 
-                        {info.blobUrlsCreated} blob URLs • 
-                        {info.hasImdbId ? 'Has IMDB' : 'No IMDB'}
-                      </span>
-                    ) : null;
-                  })()}
-                </div>
-              )}
             </div>
 
             {/* Server selector is always visible */}
@@ -1618,3 +2021,4 @@ const MediaPlayer = ({
 };
 
 export default MediaPlayer;
+

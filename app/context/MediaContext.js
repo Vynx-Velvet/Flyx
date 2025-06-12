@@ -27,62 +27,7 @@ export const MediaProvider = ({ children }) => {
 		return mediaLoaded;
 	};
 
-	// Store subtitle data from stream extraction
-	const storeSubtitlesFromExtraction = useCallback((extractionData, cacheKey) => {
-		console.log('Storing subtitles from stream extraction:', extractionData);
-		
-		if (extractionData?.subtitles?.urls && extractionData.subtitles.urls.length > 0) {
-			// Convert vm-server subtitle format to our expected format
-			const formattedSubtitles = {
-				success: true,
-				subtitles: extractionData.subtitles.urls.map(sub => ({
-					url: sub.url,
-					language: sub.language || 'unknown',
-					isVTT: sub.isVTT,
-					contentLength: sub.contentLength,
-					content: sub.content, // VTT file content from vm-server
-					format: 'vtt',
-					encoding: 'UTF-8',
-					// Add standard fields expected by the frontend
-					downloadLink: sub.url,
-					languageName: sub.language === 'english' ? 'English' : 
-					            sub.language === 'spanish' ? 'Spanish' : 
-					            sub.language === 'french' ? 'French' : 
-					            sub.language,
-					iso639: sub.language === 'english' ? 'en' : 
-					        sub.language === 'spanish' ? 'es' : 
-					        sub.language === 'french' ? 'fr' : 'en',
-					qualityScore: 85, // High quality since they're from the video player
-					fromTrusted: true, // VM-extracted subtitles are considered trusted
-					isHD: true, // Assume HD quality from video player
-					hearingImpaired: false,
-					foreignPartsOnly: false,
-					// Blob URL will be created when needed
-					blobUrl: null
-				})),
-				totalCount: extractionData.subtitles.found,
-				source: 'vm-server',
-				extractionTimestamp: Date.now()
-			};
-
-			setSubtitles(prev => ({
-				...prev,
-				[cacheKey]: formattedSubtitles
-			}));
-
-			// Also store the full extraction data
-			setStreamExtractionData(prev => ({
-				...prev,
-				[cacheKey]: extractionData
-			}));
-
-			console.log('Formatted subtitles stored:', formattedSubtitles);
-			return formattedSubtitles;
-		} else {
-			console.log('No subtitles found in extraction data');
-			return null;
-		}
-	}, []);
+	// Legacy VM-server subtitle processing removed - now using frontend OpenSubtitles API
 
 	// Create blob URL from VTT content
 	const createSubtitleBlobUrl = useCallback((vttContent) => {
@@ -390,7 +335,6 @@ export const MediaProvider = ({ children }) => {
 			updateMedia, 
 			getMedia,
 			// Legacy vm-server subtitle methods (for backward compatibility)
-			storeSubtitlesFromExtraction,
 			getSubtitlesFromExtraction,
 			hasSubtitleData,
 			getVideoPlayerSubtitles,

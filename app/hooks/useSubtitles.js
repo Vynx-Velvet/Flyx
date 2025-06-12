@@ -115,7 +115,12 @@ export const useSubtitles = (mediaId, options = {}) => {
           // Check if we have cached subtitles first
           const languageCode = preferredLanguage === 'english' ? 'eng' : 
                               preferredLanguage === 'spanish' ? 'spa' : 
-                              preferredLanguage === 'french' ? 'fre' : 'eng';
+                              preferredLanguage === 'portuguese' ? 'por' :
+                              preferredLanguage === 'arabic' ? 'ara' :
+                              preferredLanguage === 'russian' ? 'rus' :
+                              preferredLanguage === 'polish' ? 'pol' :
+                              preferredLanguage === 'french' ? 'fre' : 
+                              preferredLanguage === 'german' ? 'ger' : 'eng';
           
           let cachedSubtitles = getCachedSubtitles(imdbId, languageCode, season, episode);
           
@@ -281,11 +286,21 @@ export const useSubtitles = (mediaId, options = {}) => {
   // Helper functions for specific languages
   const hasEnglish = useCallback(() => hasLanguage('english'), [hasLanguage]);
   const hasSpanish = useCallback(() => hasLanguage('spanish'), [hasLanguage]);
+  const hasPortuguese = useCallback(() => hasLanguage('portuguese'), [hasLanguage]);
+  const hasArabic = useCallback(() => hasLanguage('arabic'), [hasLanguage]);
+  const hasRussian = useCallback(() => hasLanguage('russian'), [hasLanguage]);
+  const hasPolish = useCallback(() => hasLanguage('polish'), [hasLanguage]);
   const hasFrench = useCallback(() => hasLanguage('french'), [hasLanguage]);
+  const hasGerman = useCallback(() => hasLanguage('german'), [hasLanguage]);
 
   const getEnglishSubtitle = useCallback(() => getSubtitleForLanguage('english'), [getSubtitleForLanguage]);
   const getSpanishSubtitle = useCallback(() => getSubtitleForLanguage('spanish'), [getSubtitleForLanguage]);
+  const getPortugueseSubtitle = useCallback(() => getSubtitleForLanguage('portuguese'), [getSubtitleForLanguage]);
+  const getArabicSubtitle = useCallback(() => getSubtitleForLanguage('arabic'), [getSubtitleForLanguage]);
+  const getRussianSubtitle = useCallback(() => getSubtitleForLanguage('russian'), [getSubtitleForLanguage]);
+  const getPolishSubtitle = useCallback(() => getSubtitleForLanguage('polish'), [getSubtitleForLanguage]);
   const getFrenchSubtitle = useCallback(() => getSubtitleForLanguage('french'), [getSubtitleForLanguage]);
+  const getGermanSubtitle = useCallback(() => getSubtitleForLanguage('german'), [getSubtitleForLanguage]);
 
   // Get subtitle statistics from extraction
   const getStats = useCallback(() => {
@@ -354,7 +369,12 @@ export const useSubtitles = (mediaId, options = {}) => {
     try {
       const languageName = preferredLang === 'english' ? 'English' :
                           preferredLang === 'spanish' ? 'Spanish' :
-                          preferredLang === 'french' ? 'French' : 'English';
+                          preferredLang === 'portuguese' ? 'Portuguese' :
+                          preferredLang === 'arabic' ? 'Arabic' :
+                          preferredLang === 'russian' ? 'Russian' :
+                          preferredLang === 'polish' ? 'Polish' :
+                          preferredLang === 'french' ? 'French' : 
+                          preferredLang === 'german' ? 'German' : 'English';
       
       const bestSubtitle = getBestAvailableSubtitle(subtitles.subtitles, languageName);
       
@@ -385,7 +405,12 @@ export const useSubtitles = (mediaId, options = {}) => {
       
       const languageCode = preferredLanguage === 'english' ? 'eng' : 
                           preferredLanguage === 'spanish' ? 'spa' : 
-                          preferredLanguage === 'french' ? 'fre' : 'eng';
+                          preferredLanguage === 'portuguese' ? 'por' :
+                          preferredLanguage === 'arabic' ? 'ara' :
+                          preferredLanguage === 'russian' ? 'rus' :
+                          preferredLanguage === 'polish' ? 'pol' :
+                          preferredLanguage === 'french' ? 'fre' : 
+                          preferredLanguage === 'german' ? 'ger' : 'eng';
       
       // Check cache unless force refresh
       if (!forceRefresh) {
@@ -468,12 +493,22 @@ export const useSubtitles = (mediaId, options = {}) => {
     hasLanguage,
     hasEnglish,
     hasSpanish,  
+    hasPortuguese,
+    hasArabic,
+    hasRussian,
+    hasPolish,
     hasFrench,
+    hasGerman,
     
     // Language-specific getters
     getEnglishSubtitle,
     getSpanishSubtitle,
+    getPortugueseSubtitle,
+    getArabicSubtitle,
+    getRussianSubtitle,
+    getPolishSubtitle,
     getFrenchSubtitle,
+    getGermanSubtitle,
     
     // Video player integration
     formatForVideoPlayer,

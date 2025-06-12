@@ -22,17 +22,22 @@ export async function GET(request) {
   try {
     // Build OpenSubtitles API URL with PROPER parameter sorting (alphabetical order required!)
     // OpenSubtitles redirects with 302 if parameters are not sorted alphabetically
+    
+    // Extract numeric IMDB ID (OpenSubtitles expects just the number, not "tt123456")
+    const numericImdbId = imdbId.replace(/^tt/, '');
+    console.log('🎬 Converting IMDB ID:', { original: imdbId, numeric: numericImdbId });
+    
     const params = [];
     
     if (season && episode) {
       // TV show episode - parameters must be in alphabetical order
       params.push(`episode-${episode}`);
-      params.push(`imdbid-${imdbId}`);
+      params.push(`imdbid-${numericImdbId}`);
       params.push(`season-${season}`);
       params.push(`sublanguageid-${languageId}`);
     } else {
       // Movie - parameters must be in alphabetical order
-      params.push(`imdbid-${imdbId}`);
+      params.push(`imdbid-${numericImdbId}`);
       params.push(`sublanguageid-${languageId}`);
     }
     
@@ -69,66 +74,116 @@ export async function GET(request) {
       rejectUnauthorized: true
     });
 
-    let response;
+        let response;
+    let finalUrl = apiUrl;
     
-    try {
-      // First try with fetch API using OpenSubtitles' official requirements
-      response = await fetch(apiUrl, {
+    // Function to make a request and handle redirects manually
+    const makeRequest = async (url, maxRedirects = 3) => {
+      console.log(`🔄 Making request to: ${url} (redirects left: ${maxRedirects})`);
+      
+      const requestResponse = await fetch(url, {
         method: 'GET',
         headers: {
-          // Use TemporaryUserAgent for testing (as per OpenSubtitles documentation)
           'User-Agent': 'TemporaryUserAgent', 
-          'X-User-Agent': 'TemporaryUserAgent', // Fallback for clients that can't change User-Agent
+          'X-User-Agent': 'TemporaryUserAgent',
           'Accept': 'application/json',
           'Cache-Control': 'no-cache'
         },
         agent: agent,
-        redirect: 'follow' // Automatically follow redirects (302s)
+        redirect: 'manual' // Handle redirects manually
       });
+
+      console.log(`📡 Response status: ${requestResponse.status} for URL: ${url}`);
+
+      // Handle redirects manually
+      if (requestResponse.status === 302 && maxRedirects > 0) {
+        const redirectLocation = requestResponse.headers.get('location');
+        console.log(`🔄 302 redirect to: ${redirectLocation}`);
+        
+        if (redirectLocation) {
+          // Follow the redirect recursively
+          finalUrl = redirectLocation;
+          return await makeRequest(redirectLocation, maxRedirects - 1);
+        } else {
+          throw new Error('302 redirect received but no location header found');
+        }
+      }
+
+      return requestResponse;
+    };
+
+    try {
+      // First try with fetch API and manual redirect handling
+      response = await makeRequest(apiUrl);
     } catch (fetchError) {
       console.log('⚠️ Fetch failed, trying direct HTTPS request:', fetchError.message);
       
-      // Fallback to direct HTTPS request
-      response = await new Promise((resolve, reject) => {
-        const url = new URL(apiUrl);
-                 const options = {
-           hostname: url.hostname,
-           port: url.port || 443,
-           path: url.pathname + url.search,
-           method: 'GET',
-           headers: {
-             // Use TemporaryUserAgent for testing (as per OpenSubtitles documentation)
-             'User-Agent': 'TemporaryUserAgent',
-             'X-User-Agent': 'TemporaryUserAgent',
-             'Accept': 'application/json',
-             'Cache-Control': 'no-cache'
-           },
-           timeout: 10000,
-           agent: false // Disable proxy
-         };
+      // Fallback to direct HTTPS request with manual redirect handling
+      const makeHttpsRequest = async (url, maxRedirects = 3) => {
+        console.log(`🔄 Making HTTPS request to: ${url} (redirects left: ${maxRedirects})`);
+        
+        return new Promise((resolve, reject) => {
+          const urlObj = new URL(url);
+          const options = {
+            hostname: urlObj.hostname,
+            port: urlObj.port || 443,
+            path: urlObj.pathname + urlObj.search,
+            method: 'GET',
+            headers: {
+              'User-Agent': 'TemporaryUserAgent',
+              'X-User-Agent': 'TemporaryUserAgent',
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache'
+            },
+            timeout: 10000,
+            agent: false
+          };
 
-        const req = https.request(options, (res) => {
-          let data = '';
-          res.on('data', (chunk) => data += chunk);
-          res.on('end', () => {
-            resolve({
-              ok: res.statusCode >= 200 && res.statusCode < 300,
-              status: res.statusCode,
-              statusText: res.statusMessage,
-              json: async () => JSON.parse(data)
+          const req = https.request(options, (res) => {
+            console.log(`📡 HTTPS Response status: ${res.statusCode} for URL: ${url}`);
+            
+            // Handle redirects manually
+            if (res.statusCode === 302 && maxRedirects > 0) {
+              const redirectLocation = res.headers.location;
+              console.log(`🔄 HTTPS 302 redirect to: ${redirectLocation}`);
+              
+              if (redirectLocation) {
+                finalUrl = redirectLocation;
+                makeHttpsRequest(redirectLocation, maxRedirects - 1)
+                  .then(resolve)
+                  .catch(reject);
+                return;
+              } else {
+                reject(new Error('302 redirect received but no location header found'));
+                return;
+              }
+            }
+
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+              resolve({
+                ok: res.statusCode >= 200 && res.statusCode < 300,
+                status: res.statusCode,
+                statusText: res.statusMessage,
+                headers: res.headers,
+                json: async () => JSON.parse(data)
+              });
             });
           });
-        });
 
-        req.on('error', reject);
-        req.on('timeout', () => reject(new Error('Request timeout')));
-        req.end();
-      });
+          req.on('error', reject);
+          req.on('timeout', () => reject(new Error('Request timeout')));
+          req.end();
+        });
+      };
       
+      response = await makeHttpsRequest(apiUrl);
       console.log('✅ Direct HTTPS request successful');
     }
 
-    console.log('📡 OpenSubtitles response status:', response.status, '(after following any redirects)');
+    console.log('📡 OpenSubtitles final response status:', response.status, '(after following any redirects)');
+    console.log('🎯 Final URL after redirects:', finalUrl);
 
     if (!response.ok) {
       console.error('❌ OpenSubtitles API error:', {
