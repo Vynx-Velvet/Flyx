@@ -982,6 +982,97 @@
   background-color: #374151;
 }
 
+/* ======== NEW ENHANCED SUBTITLE CONTROLS ======== */
+.subtitleControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.subtitleControls .subtitleDropdown {
+  flex: 1;
+}
+
+.frontendIndicator {
+  background: linear-gradient(45deg, #00ff88, #00aaff);
+  color: #000;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  margin-left: 6px;
+  animation: frontendGlow 2s ease-in-out infinite alternate;
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+@keyframes frontendGlow {
+  0% { box-shadow: 0 0 5px rgba(0, 255, 136, 0.5); }
+  100% { box-shadow: 0 0 15px rgba(0, 255, 136, 0.8); }
+}
+
+.noImdbIndicator {
+  background: rgba(255, 165, 0, 0.2);
+  color: #ffab00;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  margin-left: 6px;
+  border: 1px solid rgba(255, 165, 0, 0.3);
+}
+
+.refreshButton {
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #3b82f6;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  backdrop-filter: blur(5px);
+}
+
+.refreshButton:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.6);
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.refreshButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  animation: spin 1s linear infinite;
+}
+
+.imdbInfo {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.7rem;
+  margin-left: 8px;
+  font-family: ui-monospace, 'SF Mono', monospace;
+}
+
+.debugInfo {
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  border-left: 2px solid #ff6b6b;
+}
+
+.debugText {
+  font-size: 0.65rem;
+  color: rgba(255, 107, 107, 0.8);
+  font-family: ui-monospace, 'SF Mono', monospace;
+}
+
 /* ========================================
    RESPONSIVE BREAKPOINTS - CLEAN
    ======================================== */

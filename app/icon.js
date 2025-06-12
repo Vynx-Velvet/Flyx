@@ -41,7 +41,7 @@ export default function Icon() {
             stroke="#6366f1"
             strokeWidth="2.5"
             strokeLinecap="round"
-            strokeLineJoin="round"
+            strokeLinejoin="round"
           />
         </svg>
       </div>

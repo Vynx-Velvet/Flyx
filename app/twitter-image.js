@@ -87,7 +87,7 @@ export default async function Image() {
                 stroke="white"
                 strokeWidth="2.5"
                 strokeLinecap="round"
-                strokeLineJoin="round"
+                strokeLinejoin="round"
               />
             </svg>
           </div>

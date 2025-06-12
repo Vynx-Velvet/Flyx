@@ -40,7 +40,7 @@ const NavBar = ({ onClearSearch }) => {
                 </defs>
                 <path d="M4 8L16 2L28 8V24L16 30L4 24V8Z" stroke="url(#logoGradient)" strokeWidth="2" fill="rgba(99, 102, 241, 0.1)" />
                 <circle cx="16" cy="16" r="6" fill="url(#logoGradient)" />
-                <path d="M12 16L15 19L20 13" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLineJoin="round" />
+                <path d="M12 16L15 19L20 13" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
             <div className="logo-text-container">
