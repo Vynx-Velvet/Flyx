@@ -6,7 +6,6 @@ import ShowDetails from '../../components/ShowDetails';
 import NavBar from '../../components/NavBar';
 import Footer from '../../components/Footer';
 import { MediaProvider } from '../../context/MediaContext';
-import { UniversalMediaProvider } from '../../context/UniversalMediaContext';
 
 export default function DetailsPage() {
   const params = useParams();
@@ -85,13 +84,11 @@ export default function DetailsPage() {
   if (loading) {
     return (
       <MediaProvider>
-        <UniversalMediaProvider>
-          <div className="app">
-            <NavBar onClearSearch={handleNavBarClear} />
-            <div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>
-            {!isMediaPlayerActive && <Footer />}
-          </div>
-        </UniversalMediaProvider>
+        <div className="app">
+          <NavBar onClearSearch={handleNavBarClear} />
+          <div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>
+          {!isMediaPlayerActive && <Footer />}
+        </div>
       </MediaProvider>
     );
   }
@@ -99,36 +96,32 @@ export default function DetailsPage() {
   if (!movieData) {
     return (
       <MediaProvider>
-        <UniversalMediaProvider>
-          <div className="app">
-            <NavBar onClearSearch={handleNavBarClear} />
-            <div style={{ padding: '20px', textAlign: 'center' }}>
-              Movie or show not found.
-              <br />
-              <button onClick={handleClearMovie} style={{ marginTop: '10px' }}>
-                Back to Home
-              </button>
-            </div>
-            {!isMediaPlayerActive && <Footer />}
+        <div className="app">
+          <NavBar onClearSearch={handleNavBarClear} />
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            Movie or show not found.
+            <br />
+            <button onClick={handleClearMovie} style={{ marginTop: '10px' }}>
+              Back to Home
+            </button>
           </div>
-        </UniversalMediaProvider>
+          {!isMediaPlayerActive && <Footer />}
+        </div>
       </MediaProvider>
     );
   }
 
   return (
     <MediaProvider>
-      <UniversalMediaProvider>
-        <div className="app">
-          <NavBar onClearSearch={handleNavBarClear} />
-          <ShowDetails 
-            movieId={movieData} 
-            clearMovie={handleClearMovie} 
-            onMediaPlayerStateChange={handleMediaPlayerStateChange}
-          />
-          {!isMediaPlayerActive && <Footer />}
-        </div>
-      </UniversalMediaProvider>
+      <div className="app">
+        <NavBar onClearSearch={handleNavBarClear} />
+        <ShowDetails 
+          movieId={movieData} 
+          clearMovie={handleClearMovie} 
+          onMediaPlayerStateChange={handleMediaPlayerStateChange}
+        />
+        {!isMediaPlayerActive && <Footer />}
+      </div>
     </MediaProvider>
   );
 } 

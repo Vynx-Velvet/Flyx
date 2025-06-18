@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from "react";
-import UniversalMediaPlayer from "./UniversalMediaPlayer"; // Import the Universal MediaPlayer component
+import UniversalMediaPlayer from "./UniversalMediaPlayer"; // Import the new UniversalMediaPlayer component
 import Recommendations from "./Recommendations"; // Import the Recommendations component
 import "./ShowDetails.css"; // Custom styles for the compact design
 
@@ -90,7 +90,7 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
 
   const { movie, seasons } = movieDetails;
 
-  // If an episode is selected OR it's a movie that was clicked to play, show the UniversalMediaPlayer
+  // If an episode is selected OR it's a movie that was clicked to play, show the MediaPlayer
   if (selectedEpisode) {
     if (movieId.media_type === "movie") {
       // For movies, we don't need season/episode info
@@ -100,22 +100,17 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
           movieId={movieId.id}
           seasonId={null}
           episodeId={null}
-          maxEpisodes={null}
-          onEpisodeChange={() => {}}
           onBackToShowDetails={() => setSelectedEpisode(null)}
         />
       );
     } else {
       // For TV shows, use the existing logic
-      const maxEpisodes = seasons ? seasons[selectedSeason]?.episodes?.length : null;
       return (
         <UniversalMediaPlayer
           mediaType={movieId.media_type}
           movieId={movieId.id}
           seasonId={selectedSeason + 1} // Season numbers are 1-indexed
           episodeId={selectedEpisode.episode_number}
-          maxEpisodes={maxEpisodes}
-          onEpisodeChange={handleEpisodeChange}
           onBackToShowDetails={handleBackToShowDetails}
         />
       );

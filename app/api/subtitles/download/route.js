@@ -82,8 +82,72 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  return NextResponse.json(
-    { error: 'Method not allowed' },
-    { status: 405 }
-  );
+  try {
+    const { download_link } = await request.json();
+    
+    if (!download_link) {
+      return NextResponse.json(
+        { success: false, error: 'Download link is required' },
+        { status: 400 }
+      );
+    }
+
+    console.log('📥 Downloading subtitle from:', download_link);
+
+    // Download the subtitle file
+    const response = await fetch(download_link, {
+      headers: {
+        'User-Agent': 'TemporaryUserAgent',
+        'Accept': '*/*',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to download subtitle: ${response.status}`);
+    }
+
+    const subtitleContent = await response.text();
+    console.log('📄 Downloaded subtitle content length:', subtitleContent.length);
+
+    // Convert SRT to VTT if needed
+    let vttContent;
+    if (download_link.includes('.srt') || subtitleContent.includes('-->') && !subtitleContent.startsWith('WEBVTT')) {
+      // Convert SRT to VTT
+      vttContent = convertSrtToVtt(subtitleContent);
+      console.log('🔄 Converted SRT to VTT');
+    } else if (subtitleContent.startsWith('WEBVTT')) {
+      // Already VTT format
+      vttContent = subtitleContent;
+      console.log('✅ Already in VTT format');
+    } else {
+      // Assume it's SRT and convert
+      vttContent = convertSrtToVtt(subtitleContent);
+      console.log('🔄 Assumed SRT format and converted to VTT');
+    }
+
+    return NextResponse.json({
+      success: true,
+      vtt: vttContent,
+    });
+
+  } catch (error) {
+    console.error('❌ Error downloading subtitle:', error);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+function convertSrtToVtt(srtContent) {
+  // Basic SRT to VTT conversion
+  let vtt = 'WEBVTT\n\n';
+  
+  // Replace SRT timestamps (00:00:00,000) with VTT timestamps (00:00:00.000)
+  vtt += srtContent
+    .replace(/(\d{2}):(\d{2}):(\d{2}),(\d{3})/g, '$1:$2:$3.$4')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+
+  return vtt;
 } 

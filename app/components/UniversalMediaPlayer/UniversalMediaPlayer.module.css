@@ -1,0 +1,401 @@
+/* Universal Media Player Styles */
+.playerContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.videoElement {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.controlsOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background-color: rgba(0, 0, 0, 0.3);
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.playerContainer:hover .controlsOverlay,
+.playerContainer.user-active .controlsOverlay {
+  opacity: 1;
+}
+
+.topControls {
+  display: flex;
+  justify-content: flex-start;
+  padding: 1rem;
+}
+
+.backButton {
+  background: rgba(30, 30, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+.backButton:hover {
+  background: rgba(50, 50, 50, 0.9);
+}
+
+.bottomControls {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+}
+
+.timelineContainer {
+  width: 100%;
+  padding: 0.5rem 0;
+  cursor: pointer;
+}
+
+.timeline {
+  width: 100%;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.3);
+  position: relative;
+  border-radius: 2px;
+}
+
+.timelineBuffered {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+
+.timelineProgress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background-color: #3b82f6;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+
+.controlsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.leftControls, .rightControls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.controlButton {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+}
+
+.volumeContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.volumeSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 80px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.volumeSlider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.timeDisplay {
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.loadingContainer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  z-index: 20;
+}
+
+.spinner {
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loadingInfo {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.loadingPhase {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.loadingProgress {
+  font-size: 1rem;
+  margin-top: 0.5rem;
+  color: #a0aec0;
+}
+
+.errorOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #f87171;
+  font-size: 1.2rem;
+  padding: 2rem;
+  text-align: center;
+  z-index: 20;
+}
+
+/* Add more styles for other controls later */
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .topControls {
+    padding: 0.5rem;
+  }
+  .backButton {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+  }
+  .bottomControls {
+    padding: 0.5rem;
+  }
+  .leftControls, .rightControls {
+    gap: 0.5rem;
+  }
+  .controlButton {
+    font-size: 1.2rem;
+  }
+  .volumeSlider {
+    width: 60px;
+  }
+  .timeDisplay {
+    font-size: 0.8rem;
+  }
+}
+
+.rightControls {
+  position: relative; /* For settings menu positioning */
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.settingsMenu {
+  position: absolute;
+  bottom: 100%; /* Position above the controls */
+  right: 0;
+  background-color: rgba(30, 30, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  width: 200px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settingsSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.settingsDropdownHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.settingsDropdownHeader:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.settingsTitle {
+  color: #a0aec0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.settingsCurrentValue {
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.settingsArrow {
+  color: #a0aec0;
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+}
+
+.settingsDropdownList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.settingsDropdownList li {
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  margin: 0.25rem;
+}
+
+.settingsDropdownList li:hover {
+  background-color: #3b82f6;
+}
+
+/* Remove old styles that are no longer needed */
+.settingsMenu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settingsMenu li {
+  color: #fff;
+  padding: 0.5rem;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.settingsMenu li:hover {
+  background-color: #3b82f6;
+}
+
+.settingsMenu li.activeOption {
+  font-weight: bold;
+  color: #3b82f6;
+}
+
+.settingsDropdownList li.justSelected {
+  background-color: #22c55e !important;
+  animation: selectionPulse 0.6s ease-out;
+}
+
+.selectionFeedback {
+  float: right;
+  font-size: 0.8rem;
+  color: #fff;
+  font-weight: bold;
+  animation: fadeInOut 2s ease-out forwards;
+}
+
+@keyframes selectionPulse {
+  0% {
+    background-color: #22c55e;
+    transform: scale(1);
+  }
+  50% {
+    background-color: #16a34a;
+    transform: scale(1.02);
+  }
+  100% {
+    background-color: #22c55e;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  80% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+} 
