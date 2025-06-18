@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useState } from "react";
-import MediaPlayer from "./MediaPlayer"; // Import the MediaPlayer component
 import UniversalMediaPlayer from "./UniversalMediaPlayer"; // Import the Universal MediaPlayer component
 import Recommendations from "./Recommendations"; // Import the Recommendations component
 import "./ShowDetails.css"; // Custom styles for the compact design
@@ -12,7 +11,6 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
   const [loading, setLoading] = useState(true);
   const [selectedSeason, setSelectedSeason] = useState(0); // Tracks which season is selected
   const [selectedEpisode, setSelectedEpisode] = useState(null); // Tracks which episode is selected
-  const [useUniversalPlayer, setUseUniversalPlayer] = useState(false); // Toggle between players
 
   // Notify parent when media player state changes
   useEffect(() => {
@@ -92,86 +90,34 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
 
   const { movie, seasons } = movieDetails;
 
-  // If an episode is selected OR it's a movie that was clicked to play, show the MediaPlayer
+  // If an episode is selected OR it's a movie that was clicked to play, show the UniversalMediaPlayer
   if (selectedEpisode) {
-    const MediaPlayerComponent = useUniversalPlayer ? UniversalMediaPlayer : MediaPlayer;
-    
     if (movieId.media_type === "movie") {
       // For movies, we don't need season/episode info
       return (
-        <div>
-          {/* Player type toggle - shown at top for easy access */}
-          <div style={{
-            position: 'fixed',
-            top: '10px',
-            right: '10px',
-            zIndex: 1000,
-            background: 'rgba(0, 0, 0, 0.8)',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            color: 'white',
-            fontSize: '14px'
-          }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={useUniversalPlayer}
-                onChange={(e) => setUseUniversalPlayer(e.target.checked)}
-                style={{ margin: 0 }}
-              />
-              Universal Player (TV/Mobile Compatible)
-            </label>
-          </div>
-          
-          <MediaPlayerComponent
-            mediaType="movie"
-            movieId={movieId.id}
-            seasonId={null}
-            episodeId={null}
-            maxEpisodes={null}
-            onEpisodeChange={() => {}}
-            onBackToShowDetails={() => setSelectedEpisode(null)}
-          />
-        </div>
+        <UniversalMediaPlayer
+          mediaType="movie"
+          movieId={movieId.id}
+          seasonId={null}
+          episodeId={null}
+          maxEpisodes={null}
+          onEpisodeChange={() => {}}
+          onBackToShowDetails={() => setSelectedEpisode(null)}
+        />
       );
     } else {
       // For TV shows, use the existing logic
       const maxEpisodes = seasons ? seasons[selectedSeason]?.episodes?.length : null;
       return (
-        <div>
-          {/* Player type toggle - shown at top for easy access */}
-          <div style={{
-            position: 'fixed',
-            top: '10px',
-            right: '10px',
-            zIndex: 1000,
-            background: 'rgba(0, 0, 0, 0.8)',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            color: 'white',
-            fontSize: '14px'
-          }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={useUniversalPlayer}
-                onChange={(e) => setUseUniversalPlayer(e.target.checked)}
-                style={{ margin: 0 }}
-              />
-              Universal Player (TV/Mobile Compatible)
-            </label>
-          </div>
-          
-          <MediaPlayerComponent
-            mediaType={movieId.media_type}
-            movieId={movieId.id}
-            seasonId={selectedSeason + 1} // Season numbers are 1-indexed
-            episodeId={selectedEpisode.episode_number}
-            maxEpisodes={maxEpisodes}
-            onEpisodeChange={handleEpisodeChange}
-            onBackToShowDetails={handleBackToShowDetails}
-          />
-        </div>
+        <UniversalMediaPlayer
+          mediaType={movieId.media_type}
+          movieId={movieId.id}
+          seasonId={selectedSeason + 1} // Season numbers are 1-indexed
+          episodeId={selectedEpisode.episode_number}
+          maxEpisodes={maxEpisodes}
+          onEpisodeChange={handleEpisodeChange}
+          onBackToShowDetails={handleBackToShowDetails}
+        />
       );
     }
   }
