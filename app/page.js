@@ -6,6 +6,7 @@ import HomePage from './components/HomePage';
 import NavBar from "./components/NavBar";
 import Footer from "./components/Footer";
 import { MediaProvider } from './context/MediaContext';
+import { UniversalMediaProvider } from './context/UniversalMediaContext';
 
 export default function Home() {
   const router = useRouter();
@@ -27,11 +28,13 @@ export default function Home() {
 
   return (
     <MediaProvider>
-      <div className="app">
-        <NavBar onClearSearch={handleClearSearch} />
-        <HomePage key={refreshKey} movieClick={handleMovieClick} />
-        <Footer />
-      </div>
+      <UniversalMediaProvider>
+        <div className="app">
+          <NavBar onClearSearch={handleClearSearch} />
+          <HomePage key={refreshKey} movieClick={handleMovieClick} />
+          <Footer />
+        </div>
+      </UniversalMediaProvider>
     </MediaProvider>
   );
 } 
