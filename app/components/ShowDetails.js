@@ -11,13 +11,27 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
   const [loading, setLoading] = useState(true);
   const [selectedSeason, setSelectedSeason] = useState(0); // Tracks which season is selected
   const [selectedEpisode, setSelectedEpisode] = useState(null); // Tracks which episode is selected
+  const [episodeLoading, setEpisodeLoading] = useState(false); // Track episode loading state
+  const [isLaunching, setIsLaunching] = useState(false); // Track when media player is being launched
+
+  // Show media player only when:
+  // - For movies: when launching or when selected episode is set (movie object)
+  // - For TV shows: only when a specific episode is selected (not just launching)
+  const shouldShowPlayer = () => {
+    if (movieId.media_type === "movie") {
+      return selectedEpisode || isLaunching;
+    } else if (movieId.media_type === "tv") {
+      return selectedEpisode !== null; // Only show player for TV when specific episode selected
+    }
+    return false;
+  };
 
   // Notify parent when media player state changes
   useEffect(() => {
     if (onMediaPlayerStateChange) {
-      onMediaPlayerStateChange(!!selectedEpisode);
+      onMediaPlayerStateChange(shouldShowPlayer());
     }
-  }, [selectedEpisode, onMediaPlayerStateChange]);
+  }, [selectedEpisode, isLaunching, movieId.media_type, onMediaPlayerStateChange]);
 
   useEffect(() => {
     const fetchMovieDetails = async () => {
@@ -54,16 +68,44 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
   }, [movieId]);
 
   const returnToHome = () => {
+    // Prevent navigation back to home if media player is launching or active
+    if (isLaunching || selectedEpisode) {
+      console.log('🚫 Navigation to home blocked - media player is active');
+      return;
+    }
+    console.log('🏠 Navigating back to home page');
     clearMovie(null);
   };
 
   const handleSeasonChange = (seasonIndex) => {
+    setEpisodeLoading(true);
     setSelectedSeason(seasonIndex);
     setSelectedEpisode(null); // Reset the selected episode when the season changes
+    
+    // Simulate episode loading for better UX
+    setTimeout(() => {
+      setEpisodeLoading(false);
+    }, 300);
   };
 
+  // Handle playing a specific episode (for TV shows)
+  const handlePlayEpisode = (episode) => {
+    console.log('📺 Playing specific episode:', episode.name, 'Episode', episode.episode_number);
+    setIsLaunching(true); // Set launching state to prevent home page rendering
+    setSelectedEpisode(episode);
+  };
+
+  // Handle playing a movie (for movies only)
+  const handlePlayMovie = (movie) => {
+    console.log('🎬 Playing movie:', movie.title || movie.name);
+    setIsLaunching(true); // Set launching state to prevent home page rendering
+    setSelectedEpisode(movie); // For movies, we use selectedEpisode to trigger player
+  };
+
+  // Legacy function - kept for compatibility but should not set launching state immediately
   const handleEpisodeClick = (episode) => {
-    setSelectedEpisode(episode); // Set the clicked episode as the selected episode
+    // This function should only be used for actual episode playback now
+    handlePlayEpisode(episode);
   };
 
   const handleEpisodeChange = (seasonId, episodeNumber) => {
@@ -75,10 +117,26 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
     setSelectedEpisode(newEpisode);
   };
 
-  const handleBackToShowDetails = (lastPlayedSeasonId) => {
-    setSelectedSeason(lastPlayedSeasonId - 1); // Convert 1-indexed season to 0-indexed
+  // FIXED: Properly clear media player state and return to show details (NOT home)
+  const handleBackFromMediaPlayer = () => {
+    console.log('🔙 Back button pressed - returning to show details');
+    
+    // CRITICAL: Reset media player state to return to show details view
     setSelectedEpisode(null);
+    setIsLaunching(false);
+    
+    // DO NOT call clearMovie - stay in the modal/show details view
+    console.log('✅ Media player closed - returned to show details modal');
   };
+
+  // FIXED: Reset state when movieId changes (switching between different media)
+  useEffect(() => {
+    console.log('🔄 MovieId changed - resetting all state');
+    setSelectedEpisode(null);
+    setIsLaunching(false);
+    setSelectedSeason(0);
+    setEpisodeLoading(false);
+  }, [movieId.id, movieId.media_type]);
 
   if (loading) {
     return <div className="show-details">Loading...</div>;
@@ -90,8 +148,7 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
 
   const { movie, seasons } = movieDetails;
 
-  // If an episode is selected OR it's a movie that was clicked to play, show the MediaPlayer
-  if (selectedEpisode) {
+  if (shouldShowPlayer()) {
     if (movieId.media_type === "movie") {
       // For movies, we don't need season/episode info
       return (
@@ -100,18 +157,18 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
           movieId={movieId.id}
           seasonId={null}
           episodeId={null}
-          onBackToShowDetails={() => setSelectedEpisode(null)}
+          onBackToShowDetails={handleBackFromMediaPlayer}
         />
       );
-    } else {
-      // For TV shows, use the existing logic
+    } else if (movieId.media_type === "tv") {
+      // For TV shows, we know selectedEpisode is not null here
       return (
         <UniversalMediaPlayer
           mediaType={movieId.media_type}
           movieId={movieId.id}
           seasonId={selectedSeason + 1} // Season numbers are 1-indexed
           episodeId={selectedEpisode.episode_number}
-          onBackToShowDetails={handleBackToShowDetails}
+          onBackToShowDetails={handleBackFromMediaPlayer}
         />
       );
     }
@@ -138,7 +195,7 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
       </div>
 
       {movieId.media_type === "movie" && (
-        <button className="play-movie-button" onClick={() => handleEpisodeClick(movie)}>
+        <button className="play-movie-button" onClick={() => handlePlayMovie(movie)}>
           Play Movie
         </button>
       )}
@@ -164,47 +221,54 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
 
           {seasons[selectedSeason] && (
             <div className="episodes-container">
-              <div className="episodes-grid">
-                {seasons[selectedSeason].episodes.map((episode) =>
-                  episode.still_path ? (
-                    <div
-                      key={episode.id}
-                      className="episode-card"
-                      onClick={() => handleEpisodeClick(episode)}
-                    >
-                      <img
-                        className="episode-thumbnail"
-                        src={`https://image.tmdb.org/t/p/w300${episode.still_path}`}
-                        alt={`${episode.name} thumbnail`}
-                      />
-                      <div className="episode-info">
-                        <h4>Episode {episode.episode_number}</h4>
-                        <p>{episode.name}</p>
-                        <p>{episode.overview}</p>
-                        <p>{episode.air_date}</p>
+              {episodeLoading ? (
+                <div className="episodes-loading">
+                  <div className="loading-spinner"></div>
+                  <p>Loading episodes...</p>
+                </div>
+              ) : (
+                <div className="episodes-grid">
+                  {seasons[selectedSeason].episodes.map((episode) =>
+                    episode.still_path ? (
+                      <div
+                        key={episode.id}
+                        className="episode-card"
+                        onClick={() => handlePlayEpisode(episode)}
+                      >
+                        <img
+                          className="episode-thumbnail"
+                          src={`https://image.tmdb.org/t/p/w300${episode.still_path}`}
+                          alt={`${episode.name} thumbnail`}
+                        />
+                        <div className="episode-info">
+                          <h4>Episode {episode.episode_number}</h4>
+                          <p>{episode.name}</p>
+                          <p>{episode.overview}</p>
+                          <p>{episode.air_date}</p>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div
-                      key={episode.id}
-                      className="episode-card"
-                      onClick={() => handleEpisodeClick(episode)}
-                    >
-                      <img
-                        className="episode-thumbnail"
-                        src={`/imgs/TBA.webp`}
-                        alt={`${episode.name} thumbnail`}
-                      />
-                      <div className="episode-info">
-                        <h4>Episode {episode.episode_number}</h4>
-                        <p>{episode.name}</p>
-                        <p>{episode.overview}</p>
-                        <p>{episode.air_date}</p>
+                    ) : (
+                      <div
+                        key={episode.id}
+                        className="episode-card"
+                        onClick={() => handlePlayEpisode(episode)}
+                      >
+                        <img
+                          className="episode-thumbnail"
+                          src={`/imgs/TBA.webp`}
+                          alt={`${episode.name} thumbnail`}
+                        />
+                        <div className="episode-info">
+                          <h4>Episode {episode.episode_number}</h4>
+                          <p>{episode.name}</p>
+                          <p>{episode.overview}</p>
+                          <p>{episode.air_date}</p>
+                        </div>
                       </div>
-                    </div>
-                  )
-                )}
-              </div>
+                    )
+                  )}
+                </div>
+              )}
             </div>
           )}
         </>

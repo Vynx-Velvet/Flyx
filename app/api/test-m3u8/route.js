@@ -65,7 +65,7 @@ function processM3U8Playlist(m3u8Content, originalUrl, request) {
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const mode = searchParams.get('mode') || 'processed';
-  const originalUrl = searchParams.get('originalUrl') || 'https://embed.su/example/playlist.m3u8';
+  const originalUrl = searchParams.get('originalUrl') || 'ERROR: test-m3u8 should not be used for real streams - use extract-stream API instead';
 
   console.log('Test M3U8 endpoint called', { mode, originalUrl });
 

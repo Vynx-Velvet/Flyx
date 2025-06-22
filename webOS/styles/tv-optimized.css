@@ -1,0 +1,465 @@
+/* TV-Specific Optimizations */
+
+/* Enhanced Focus Management for Remote Control */
+*:focus {
+    outline: 3px solid #6366f1;
+    outline-offset: 2px;
+}
+
+/* Enhanced Focus Styles for TV Navigation */
+.focusable {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.focusable:focus,
+.focusable.tv-focused {
+    transform: scale(1.05);
+    z-index: 100;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.5);
+    border-radius: 8px;
+}
+
+/* TV-Optimized Button Styles */
+button, .btn {
+    min-height: 48px;
+    min-width: 120px;
+    font-size: 18px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+button:focus, .btn:focus,
+button.tv-focused, .btn.tv-focused {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.6);
+    outline: none;
+}
+
+/* Navigation Enhancements */
+.nav-button {
+    min-width: 140px;
+    min-height: 52px;
+    font-size: 20px;
+    margin: 0 5px;
+    position: relative;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.nav-button:focus,
+.nav-button.tv-focused {
+    transform: scale(1.15) !important;
+    background: rgba(99, 102, 241, 0.6) !important;
+    border-color: #ffffff !important;
+    outline: none !important;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.8), 0 0 20px rgba(99, 102, 241, 0.6) !important;
+    color: #ffffff !important;
+    z-index: 1000 !important;
+}
+
+/* Make active nav button even more distinct when focused */
+.nav-button.active:focus,
+.nav-button.active.tv-focused {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.8), 0 0 25px rgba(99, 102, 241, 0.8) !important;
+    transform: scale(1.2) !important;
+}
+
+/* Navigation button hover effect for additional feedback */
+.nav-button:hover {
+    background: rgba(99, 102, 241, 0.3);
+    transform: scale(1.05);
+}
+
+/* Ensure nav buttons have proper stacking context */
+.header-navigation {
+    display: flex;
+    gap: 20px;
+    position: relative;
+    z-index: 100;
+}
+
+/* Search Button Specific Styles */
+.search-btn {
+    min-width: 140px;
+    min-height: 56px;
+    font-size: 20px;
+    font-weight: 600;
+    position: relative;
+    border: 2px solid transparent;
+}
+
+.search-btn:focus,
+.search-btn.tv-focused {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.6);
+    border-color: rgba(99, 102, 241, 0.8);
+    outline: none;
+    z-index: 100;
+}
+
+/* Search Input TV Optimization */
+.search-field {
+    min-height: 56px;
+    font-size: 22px;
+    border: 3px solid rgba(99, 102, 241, 0.3);
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.search-field:focus,
+.search-field.tv-focused {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.3) !important;
+    outline: none !important;
+    transform: scale(1.08) !important;
+    background: rgba(99, 102, 241, 0.2) !important;
+    z-index: 1000 !important;
+}
+
+/* Header Brand Focus */
+.header-brand:focus,
+.header-brand.tv-focused {
+    transform: scale(1.03);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.6);
+}
+
+
+
+/* Media Card TV Optimizations */
+.media-card {
+    border: 3px solid transparent;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.media-card:focus,
+.media-card.tv-focused {
+    border-color: #6366f1 !important;
+    transform: translateY(-8px) scale(1.05) !important;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.3), 0 8px 32px rgba(99, 102, 241, 0.4) !important;
+    z-index: 100 !important;
+    outline: none;
+}
+
+/* Horizontal Scroll Indicators */
+.media-grid {
+    position: relative;
+}
+
+.media-grid:focus-within::before {
+    content: "◀ Navigate with ◀▶ ▶";
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #ffffff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    z-index: 1000;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Section Focus Indicators */
+.content-section {
+    position: relative;
+    scroll-margin-top: 100px;
+}
+
+.content-section:focus-within .section-heading {
+    color: #6366f1;
+    text-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+/* Modal TV Optimizations */
+.modal-content {
+    border: 4px solid rgba(99, 102, 241, 0.5);
+}
+
+.modal-close:focus,
+.modal-close.tv-focused {
+    background: rgba(99, 102, 241, 0.3);
+    transform: scale(1.2);
+    outline: none;
+}
+
+/* Action Button Focus */
+.action-btn:focus,
+.action-btn.tv-focused {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 8px 32px rgba(99, 102, 241, 0.4);
+    outline: none;
+}
+
+/* TV-Safe Area Margins */
+.tv-safe-area {
+    margin: 60px;
+}
+
+/* Improved Scrolling for TV */
+.media-grid {
+    scroll-snap-type: x mandatory;
+}
+
+.media-card {
+    scroll-snap-align: center;
+}
+
+/* Focus Ring Animation */
+@keyframes focusRing {
+    0% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(99, 102, 241, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+    }
+}
+
+.focusable:focus,
+.focusable.tv-focused {
+    animation: focusRing 0.6s ease-out;
+}
+
+/* Large Screen Optimizations */
+@media (min-width: 1920px) {
+
+    
+    .section-title {
+        font-size: 42px;
+    }
+    
+    .movie-grid {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 40px;
+    }
+    
+    .navbar {
+        padding: 25px 80px;
+    }
+    
+    .main-content {
+        padding: 50px 80px 140px;
+    }
+}
+
+/* 4K TV Optimizations */
+@media (min-width: 3840px) {
+    html {
+        font-size: 24px;
+    }
+    
+
+    
+    .section-title {
+        font-size: 54px;
+    }
+    
+    .movie-grid {
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+        gap: 60px;
+    }
+}
+
+/* Remote Control Key Mapping Hints */
+.remote-hint {
+    position: fixed;
+    bottom: 100px;
+    right: 60px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #ffffff;
+    padding: 15px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.remote-hint.show {
+    opacity: 1;
+}
+
+/* Loading Optimizations for TV */
+.loading-screen {
+    background: #000000;
+}
+
+.loading-spinner {
+    width: 80px;
+    height: 80px;
+    border-width: 6px;
+}
+
+/* TV-Specific Animations */
+@keyframes tvFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tv-fade-in {
+    animation: tvFadeIn 0.5s ease-out;
+}
+
+/* High Contrast Mode for Better TV Visibility */
+@media (prefers-contrast: high) {
+    .movie-card {
+        border: 2px solid #ffffff;
+    }
+    
+    .nav-btn {
+        border: 2px solid #ffffff;
+    }
+    
+    .search-input {
+        border: 2px solid #ffffff;
+    }
+}
+
+/* Reduced Motion for TV */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* WebOS Specific Optimizations */
+.webos-optimized {
+    /* Ensure proper rendering on WebOS */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Spatial Navigation Enhancement */
+.spatial-nav-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.spatial-nav-item {
+    flex: 0 0 auto;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.spatial-nav-item:focus {
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.1);
+}
+
+/* TV-Optimized Scrollbar */
+::-webkit-scrollbar {
+    width: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.6);
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.8);
+}
+
+/* Error States for TV */
+.error-message {
+    background: rgba(239, 68, 68, 0.1);
+    border: 2px solid #ef4444;
+    color: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 18px;
+    margin: 20px 0;
+}
+
+.error-message:focus {
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.3);
+}
+
+/* Success States for TV */
+.success-message {
+    background: rgba(34, 197, 94, 0.1);
+    border: 2px solid #22c55e;
+    color: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 18px;
+    margin: 20px 0;
+}
+
+/* TV-Optimized Grid Layouts */
+.tv-grid {
+    display: grid;
+    gap: 30px;
+    padding: 20px;
+}
+
+.tv-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.tv-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.tv-grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.tv-grid-5 {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+.tv-grid-6 {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+/* TV-Optimized Typography */
+.tv-text-sm { font-size: 16px; }
+.tv-text-base { font-size: 18px; }
+.tv-text-lg { font-size: 22px; }
+.tv-text-xl { font-size: 26px; }
+.tv-text-2xl { font-size: 32px; }
+.tv-text-3xl { font-size: 38px; }
+.tv-text-4xl { font-size: 46px; }
+
+/* TV-Optimized Spacing */
+.tv-p-sm { padding: 12px; }
+.tv-p-base { padding: 16px; }
+.tv-p-lg { padding: 24px; }
+.tv-p-xl { padding: 32px; }
+
+.tv-m-sm { margin: 12px; }
+.tv-m-base { margin: 16px; }
+.tv-m-lg { margin: 24px; }
+.tv-m-xl { margin: 32px; }
+
+/* TV-Specific Content Layout Adjustments */
+
+/* Focus Management */ 

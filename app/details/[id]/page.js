@@ -14,6 +14,7 @@ export default function DetailsPage() {
   const [movieData, setMovieData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isMediaPlayerActive, setIsMediaPlayerActive] = useState(false);
+  const [preventNavigation, setPreventNavigation] = useState(false);
 
   useEffect(() => {
     const fetchMovieData = async () => {
@@ -69,23 +70,42 @@ export default function DetailsPage() {
     fetchMovieData();
   }, [params.id, searchParams]);
 
+  // FIXED: Clear media player state when navigating between different media items
+  useEffect(() => {
+    console.log('🔄 Details page: ID changed, clearing media player states');
+    setIsMediaPlayerActive(false);
+    setPreventNavigation(false);
+  }, [params.id]); // Trigger when the route ID changes
+
   const handleClearMovie = () => {
+    if (preventNavigation) {
+      console.log('🚫 Navigation blocked - media player session active');
+      return;
+    }
+    console.log('🏠 Navigating to home page from details');
     router.push('/');
   };
 
   const handleNavBarClear = () => {
+    if (preventNavigation) {
+      console.log('🚫 Navigation blocked - media player session active');
+      return;
+    }
+    console.log('🏠 Navigating to home page from navbar');
     router.push('/');
   };
 
   const handleMediaPlayerStateChange = (isActive) => {
+    console.log('📺 Media player state changed:', isActive ? 'ACTIVE' : 'INACTIVE');
     setIsMediaPlayerActive(isActive);
+    setPreventNavigation(isActive); // Prevent navigation when media player is active
   };
 
   if (loading) {
     return (
       <MediaProvider>
         <div className="app">
-          <NavBar onClearSearch={handleNavBarClear} />
+          {!isMediaPlayerActive && <NavBar onClearSearch={handleNavBarClear} />}
           <div style={{ padding: '20px', textAlign: 'center' }}>Loading...</div>
           {!isMediaPlayerActive && <Footer />}
         </div>
@@ -97,7 +117,7 @@ export default function DetailsPage() {
     return (
       <MediaProvider>
         <div className="app">
-          <NavBar onClearSearch={handleNavBarClear} />
+          {!isMediaPlayerActive && <NavBar onClearSearch={handleNavBarClear} />}
           <div style={{ padding: '20px', textAlign: 'center' }}>
             Movie or show not found.
             <br />
@@ -114,7 +134,7 @@ export default function DetailsPage() {
   return (
     <MediaProvider>
       <div className="app">
-        <NavBar onClearSearch={handleNavBarClear} />
+        {!isMediaPlayerActive && <NavBar onClearSearch={handleNavBarClear} />}
         <ShowDetails 
           movieId={movieData} 
           clearMovie={handleClearMovie} 

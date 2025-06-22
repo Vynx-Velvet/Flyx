@@ -3,6 +3,7 @@ import { useReducer, useCallback } from 'react';
 const initialState = {
   isPlaying: false,
   volume: 1,
+  previousVolume: 1, // Remember volume before muting
   isMuted: false,
   duration: 0,
   currentTime: 0,
@@ -21,9 +22,31 @@ const reducer = (state, action) => {
     case 'TOGGLE_PLAY':
       return { ...state, isPlaying: !state.isPlaying };
     case 'SET_VOLUME':
-      return { ...state, volume: action.payload, isMuted: action.payload === 0 };
+      // When setting volume, if it's > 0 and we're muted, unmute
+      const volume = action.payload;
+      const shouldUnmute = volume > 0 && state.isMuted;
+      return { 
+        ...state, 
+        volume: volume,
+        previousVolume: volume > 0 ? volume : state.previousVolume,
+        isMuted: shouldUnmute ? false : state.isMuted
+      };
     case 'TOGGLE_MUTE':
-      return { ...state, isMuted: !state.isMuted };
+      if (state.isMuted) {
+        // Unmuting: restore previous volume
+        return { 
+          ...state, 
+          isMuted: false,
+          volume: state.previousVolume > 0 ? state.previousVolume : 0.5
+        };
+      } else {
+        // Muting: remember current volume
+        return { 
+          ...state, 
+          isMuted: true,
+          previousVolume: state.volume > 0 ? state.volume : 0.5
+        };
+      }
     case 'SET_DURATION':
       return { ...state, duration: action.payload };
     case 'SET_CURRENT_TIME':
@@ -34,6 +57,8 @@ const reducer = (state, action) => {
       return { ...state, isSeeking: action.payload };
     case 'TOGGLE_FULLSCREEN':
       return { ...state, isFullscreen: !state.isFullscreen };
+    case 'SET_FULLSCREEN':
+      return { ...state, isFullscreen: action.payload };
     case 'SET_ERROR':
         return { ...state, error: action.payload };
     default:
@@ -80,6 +105,10 @@ export const usePlayerState = () => {
     dispatch({ type: 'TOGGLE_FULLSCREEN' });
   }, []);
 
+  const setFullscreen = useCallback((isFullscreen) => {
+    dispatch({ type: 'SET_FULLSCREEN', payload: isFullscreen });
+  }, []);
+
   const setError = useCallback((error) => {
     dispatch({ type: 'SET_ERROR', payload: error });
   }, []);
@@ -94,6 +123,7 @@ export const usePlayerState = () => {
     setBuffered,
     setSeeking,
     toggleFullscreen,
+    setFullscreen,
     setError,
   };
 

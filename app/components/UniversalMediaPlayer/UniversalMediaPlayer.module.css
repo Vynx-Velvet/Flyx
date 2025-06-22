@@ -1,166 +1,492 @@
-/* Universal Media Player Styles */
+/* Simple Universal Media Player */
 .playerContainer {
   position: relative;
   width: 100%;
-  height: 100%;
-  background-color: #000;
+  height: 100vh;
+  background: #000;
   display: flex;
-  justify-content: center;
   align-items: center;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  overflow: hidden;
 }
 
+/* Fullscreen mode styling */
+.playerContainer:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+}
+
+/* Webkit fullscreen support */
+.playerContainer:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+}
+
+/* Mozilla fullscreen support */
+.playerContainer:-moz-full-screen {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+}
+
+/* Video Element - Maintain Original Resolution */
 .videoElement {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: contain; /* Maintain aspect ratio without stretching */
+  background: #000;
 }
 
-.controlsOverlay {
+/* Hide all native video controls */
+.videoElement::-webkit-media-controls {
+  display: none !important;
+}
+
+/* Subtitle Overlay - Positioned Above Controls */
+.subtitleOverlay {
   position: absolute;
-  top: 0;
+  bottom: 12%; /* Moved higher to avoid controls overlap */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  pointer-events: none;
+  
+  /* Larger, more readable styling */
+  color: #ffffff;
+  font-size: 35px; /* Increased by 25% from 28px */
+  font-weight: 500; /* Slightly bolder */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  text-align: center;
+  max-width: 90%;
+  word-wrap: break-word;
+  line-height: 1.3;
+  
+  /* Enhanced shadow for better readability */
+  text-shadow: 
+    2px 2px 4px rgba(0, 0, 0, 0.9),
+    0 0 8px rgba(0, 0, 0, 0.7),
+    0 0 16px rgba(0, 0, 0, 0.5);
+  
+  /* Subtle fade-in */
+  animation: subtitleFadeIn 0.2s ease-out;
+}
+
+@keyframes subtitleFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(5px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Status Indicator */
+.statusIndicator {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(59, 130, 246, 0.9);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 100;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Back Button - Top Left */
+.backBtn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 100;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.backBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* MEDIA CONTROLS - Modern Design */
+.controlsContainer {
+  position: absolute;
+  bottom: 0;
   left: 0;
   right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  background-color: rgba(0, 0, 0, 0.3);
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.7) 50%,
+    transparent 100%
+  );
+  padding: 30px;
+  z-index: 90;
+  backdrop-filter: blur(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Auto-hide controls states */
+.controlsVisible {
   opacity: 1;
-  transition: opacity 0.3s ease;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
-.playerContainer:hover .controlsOverlay,
-.playerContainer.user-active .controlsOverlay {
-  opacity: 1;
+.controlsHidden {
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
 }
 
-.topControls {
-  display: flex;
-  justify-content: flex-start;
-  padding: 1rem;
+/* Keep controls visible when hovered */
+.controlsContainer:hover {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  pointer-events: auto !important;
 }
 
-.backButton {
-  background: rgba(30, 30, 30, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.2s ease;
-}
-
-.backButton:hover {
-  background: rgba(50, 50, 50, 0.9);
-}
-
-.bottomControls {
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
-}
-
-.timelineContainer {
-  width: 100%;
-  padding: 0.5rem 0;
-  cursor: pointer;
-}
-
+/* Timeline Styles */
 .timeline {
-  width: 100%;
-  height: 4px;
-  background-color: rgba(255, 255, 255, 0.3);
   position: relative;
-  border-radius: 2px;
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 24px;
+  transition: height 0.2s ease;
+}
+
+.timeline:hover {
+  height: 10px;
 }
 
 .timelineBuffered {
   position: absolute;
   left: 0;
   top: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.5);
-  border-radius: 2px;
-  transition: width 0.1s linear;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 4px;
+  pointer-events: none;
 }
 
 .timelineProgress {
   position: absolute;
   left: 0;
   top: 0;
-  bottom: 0;
-  background-color: #3b82f6;
-  border-radius: 2px;
-  transition: width 0.1s linear;
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 4px;
+  pointer-events: none;
+  transition: background-color 0.2s ease;
 }
 
+.timeline:hover .timelineProgress {
+  background: #2563eb;
+}
+
+/* Timeline seeking state */
+.timelineSeeking {
+  pointer-events: none !important;
+}
+
+.timelineSeeking .timelineProgress {
+  background: #f59e0b !important;
+  animation: seekingPulse 1s ease-in-out infinite alternate;
+}
+
+/* Timeline dragging state */
+.timelineDragging {
+  cursor: grabbing !important;
+}
+
+.timelineDragging .timelineProgress {
+  background: #2563eb !important;
+  height: 100% !important;
+}
+
+.timeline {
+  cursor: pointer;
+}
+
+.timeline:active {
+  cursor: grabbing;
+}
+
+@keyframes seekingPulse {
+  0% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* Controls Row */
 .controlsRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 24px;
+  width: 100%;
 }
 
-.leftControls, .rightControls {
+/* Left Controls Group */
+.leftControls {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 24px;
+  flex: 1;
 }
 
-.controlButton {
-  background: none;
-  border: none;
-  color: #fff;
-  font-size: 1.5rem;
+/* Play Button */
+.playButton {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 24px;
   cursor: pointer;
-  padding: 0.25rem;
-  line-height: 1;
+  min-width: 52px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  flex-shrink: 0;
 }
 
+.playButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: scale(1.05);
+}
+
+/* Volume Controls */
 .volumeContainer {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 16px;
+  flex-shrink: 0;
 }
 
-.volumeSlider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 80px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 2px;
-  outline: none;
-  cursor: pointer;
-}
-
-.volumeSlider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  background: #fff;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.volumeSlider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  background: #fff;
-  border-radius: 50%;
-  cursor: pointer;
+.volumeButton {
+  background: transparent;
   border: none;
+  color: white;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
+.volumeButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+/* Custom Volume Slider - Completely Rebuilt */
+.customVolumeSlider {
+  position: relative;
+  width: 120px;
+  height: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.volumeTrack {
+  position: absolute;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.customVolumeSlider:hover .volumeTrack {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.volumeFill {
+  position: absolute;
+  height: 6px;
+  background: #3b82f6;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  pointer-events: none;
+}
+
+.customVolumeSlider:hover .volumeFill {
+  height: 8px;
+  background: #2563eb;
+}
+
+.volumeThumb {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #3b82f6;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+  pointer-events: none;
+}
+
+.customVolumeSlider:hover .volumeThumb {
+  width: 20px;
+  height: 20px;
+  background: #2563eb;
+  transform: translateX(-50%) scale(1.1);
+}
+
+/* Muted volume slider styling */
+.volumeMuted .volumeTrack {
+  background: rgba(239, 68, 68, 0.3) !important;
+}
+
+.volumeMuted .volumeFill {
+  background: rgba(239, 68, 68, 0.6) !important;
+}
+
+.volumeMuted .volumeThumb {
+  background: #ef4444 !important;
+  border-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.volumeMuted:hover .volumeFill {
+  background: rgba(239, 68, 68, 0.8) !important;
+}
+
+.volumeMuted:hover .volumeThumb {
+  background: #dc2626 !important;
+}
+
+/* Volume slider dragging state */
+.volumeDragging {
+  cursor: grabbing !important;
+}
+
+.volumeDragging .volumeTrack {
+  height: 8px !important;
+  background: rgba(255, 255, 255, 0.5) !important;
+}
+
+.volumeDragging .volumeFill {
+  height: 8px !important;
+  background: #2563eb !important;
+}
+
+.volumeDragging .volumeThumb {
+  width: 22px !important;
+  height: 22px !important;
+  background: #2563eb !important;
+  transform: translateX(-50%) scale(1.2) !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Enhanced volume slider cursor states */
+.customVolumeSlider {
+  cursor: pointer;
+}
+
+.customVolumeSlider:active {
+  cursor: grabbing;
+}
+
+.volumeThumb {
+  cursor: grab;
+}
+
+.volumeThumb:active {
+  cursor: grabbing;
+}
+
+/* Time Display */
 .timeDisplay {
-  color: #fff;
-  font-size: 0.9rem;
+  color: white;
+  font-size: 16px;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 10px 16px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
+/* Right Controls Group */
+.rightControls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+/* Select Dropdowns */
+.controlSelect {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  min-width: 140px;
+  outline: none;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  flex-shrink: 0;
+}
+
+.controlSelect:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.controlSelect:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.controlSelect option {
+  background: #1a1a1a;
+  color: white;
+  padding: 10px;
+}
+
+/* Loading Spinner */
 .loadingContainer {
   position: absolute;
   inset: 0;
@@ -168,9 +494,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.8);
-  color: #fff;
-  z-index: 20;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  z-index: 200;
 }
 
 .spinner {
@@ -180,6 +506,7 @@
   width: 50px;
   height: 50px;
   animation: spin 1s linear infinite;
+  margin-bottom: 20px;
 }
 
 @keyframes spin {
@@ -187,215 +514,270 @@
   100% { transform: rotate(360deg); }
 }
 
-.loadingInfo {
-  margin-top: 1rem;
-  text-align: center;
+.loadingText {
+  font-size: 18px;
+  margin-bottom: 10px;
 }
 
 .loadingPhase {
-  font-size: 1.1rem;
-  font-weight: 500;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
-.loadingProgress {
-  font-size: 1rem;
-  margin-top: 0.5rem;
-  color: #a0aec0;
-}
-
+/* Error Overlay */
 .errorOverlay {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.8);
-  color: #f87171;
-  font-size: 1.2rem;
-  padding: 2rem;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
   text-align: center;
-  z-index: 20;
+  z-index: 200;
 }
 
-/* Add more styles for other controls later */
+.errorOverlay h3 {
+  font-size: 24px;
+  color: #ef4444;
+  margin-bottom: 16px;
+}
+
+.errorOverlay p {
+  font-size: 16px;
+  margin-bottom: 24px;
+  max-width: 500px;
+}
+
+.backButton {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.backButton:hover {
+  background: #2563eb;
+}
 
 /* Responsive Design */
+@media (max-width: 1024px) {
+  .controlsContainer {
+    padding: 25px;
+  }
+  
+  .leftControls {
+    gap: 20px;
+  }
+  
+  .rightControls {
+    gap: 16px;
+  }
+  
+  .customVolumeSlider {
+    width: 100px;
+  }
+  
+  .controlSelect {
+    min-width: 120px;
+  }
+}
+
 @media (max-width: 768px) {
-  .topControls {
-    padding: 0.5rem;
+  .subtitleOverlay {
+    font-size: 30px; /* Increased by 25% from 24px */
+    max-width: 92%;
+    bottom: 15%; /* Higher positioning for mobile controls */
   }
-  .backButton {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.9rem;
+  
+  .controlsContainer {
+    padding: 20px;
   }
-  .bottomControls {
-    padding: 0.5rem;
+  
+  .timeline {
+    margin-bottom: 20px;
   }
-  .leftControls, .rightControls {
-    gap: 0.5rem;
+  
+  .controlsRow {
+    flex-direction: column;
+    gap: 20px;
+    align-items: stretch;
   }
-  .controlButton {
-    font-size: 1.2rem;
+  
+  .leftControls {
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
   }
+  
+  .rightControls {
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  
+  .controlSelect {
+    min-width: 110px;
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+  
+  .timeDisplay {
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+  
+  .backBtn {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+  
+  .playButton {
+    min-width: 48px;
+    min-height: 48px;
+    font-size: 22px;
+    padding: 12px;
+  }
+  
+  .customVolumeSlider {
+    width: 80px;
+  }
+  
+  .volumeButton {
+    font-size: 20px;
+    padding: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .subtitleOverlay {
+    font-size: 28px; /* Increased by 25% from 22px (rounded) */
+    bottom: 18%; /* Higher positioning for small screen controls */
+    max-width: 95%;
+  }
+  
+  .controlsContainer {
+    padding: 15px;
+  }
+  
+  .timeline {
+    margin-bottom: 16px;
+  }
+  
+  .controlsRow {
+    gap: 16px;
+  }
+  
+  .leftControls {
+    gap: 12px;
+  }
+  
+  .rightControls {
+    gap: 10px;
+  }
+  
+  .volumeContainer {
+    gap: 12px;
+  }
+  
   .volumeSlider {
     width: 60px;
   }
+  
+  .controlSelect {
+    min-width: 100px;
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
   .timeDisplay {
-    font-size: 0.8rem;
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+  
+  .playButton {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 20px;
+    padding: 10px;
+  }
+  
+  .volumeButton {
+    font-size: 18px;
+    padding: 6px;
+  }
+  
+  .backBtn {
+    padding: 8px 12px;
+    font-size: 13px;
   }
 }
 
-.rightControls {
-  position: relative; /* For settings menu positioning */
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.settingsMenu {
+/* Seeking Indicator */
+.seekingIndicator {
   position: absolute;
-  bottom: 100%; /* Position above the controls */
-  right: 0;
-  background-color: rgba(30, 30, 30, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  padding: 0.5rem;
-  margin-bottom: 0.5rem;
-  width: 200px;
-  z-index: 30;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 20px 30px;
+  border-radius: 12px;
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.settingsSection {
-  display: flex;
-  flex-direction: column;
-}
-
-.settingsDropdownHeader {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.2s ease;
+  gap: 15px;
+  z-index: 150;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
-.settingsDropdownHeader:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+.seekingSpinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: seekingSpin 1s linear infinite;
 }
 
-.settingsTitle {
-  color: #a0aec0;
-  font-size: 0.8rem;
+@keyframes seekingSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.seekingIndicator span {
+  font-size: 16px;
   font-weight: 600;
-  text-transform: uppercase;
-  margin: 0;
+  white-space: nowrap;
 }
 
-.settingsCurrentValue {
-  color: #fff;
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
-.settingsArrow {
-  color: #a0aec0;
-  font-size: 0.8rem;
-  transition: transform 0.2s ease;
-}
-
-.settingsDropdownList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.settingsDropdownList li {
-  color: #fff;
-  padding: 0.5rem 0.75rem;
+/* Fullscreen Button */
+.fullscreenButton {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 18px;
   cursor: pointer;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  margin: 0.25rem;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  flex-shrink: 0;
 }
 
-.settingsDropdownList li:hover {
-  background-color: #3b82f6;
-}
-
-/* Remove old styles that are no longer needed */
-.settingsMenu ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.settingsMenu li {
-  color: #fff;
-  padding: 0.5rem;
-  cursor: pointer;
-  border-radius: 4px;
-  font-size: 0.9rem;
-}
-
-.settingsMenu li:hover {
-  background-color: #3b82f6;
-}
-
-.settingsMenu li.activeOption {
-  font-weight: bold;
-  color: #3b82f6;
-}
-
-.settingsDropdownList li.justSelected {
-  background-color: #22c55e !important;
-  animation: selectionPulse 0.6s ease-out;
-}
-
-.selectionFeedback {
-  float: right;
-  font-size: 0.8rem;
-  color: #fff;
-  font-weight: bold;
-  animation: fadeInOut 2s ease-out forwards;
-}
-
-@keyframes selectionPulse {
-  0% {
-    background-color: #22c55e;
-    transform: scale(1);
-  }
-  50% {
-    background-color: #16a34a;
-    transform: scale(1.02);
-  }
-  100% {
-    background-color: #22c55e;
-    transform: scale(1);
-  }
-}
-
-@keyframes fadeInOut {
-  0% {
-    opacity: 0;
-    transform: translateX(10px);
-  }
-  20% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  80% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
+.fullscreenButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: scale(1.05);
 } 

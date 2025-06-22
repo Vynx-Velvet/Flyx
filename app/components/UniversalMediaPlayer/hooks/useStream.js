@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export const useStream = ({ mediaType, movieId, seasonId, episodeId }) => {
+export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch = true }) => {
   const [server, setServer] = useState("Vidsrc.xyz");
   const [streamUrl, setStreamUrl] = useState(null);
   const [streamType, setStreamType] = useState(null);
@@ -10,10 +10,19 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId }) => {
   const [loadingPhase, setLoadingPhase] = useState('initializing');
 
   useEffect(() => {
+    // CRITICAL: Only fetch streams when explicitly requested
+    if (!shouldFetch) {
+      console.log('🚫 Stream fetching disabled - useStream in view-only mode');
+      setLoading(false);
+      return;
+    }
+
     if (!movieId || (mediaType === 'tv' && (!seasonId || !episodeId))) {
       setLoading(false);
       return;
     }
+
+    console.log('🚀 STARTING STREAM EXTRACTION for:', { mediaType, movieId, seasonId, episodeId });
 
     let isMounted = true;
     let eventSource;
@@ -105,7 +114,7 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId }) => {
         eventSource.close();
       }
     };
-  }, [server, mediaType, movieId, seasonId, episodeId]);
+  }, [server, mediaType, movieId, seasonId, episodeId, shouldFetch]);
 
   return { streamUrl, streamType, loading, error, loadingProgress, loadingPhase, setServer };
 }; 

@@ -1,0 +1,17 @@
+{
+  "name": "com.flyx.streaming.service",
+  "version": "1.0.0",
+  "description": "Flyx TV Background Service for WebOS",
+  "main": "service.js",
+  "scripts": {
+    "start": "node service.js"
+  },
+  "dependencies": {
+    "webos-service": "^0.6.1"
+  },
+  "engines": {
+    "node": ">=10.0.0"
+  },
+  "author": "Flyx Development Team",
+  "license": "MIT"
+} 

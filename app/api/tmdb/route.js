@@ -39,7 +39,7 @@ export async function GET(request) {
 	try {
 		switch (action) {
 			case 'getShowDetails':
-				const response = await fetch(`https://api.themoviedb.org/3/tv/${movieId}?language=en-US`, tmdbOptions);
+				const response = await fetch(`https://api.themoviedb.org/3/tv/${movieId}?language=en-US&append_to_response=credits`, tmdbOptions);
 				const showData = await response.json();
 				
 				// Fetch external IDs (including IMDB ID) for the show
@@ -56,7 +56,7 @@ export async function GET(request) {
 				return NextResponse.json(enrichedShowData);
 
 			case 'getMovieDetails':
-				const movieResponse = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?language=en-US`, tmdbOptions);
+				const movieResponse = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?language=en-US&append_to_response=credits`, tmdbOptions);
 				const movieData = await movieResponse.json();
 				
 				// Fetch external IDs (including IMDB ID) for the movie

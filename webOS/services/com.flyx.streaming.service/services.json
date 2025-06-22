@@ -1,0 +1,11 @@
+{
+  "id": "com.flyx.streaming.service",
+  "description": "Flyx TV Background Service for API calls and streaming operations",
+  "engine": "nodejs",
+  "executable": "service.js",
+  "services": [
+    {
+      "name": "com.flyx.streaming.service"
+    }
+  ]
+} 

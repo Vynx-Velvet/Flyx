@@ -1,6 +1,7 @@
 // Server-side proxy for downloading subtitle files (avoids CORS issues)
 
 import { NextResponse } from 'next/server';
+import { gunzipSync } from 'zlib';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -106,24 +107,73 @@ export async function POST(request) {
       throw new Error(`Failed to download subtitle: ${response.status}`);
     }
 
-    const subtitleContent = await response.text();
-    console.log('📄 Downloaded subtitle content length:', subtitleContent.length);
+    // Get as array buffer to handle both text and binary content
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    console.log('📄 Downloaded subtitle content:', {
+      size: arrayBuffer.byteLength,
+      firstBytes: Array.from(uint8Array.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' '),
+      isGzipped: uint8Array.length >= 2 && uint8Array[0] === 0x1f && uint8Array[1] === 0x8b
+    });
+
+    let subtitleContent;
+    
+    // Check if content is gzipped (magic number: 1f 8b)
+    if (uint8Array.length >= 2 && uint8Array[0] === 0x1f && uint8Array[1] === 0x8b) {
+      console.log('🗜️ Decompressing gzipped content...');
+      try {
+        // Decompress using Node.js zlib
+        const decompressed = gunzipSync(Buffer.from(arrayBuffer));
+        subtitleContent = decompressed.toString('utf-8');
+        console.log('✅ Successfully decompressed gzipped content:', {
+          originalSize: arrayBuffer.byteLength,
+          decompressedSize: subtitleContent.length
+        });
+      } catch (decompressError) {
+        console.error('❌ Failed to decompress gzipped content:', decompressError);
+        throw new Error(`Failed to decompress gzipped subtitle: ${decompressError.message}`);
+      }
+    } else {
+      // Not gzipped, treat as regular text
+      console.log('📄 Processing uncompressed content');
+      subtitleContent = new TextDecoder('utf-8').decode(arrayBuffer);
+    }
+
+    console.log('📝 Subtitle content preview:', {
+      length: subtitleContent.length,
+      startsWithWebVTT: subtitleContent.startsWith('WEBVTT'),
+      firstLine: subtitleContent.split('\n')[0],
+      hasNumbers: /^\d+$/.test(subtitleContent.split('\n')[0]) // SRT format check
+    });
 
     // Convert SRT to VTT if needed
     let vttContent;
-    if (download_link.includes('.srt') || subtitleContent.includes('-->') && !subtitleContent.startsWith('WEBVTT')) {
-      // Convert SRT to VTT
-      vttContent = convertSrtToVtt(subtitleContent);
-      console.log('🔄 Converted SRT to VTT');
-    } else if (subtitleContent.startsWith('WEBVTT')) {
+    if (subtitleContent.startsWith('WEBVTT')) {
       // Already VTT format
       vttContent = subtitleContent;
       console.log('✅ Already in VTT format');
+    } else if (download_link.includes('.srt') || subtitleContent.includes('-->') && !subtitleContent.startsWith('WEBVTT')) {
+      // Convert SRT to VTT
+      vttContent = convertSrtToVtt(subtitleContent);
+      console.log('🔄 Converted SRT to VTT');
     } else {
       // Assume it's SRT and convert
       vttContent = convertSrtToVtt(subtitleContent);
       console.log('🔄 Assumed SRT format and converted to VTT');
     }
+
+    // Validate VTT content
+    if (!vttContent.startsWith('WEBVTT')) {
+      console.warn('⚠️ VTT content does not start with WEBVTT header, adding it...');
+      vttContent = 'WEBVTT\n\n' + vttContent;
+    }
+
+    console.log('📄 Final VTT content preview:', {
+      length: vttContent.length,
+      startsWithWebVTT: vttContent.startsWith('WEBVTT'),
+      firstLines: vttContent.split('\n').slice(0, 5)
+    });
 
     return NextResponse.json({
       success: true,
@@ -140,6 +190,8 @@ export async function POST(request) {
 }
 
 function convertSrtToVtt(srtContent) {
+  console.log('🔄 Converting SRT to VTT...');
+  
   // Basic SRT to VTT conversion
   let vtt = 'WEBVTT\n\n';
   
@@ -148,6 +200,11 @@ function convertSrtToVtt(srtContent) {
     .replace(/(\d{2}):(\d{2}):(\d{2}),(\d{3})/g, '$1:$2:$3.$4')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n');
+
+  console.log('✅ SRT to VTT conversion completed:', {
+    originalLength: srtContent.length,
+    vttLength: vtt.length
+  });
 
   return vtt;
 } 
