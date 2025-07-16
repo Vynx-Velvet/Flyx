@@ -265,7 +265,7 @@
 
 .tech-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.5rem;
 }
 
@@ -301,12 +301,109 @@
   font-weight: 600;
   color: #00f5ff;
   margin-bottom: 0.5rem;
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
 }
 
 .tech-desc {
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.9rem;
   line-height: 1.5;
+}
+
+/* ========================================
+   ENHANCED TECH SECTIONS WITH EMOJIS
+   ======================================== */
+.tech-item .tech-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #00f5ff;
+  margin-bottom: 0.75rem;
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
+}
+
+.tech-item .tech-name::before {
+  content: '';
+  font-size: 1.2rem;
+  filter: drop-shadow(0 0 5px rgba(0, 245, 255, 0.4));
+}
+
+/* Different colors for different sections */
+.solution-section .tech-item {
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.solution-section .tech-item::before {
+  background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.6), transparent);
+}
+
+.solution-section .tech-item:hover {
+  border-color: rgba(34, 197, 94, 0.4);
+  box-shadow: 0 10px 25px rgba(34, 197, 94, 0.1);
+}
+
+.solution-section .tech-name {
+  color: #22c55e;
+  text-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+}
+
+/* Special styling for reverse engineering section */
+.tech-section:nth-of-type(6) .tech-item {
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.tech-section:nth-of-type(6) .tech-item::before {
+  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.6), transparent);
+}
+
+.tech-section:nth-of-type(6) .tech-item:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 10px 25px rgba(139, 92, 246, 0.1);
+}
+
+.tech-section:nth-of-type(6) .tech-name {
+  color: #8b5cf6;
+  text-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+}
+
+/* Special styling for architecture section */
+.tech-section:nth-of-type(7) .tech-item {
+  border-color: rgba(6, 182, 212, 0.2);
+}
+
+.tech-section:nth-of-type(7) .tech-item::before {
+  background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.6), transparent);
+}
+
+.tech-section:nth-of-type(7) .tech-item:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: 0 10px 25px rgba(6, 182, 212, 0.1);
+}
+
+.tech-section:nth-of-type(7) .tech-name {
+  color: #06b6d4;
+  text-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+}
+
+/* Special styling for challenges section */
+.tech-section:nth-of-type(8) .tech-item {
+  border-color: rgba(245, 101, 101, 0.2);
+}
+
+.tech-section:nth-of-type(8) .tech-item::before {
+  background: linear-gradient(90deg, transparent, rgba(245, 101, 101, 0.6), transparent);
+}
+
+.tech-section:nth-of-type(8) .tech-item:hover {
+  border-color: rgba(245, 101, 101, 0.4);
+  box-shadow: 0 10px 25px rgba(245, 101, 101, 0.1);
+}
+
+.tech-section:nth-of-type(8) .tech-name {
+  color: #f56565;
+  text-shadow: 0 0 10px rgba(245, 101, 101, 0.3);
 }
 
 /* ========================================
@@ -441,6 +538,14 @@
   .feature,
   .tech-item {
     padding: 1.25rem;
+  }
+  
+  .tech-name {
+    font-size: 0.95rem;
+  }
+  
+  .tech-desc {
+    font-size: 0.85rem;
   }
 }
 

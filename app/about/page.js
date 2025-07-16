@@ -90,6 +90,150 @@ const AboutPage = () => {
             </div>
           </section>
 
+          {/* How It Works Section */}
+          <section className="tech-section">
+            <div className="content-card">
+              <h2>How Our System Works</h2>
+              <p className="tech-intro">
+                Behind the clean interface lies a sophisticated architecture designed to extract and deliver content securely:
+              </p>
+              <div className="tech-grid">
+                <div className="tech-item">
+                  <span className="tech-name">🎯 Smart Source Detection</span>
+                  <span className="tech-desc">Automatically identifies and prioritizes the highest quality streaming sources from multiple providers</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🔧 VM-Based Extraction</span>
+                  <span className="tech-desc">Isolated virtual machine environment safely processes embed pages and extracts clean stream URLs</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🌐 CORS Proxy System</span>
+                  <span className="tech-desc">Advanced proxy layer masks origins and handles cross-origin restrictions for seamless playback</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">📺 M3U8 Processing</span>
+                  <span className="tech-desc">Real-time playlist parsing and URL rewriting for multi-quality streaming support</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🎬 Progressive Loading</span>
+                  <span className="tech-desc">Stream-first architecture with fallback systems and automatic server switching</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">📝 Subtitle Integration</span>
+                  <span className="tech-desc">Direct OpenSubtitles API integration with VTT conversion and quality scoring</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Reverse Engineering Section */}
+          <section className="tech-section">
+            <div className="content-card">
+              <h2>Reverse Engineering Process</h2>
+              <p className="tech-intro">
+                Our technical approach involved comprehensive analysis and reverse engineering of existing streaming platforms:
+              </p>
+              <div className="tech-grid">
+                <div className="tech-item">
+                  <span className="tech-name">🔍 Traffic Analysis</span>
+                  <span className="tech-desc">Deep packet inspection and network flow analysis to understand embed site communication patterns</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🕷️ Web Scraping Techniques</span>
+                  <span className="tech-desc">Advanced DOM manipulation and JavaScript execution to extract hidden stream endpoints</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🎭 Anti-Detection Measures</span>
+                  <span className="tech-desc">Browser fingerprint spoofing, user agent rotation, and behavioral mimicking to avoid blocks</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🔐 Encryption Bypass</span>
+                  <span className="tech-desc">Analysis of client-side encryption schemes and development of decryption algorithms</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">⚡ Performance Optimization</span>
+                  <span className="tech-desc">Caching strategies, concurrent processing, and intelligent retry mechanisms for reliability</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🛠️ API Reconstruction</span>
+                  <span className="tech-desc">Reverse engineering of internal APIs and creation of clean, documented interfaces</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Technical Architecture Section */}
+          <section className="tech-section">
+            <div className="content-card">
+              <h2>System Architecture</h2>
+              <p className="tech-intro">
+                A multi-layered architecture ensures reliability, security, and performance:
+              </p>
+              <div className="tech-grid">
+                <div className="tech-item">
+                  <span className="tech-name">🏗️ Frontend Layer</span>
+                  <span className="tech-desc">Next.js 14 with React for responsive UI, real-time updates, and progressive enhancement</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🔄 API Gateway</span>
+                  <span className="tech-desc">Serverless functions handling authentication, rate limiting, and request routing</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🖥️ Extraction Service</span>
+                  <span className="tech-desc">Dedicated VM infrastructure running Playwright automation for safe content extraction</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🎮 Media Engine</span>
+                  <span className="tech-desc">HLS.js integration with custom error handling and adaptive bitrate streaming</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">📊 Monitoring System</span>
+                  <span className="tech-desc">Real-time performance metrics, error tracking, and automated health checks</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🔄 Fallback Mechanisms</span>
+                  <span className="tech-desc">Multiple extraction sources with intelligent switching and redundancy planning</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Challenges & Solutions Section */}
+          <section className="tech-section">
+            <div className="content-card">
+              <h2>Technical Challenges Overcome</h2>
+              <p className="tech-intro">
+                Key obstacles we solved during development:
+              </p>
+              <div className="tech-grid">
+                <div className="tech-item">
+                  <span className="tech-name">🚧 CORS Restrictions</span>
+                  <span className="tech-desc">Built sophisticated proxy system with header masking and origin spoofing</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🕸️ Dynamic Content</span>
+                  <span className="tech-desc">Implemented headless browser automation with JavaScript execution and DOM waiting</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🔄 Source Reliability</span>
+                  <span className="tech-desc">Created multi-source fallback system with quality scoring and automatic switching</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">📱 Mobile Compatibility</span>
+                  <span className="tech-desc">Optimized video delivery and controls for touch interfaces and limited bandwidth</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">⚡ Performance Issues</span>
+                  <span className="tech-desc">Implemented progressive loading, stream caching, and intelligent preloading strategies</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">🛡️ Security Concerns</span>
+                  <span className="tech-desc">Isolated execution environments and comprehensive input sanitization</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Technology Section */}
           <section className="tech-section">
             <div className="content-card">
@@ -105,6 +249,14 @@ const AboutPage = () => {
                 <div className="tech-item">
                   <span className="tech-name">Node.js</span>
                   <span className="tech-desc">Backend runtime environment</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">Playwright</span>
+                  <span className="tech-desc">Browser automation for extraction</span>
+                </div>
+                <div className="tech-item">
+                  <span className="tech-name">HLS.js</span>
+                  <span className="tech-desc">Adaptive streaming video player</span>
                 </div>
                 <div className="tech-item">
                   <span className="tech-name">Modern CSS</span>
