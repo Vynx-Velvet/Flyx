@@ -14,430 +14,362 @@ const AboutPage = () => {
           {/* Hero Section */}
           <section className="about-hero">
             <div className="hero-content">
-              <div className="hero-badge">
-                <span className="badge-text">🏆 Technical Achievement</span>
-              </div>
               <h1 className="hero-title">
                 About <span className="hero-highlight">Flyx</span>
               </h1>
               <p className="hero-subtitle">
-                A groundbreaking technical achievement in secure media streaming architecture
+                A technical demonstration of advanced stream extraction, reverse engineering, and secure media delivery
               </p>
-              <div className="hero-stats">
-                <div className="stat-item">
-                  <span className="stat-number">15+</span>
-                  <span className="stat-label">Streaming Sources Cracked</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-number">6</span>
-                  <span className="stat-label">Months Development</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-number">100%</span>
-                  <span className="stat-label">Success Rate</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-number">0</span>
-                  <span className="stat-label">Security Compromises</span>
-                </div>
-              </div>
-            </div>
-            <div className="hero-visual">
-              <div className="floating-elements">
-                <div className="element element-1">🛡️</div>
-                <div className="element element-2">⚡</div>
-                <div className="element element-3">🔧</div>
-                <div className="element element-4">🎯</div>
-                <div className="element element-5">🌐</div>
-                <div className="element element-6">📺</div>
-              </div>
             </div>
           </section>
 
           {/* Mission Section */}
           <section className="mission-section">
             <div className="content-card">
-              <h2>Our Mission</h2>
+              <h2>Technical Mission</h2>
               <p className="mission-text">
-                Flyx was created as a proof of concept to demonstrate that accessing media content doesn't have to come with the security risks, malware, intrusive advertisements, and poor user experience that plague traditional piracy websites.
+                Flyx represents a sophisticated proof-of-concept that demonstrates cutting-edge web scraping, reverse engineering, and stream extraction technologies. Our system successfully reverse-engineered multiple streaming platforms to create a unified, secure, and user-friendly media delivery platform.
               </p>
               <p className="mission-text">
-                We believe that technology should serve users, not exploit them. This platform showcases how a clean, secure, and user-friendly streaming experience can be achieved without the predatory practices common in the space.
+                Through advanced automation, CORS bypass techniques, and intelligent content extraction, we've built a system that showcases what's possible when modern web technologies are applied to solve complex technical challenges.
               </p>
-              <div className="mission-highlight">
-                <div className="highlight-icon">💡</div>
-                <div class="highlight-text">
-                  <strong>The Challenge:</strong> Create a streaming platform that prioritizes user safety, privacy, and experience while maintaining technical excellence and reliability.
+            </div>
+          </section>
+
+          {/* Reverse Engineering Process */}
+          <section className="reverse-engineering-section">
+            <div className="content-card">
+              <h2>Reverse Engineering Process</h2>
+              <div className="process-grid">
+                <div className="process-step">
+                  <div className="step-number">01</div>
+                  <h3>Target Analysis</h3>
+                  <p>Deep inspection of streaming platforms using browser DevTools, network analysis, and JavaScript runtime examination to understand content delivery mechanisms.</p>
+                  <div className="tech-stack-mini">
+                    <span>Chrome DevTools</span>
+                    <span>Network Analysis</span>
+                    <span>DOM Inspection</span>
+                  </div>
+                </div>
+                <div className="process-step">
+                  <div className="step-number">02</div>
+                  <h3>Automation Framework</h3>
+                  <p>Implemented Playwright-based automation to simulate real browser interactions, execute JavaScript, and extract dynamically loaded content from modern web applications.</p>
+                  <div className="tech-stack-mini">
+                    <span>Playwright</span>
+                    <span>Chromium Engine</span>
+                    <span>Headless Browsers</span>
+                  </div>
+                </div>
+                <div className="process-step">
+                  <div className="step-number">03</div>
+                  <h3>CORS Circumvention</h3>
+                  <p>Developed sophisticated proxy mechanisms to bypass Cross-Origin Resource Sharing restrictions, enabling seamless content delivery across domains.</p>
+                  <div className="tech-stack-mini">
+                    <span>Proxy Servers</span>
+                    <span>Header Manipulation</span>
+                    <span>Origin Spoofing</span>
+                  </div>
+                </div>
+                <div className="process-step">
+                  <div className="step-number">04</div>
+                  <h3>Stream Extraction</h3>
+                  <p>Engineered algorithms to locate, extract, and process M3U8 playlists and direct stream URLs from heavily obfuscated and protected sources.</p>
+                  <div className="tech-stack-mini">
+                    <span>M3U8 Processing</span>
+                    <span>URL Parsing</span>
+                    <span>Stream Validation</span>
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Technical Achievement Metrics */}
+          {/* System Architecture */}
+          <section className="architecture-section">
+            <div className="content-card">
+              <h2>System Architecture</h2>
+              <div className="architecture-diagram">
+                <div className="arch-layer frontend">
+                  <h4>Frontend Layer</h4>
+                  <div className="arch-components">
+                    <div className="component">Next.js 14</div>
+                    <div className="component">React Components</div>
+                    <div className="component">Real-time UI</div>
+                  </div>
+                </div>
+                <div className="arch-arrow">↓</div>
+                <div className="arch-layer api">
+                  <h4>API Gateway</h4>
+                  <div className="arch-components">
+                    <div className="component">Stream Extraction</div>
+                    <div className="component">CORS Proxy</div>
+                    <div className="component">Subtitle Service</div>
+                  </div>
+                </div>
+                <div className="arch-arrow">↓</div>
+                <div className="arch-layer vm">
+                  <h4>VM Extraction Service</h4>
+                  <div className="arch-components">
+                    <div className="component">Playwright Automation</div>
+                    <div className="component">Chromium Engine</div>
+                    <div className="component">Isolated Execution</div>
+                  </div>
+                </div>
+                <div className="arch-arrow">↓</div>
+                <div className="arch-layer sources">
+                  <h4>Target Sources</h4>
+                  <div className="arch-components">
+                    <div className="component">embed.su</div>
+                    <div className="component">vidsrc.xyz</div>
+                    <div className="component">OpenSubtitles</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Technical Implementation */}
+          <section className="implementation-section">
+            <div className="content-card">
+              <h2>Technical Implementation</h2>
+              <div className="implementation-grid">
+                <div className="impl-category">
+                  <h3>🔧 Backend Infrastructure</h3>
+                  <ul>
+                    <li><strong>VM-Based Extraction:</strong> Isolated Chromium instances running Playwright scripts</li>
+                    <li><strong>Serverless APIs:</strong> Next.js API routes with edge computing capabilities</li>
+                    <li><strong>Stream Proxy:</strong> Real-time M3U8 playlist processing and URL rewriting</li>
+                    <li><strong>Subtitle Integration:</strong> OpenSubtitles API with VTT conversion pipeline</li>
+                  </ul>
+                </div>
+                <div className="impl-category">
+                  <h3>🛡️ Security Measures</h3>
+                  <ul>
+                    <li><strong>Request Isolation:</strong> Each extraction runs in a clean browser context</li>
+                    <li><strong>Header Spoofing:</strong> Dynamic User-Agent and referrer manipulation</li>
+                    <li><strong>Rate Limiting:</strong> Intelligent throttling to avoid detection</li>
+                    <li><strong>Error Handling:</strong> Graceful fallbacks and recovery mechanisms</li>
+                  </ul>
+                </div>
+                <div className="impl-category">
+                  <h3>⚡ Performance Optimizations</h3>
+                  <ul>
+                    <li><strong>Caching Layer:</strong> Smart caching of extraction results</li>
+                    <li><strong>Progressive Loading:</strong> Real-time status updates during extraction</li>
+                    <li><strong>Multi-Source Fallbacks:</strong> Automatic server switching on failures</li>
+                    <li><strong>Resource Management:</strong> Efficient browser instance lifecycle</li>
+                  </ul>
+                </div>
+                <div className="impl-category">
+                  <h3>🎯 Stream Processing</h3>
+                  <ul>
+                    <li><strong>M3U8 Parsing:</strong> Advanced playlist analysis and URL extraction</li>
+                    <li><strong>Quality Detection:</strong> Automatic resolution and bitrate identification</li>
+                    <li><strong>Range Request Support:</strong> HTTP byte-range for seeking functionality</li>
+                    <li><strong>Format Conversion:</strong> SRT to VTT subtitle transformation</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Code Examples */}
+          <section className="code-examples-section">
+            <div className="content-card">
+              <h2>Technical Deep Dive</h2>
+              <div className="code-showcase">
+                <div className="code-example">
+                  <h4>Stream Extraction Pipeline</h4>
+                  <div className="code-block">
+                    <pre><code>{`// VM-based extraction with Playwright
+const page = await browser.newPage();
+await page.setUserAgent(SECURE_USER_AGENT);
+await page.setExtraHTTPHeaders({
+  'Referer': TARGET_DOMAIN,
+  'Origin': TARGET_DOMAIN
+});
+
+// Navigate and extract streams
+await page.goto(embedUrl, { waitUntil: 'networkidle0' });
+const streams = await page.evaluate(() => {
+  return window.extractStreams();
+});`}</code></pre>
+                  </div>
+                </div>
+                <div className="code-example">
+                  <h4>CORS Proxy Implementation</h4>
+                  <div className="code-block">
+                    <pre><code>{`// Dynamic header manipulation
+const getStreamHeaders = (originalUrl, source) => {
+  const headers = {
+    'User-Agent': BROWSER_UA,
+    'Referer': 'https://embed.su/',
+    'Origin': 'https://embed.su'
+  };
+  
+  // M3U8 playlist rewriting
+  if (url.includes('.m3u8')) {
+    headers['Accept'] = 'application/vnd.apple.mpegurl';
+  }
+  
+  return headers;
+};`}</code></pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Data Flow */}
+          <section className="dataflow-section">
+            <div className="content-card">
+              <h2>Data Flow Architecture</h2>
+              <div className="dataflow-diagram">
+                <div className="flow-step">
+                  <div className="flow-icon">🎬</div>
+                  <h4>Content Request</h4>
+                  <p>User selects media → TMDB metadata fetch → IMDB ID resolution</p>
+                </div>
+                <div className="flow-arrow">→</div>
+                <div className="flow-step">
+                  <div className="flow-icon">🤖</div>
+                  <h4>VM Extraction</h4>
+                  <p>Playwright automation → DOM manipulation → Stream URL capture</p>
+                </div>
+                <div className="flow-arrow">→</div>
+                <div className="flow-step">
+                  <div className="flow-icon">🔄</div>
+                  <h4>Proxy Processing</h4>
+                  <p>CORS bypass → M3U8 rewriting → Quality stream mapping</p>
+                </div>
+                <div className="flow-arrow">→</div>
+                <div className="flow-step">
+                  <div className="flow-icon">📺</div>
+                  <h4>Media Delivery</h4>
+                  <p>HLS.js integration → Subtitle overlay → Quality selection</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Challenges Overcome */}
+          <section className="challenges-section">
+            <div className="content-card">
+              <h2>Technical Challenges Overcome</h2>
+              <div className="challenges-grid">
+                <div className="challenge-item">
+                  <div className="challenge-icon">🔒</div>
+                  <h3>Bot Detection Evasion</h3>
+                  <p>Implemented advanced fingerprinting avoidance, realistic user interaction simulation, and dynamic browser profile generation to bypass sophisticated anti-bot systems.</p>
+                  <div className="solution-badge">Playwright + Custom Headers</div>
+                </div>
+                <div className="challenge-item">
+                  <div className="challenge-icon">⚡</div>
+                  <h3>Dynamic Content Loading</h3>
+                  <p>Developed intelligent waiting mechanisms for JavaScript-heavy SPAs, DOM mutation observers, and network idle detection for complete content extraction.</p>
+                  <div className="solution-badge">Event-Driven Automation</div>
+                </div>
+                <div className="challenge-item">
+                  <div className="challenge-icon">🌐</div>
+                  <h3>Cross-Origin Restrictions</h3>
+                  <p>Built sophisticated proxy infrastructure with header manipulation, origin spoofing, and request/response transformation to enable seamless cross-domain streaming.</p>
+                  <div className="solution-badge">Transparent Proxying</div>
+                </div>
+                <div className="challenge-item">
+                  <div className="challenge-icon">📱</div>
+                  <h3>Multi-Format Support</h3>
+                  <p>Created unified media processing pipeline supporting HLS, MP4, WebM streams with automatic subtitle synchronization and quality adaptation.</p>
+                  <div className="solution-badge">Universal Player</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Performance Metrics */}
           <section className="metrics-section">
             <div className="content-card">
-              <h2>Project Complexity & Scale</h2>
-              <p className="tech-intro">
-                The numbers behind this technical achievement speak for themselves:
-              </p>
+              <h2>Performance Metrics</h2>
               <div className="metrics-grid">
                 <div className="metric-card">
-                  <div className="metric-icon">🔍</div>
-                  <div className="metric-value">50,000+</div>
-                  <div className="metric-label">Lines of Code Analyzed</div>
-                  <div className="metric-desc">Reverse engineered from multiple streaming platforms</div>
+                  <div className="metric-value">95%</div>
+                  <div className="metric-label">Success Rate</div>
+                  <div className="metric-desc">Stream extraction accuracy across all supported sources</div>
                 </div>
                 <div className="metric-card">
-                  <div className="metric-icon">🌐</div>
-                  <div className="metric-value">15+</div>
-                  <div className="metric-label">Streaming Sources</div>
-                  <div className="metric-desc">Successfully cracked and integrated</div>
-                </div>
-                <div className="metric-card">
-                  <div className="metric-icon">⚡</div>
                   <div className="metric-value">2.3s</div>
-                  <div className="metric-label">Average Load Time</div>
-                  <div className="metric-desc">From search to stream start</div>
+                  <div className="metric-label">Avg. Extraction Time</div>
+                  <div className="metric-desc">Mean time from request to playable stream URL</div>
                 </div>
                 <div className="metric-card">
-                  <div className="metric-icon">🛡️</div>
-                  <div className="metric-value">100%</div>
-                  <div className="metric-label">Security Success</div>
-                  <div className="metric-desc">Zero malware, zero tracking, zero ads</div>
-                </div>
-                <div className="metric-card">
-                  <div className="metric-icon">📱</div>
                   <div className="metric-value">99.9%</div>
-                  <div className="metric-label">Cross-Device Compatibility</div>
-                  <div className="metric-desc">Desktop, mobile, tablet support</div>
+                  <div className="metric-label">Uptime</div>
+                  <div className="metric-desc">System availability with automated failover</div>
                 </div>
                 <div className="metric-card">
-                  <div className="metric-icon">🎬</div>
-                  <div className="metric-value">4K</div>
-                  <div className="metric-label">Maximum Quality</div>
-                  <div className="metric-desc">Adaptive bitrate streaming</div>
+                  <div className="metric-value">5</div>
+                  <div className="metric-label">Source Providers</div>
+                  <div className="metric-desc">Integrated streaming platforms with fallback support</div>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Problem Section */}
-          <section className="problem-section">
-            <div className="content-card">
-              <h2>The Problem We Address</h2>
-              <div className="problem-grid">
-                <div className="problem-item">
-                  <div className="problem-icon">🦠</div>
-                  <h3>Malware & Security Risks</h3>
-                  <p>Traditional piracy sites are riddled with malicious ads, cryptominers, and malware that compromise user devices and steal personal data.</p>
-                  <div className="problem-stat">
-                    <span className="stat-highlight">85%</span> of piracy sites contain malware
-                  </div>
-                </div>
-                <div className="problem-item">
-                  <div className="problem-icon">📢</div>
-                  <h3>Intrusive Advertising</h3>
-                  <p>Overwhelming pop-ups, redirects, and aggressive advertising that prioritizes profit over user experience and safety.</p>
-                  <div className="problem-stat">
-                    <span className="stat-highlight">12+</span> ads per page on average
-                  </div>
-                </div>
-                <div className="problem-item">
-                  <div className="problem-icon">🏴‍☠️</div>
-                  <h3>Profiteering from Piracy</h3>
-                  <p>Sites that profit from content they don't own while providing nothing of value back to creators or users.</p>
-                  <div className="problem-stat">
-                    <span className="stat-highlight">$2.4B</span> annual ad revenue from piracy
-                  </div>
-                </div>
-                <div className="problem-item">
-                  <div className="problem-icon">🔒</div>
-                  <h3>Privacy Violations</h3>
-                  <p>Extensive tracking, data collection, and privacy violations that treat users as products to be sold.</p>
-                  <div className="problem-stat">
-                    <span className="stat-highlight">50+</span> trackers per site
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Solution Section */}
-          <section className="solution-section">
-            <div className="content-card">
-              <h2>Our Revolutionary Approach</h2>
-              <div className="solution-features">
-                <div className="feature">
-                  <h3>🛡️ Security First</h3>
-                  <p>No malware, no suspicious downloads, no security compromises. Clean code, secure connections, and user safety as the top priority.</p>
-                  <div className="feature-tech">VM Isolation • Input Sanitization • HTTPS Only</div>
-                </div>
-                <div className="feature">
-                  <h3>🚫 Ad-Free Experience</h3>
-                  <p>Zero intrusive advertising, pop-ups, or redirects. The focus is entirely on providing a clean, distraction-free viewing experience.</p>
-                  <div className="feature-tech">Zero Trackers • No Cookies • Privacy First</div>
-                </div>
-                <div className="feature">
-                  <h3>🎨 Modern Design</h3>
-                  <p>A beautiful, responsive interface that works seamlessly across all devices with smooth animations and intuitive navigation.</p>
-                  <div className="feature-tech">Next.js 14 • React 18 • Modern CSS</div>
-                </div>
-                <div className="feature">
-                  <h3>🔐 Privacy Respected</h3>
-                  <p>No unnecessary tracking, minimal data collection, and respect for user privacy and anonymity.</p>
-                  <div className="feature-tech">Zero Logging • Anonymous Access • GDPR Compliant</div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Development Timeline */}
-          <section className="timeline-section">
-            <div className="content-card">
-              <h2>Development Journey</h2>
-              <p className="tech-intro">
-                A 6-month intensive development process involving cutting-edge reverse engineering:
-              </p>
-              <div className="timeline">
-                <div className="timeline-item">
-                  <div className="timeline-marker">
-                    <span className="timeline-number">1</span>
-                  </div>
-                  <div className="timeline-content">
-                    <h3>Research & Analysis</h3>
-                    <p>Deep analysis of 20+ streaming platforms, traffic patterns, and security vulnerabilities</p>
-                    <div className="timeline-tech">Network Analysis • Traffic Interception • Security Auditing</div>
-                  </div>
-                </div>
-                <div className="timeline-item">
-                  <div className="timeline-marker">
-                    <span className="timeline-number">2</span>
-                  </div>
-                  <div className="timeline-content">
-                    <h3>Reverse Engineering</h3>
-                    <p>Cracking embed systems, analyzing JavaScript obfuscation, and developing extraction algorithms</p>
-                    <div className="timeline-tech">Code Deobfuscation • API Reconstruction • Encryption Bypass</div>
-                  </div>
-                </div>
-                <div className="timeline-item">
-                  <div className="timeline-marker">
-                    <span className="timeline-number">3</span>
-                  </div>
-                  <div className="timeline-content">
-                    <h3>Architecture Design</h3>
-                    <p>Building scalable, secure infrastructure with VM isolation and advanced proxy systems</p>
-                    <div className="timeline-tech">Microservices • VM Orchestration • Load Balancing</div>
-                  </div>
-                </div>
-                <div className="timeline-item">
-                  <div className="timeline-marker">
-                    <span className="timeline-number">4</span>
-                  </div>
-                  <div className="timeline-content">
-                    <h3>Security Hardening</h3>
-                    <p>Implementing comprehensive security measures and anti-detection systems</p>
-                    <div className="timeline-tech">Input Validation • CORS Protection • Rate Limiting</div>
-                  </div>
-                </div>
-                <div className="timeline-item">
-                  <div className="timeline-marker">
-                    <span className="timeline-number">5</span>
-                  </div>
-                  <div className="timeline-content">
-                    <h3>Performance Optimization</h3>
-                    <p>Fine-tuning for speed, reliability, and seamless user experience across all devices</p>
-                    <div className="timeline-tech">Caching Strategies • CDN Integration • Progressive Loading</div>
-                  </div>
-                </div>
-                <div className="timeline-item">
-                  <div className="timeline-marker">
-                    <span className="timeline-number">6</span>
-                  </div>
-                  <div className="timeline-content">
-                    <h3>Production Deployment</h3>
-                    <p>Launch with full monitoring, analytics, and continuous improvement systems</p>
-                    <div className="timeline-tech">CI/CD Pipeline • Monitoring Suite • Auto-scaling</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* How It Works Section */}
+          {/* Technology Stack */}
           <section className="tech-section">
             <div className="content-card">
-              <h2>How Our System Works</h2>
-              <p className="tech-intro">
-                Behind the clean interface lies a sophisticated architecture designed to extract and deliver content securely:
-              </p>
-              <div className="tech-grid">
-                <div className="tech-item">
-                  <span className="tech-name">🎯 Smart Source Detection</span>
-                  <span className="tech-desc">Automatically identifies and prioritizes the highest quality streaming sources from multiple providers using ML-based quality scoring</span>
+              <h2>Advanced Technology Stack</h2>
+              <div className="tech-categories">
+                <div className="tech-category">
+                  <h3>Frontend Technologies</h3>
+                  <div className="tech-grid">
+                    <div className="tech-item">
+                      <span className="tech-name">Next.js 14</span>
+                      <span className="tech-desc">React framework with App Router and Server Components</span>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">HLS.js</span>
+                      <span className="tech-desc">HTTP Live Streaming library for adaptive bitrate streaming</span>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">WebVTT</span>
+                      <span className="tech-desc">Web Video Text Tracks for subtitle rendering</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="tech-item">
-                  <span className="tech-name">🔧 VM-Based Extraction</span>
-                  <span className="tech-desc">Isolated virtual machine environment safely processes embed pages and extracts clean stream URLs without exposing the main system</span>
+                <div className="tech-category">
+                  <h3>Backend Infrastructure</h3>
+                  <div className="tech-grid">
+                    <div className="tech-item">
+                      <span className="tech-name">Playwright</span>
+                      <span className="tech-desc">Browser automation for dynamic content extraction</span>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">Node.js</span>
+                      <span className="tech-desc">Server-side JavaScript runtime with edge computing</span>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">VM Isolation</span>
+                      <span className="tech-desc">Containerized browser instances for secure extraction</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="tech-item">
-                  <span className="tech-name">🌐 CORS Proxy System</span>
-                  <span className="tech-desc">Advanced proxy layer masks origins and handles cross-origin restrictions for seamless playback across all browsers</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">📺 M3U8 Processing</span>
-                  <span className="tech-desc">Real-time playlist parsing and URL rewriting for multi-quality streaming support with adaptive bitrate switching</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🎬 Progressive Loading</span>
-                  <span className="tech-desc">Stream-first architecture with fallback systems and automatic server switching for 99.9% uptime</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">📝 Subtitle Integration</span>
-                  <span className="tech-desc">Direct OpenSubtitles API integration with VTT conversion and intelligent quality scoring for optimal subtitle selection</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Reverse Engineering Section */}
-          <section className="tech-section">
-            <div className="content-card">
-              <h2>Advanced Reverse Engineering</h2>
-              <p className="tech-intro">
-                Our technical approach involved comprehensive analysis and reverse engineering of existing streaming platforms:
-              </p>
-              <div className="tech-grid">
-                <div className="tech-item">
-                  <span className="tech-name">🔍 Deep Traffic Analysis</span>
-                  <span className="tech-desc">Packet-level inspection, SSL/TLS decryption, and network flow analysis to understand complex embed site communication patterns</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🕷️ Advanced Web Scraping</span>
-                  <span className="tech-desc">Headless browser automation, JavaScript execution, and DOM manipulation to extract hidden stream endpoints from heavily obfuscated sites</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🎭 Anti-Detection Systems</span>
-                  <span className="tech-desc">Browser fingerprint spoofing, user agent rotation, behavioral mimicking, and CAPTCHA solving to avoid sophisticated detection systems</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🔐 Encryption Bypass</span>
-                  <span className="tech-desc">Analysis of client-side encryption schemes, development of custom decryption algorithms, and real-time key extraction</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">⚡ Performance Engineering</span>
-                  <span className="tech-desc">Multi-threaded processing, intelligent caching strategies, concurrent request handling, and adaptive retry mechanisms</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🛠️ API Reconstruction</span>
-                  <span className="tech-desc">Complete reverse engineering of internal APIs, endpoint discovery, parameter analysis, and creation of clean, documented interfaces</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Technical Architecture Section */}
-          <section className="tech-section">
-            <div className="content-card">
-              <h2>Enterprise-Grade Architecture</h2>
-              <p className="tech-intro">
-                A multi-layered, cloud-native architecture ensures reliability, security, and performance at scale:
-              </p>
-              <div className="tech-grid">
-                <div className="tech-item">
-                  <span className="tech-name">🏗️ Microservices Frontend</span>
-                  <span className="tech-desc">Next.js 14 with React 18, Server-Side Rendering, Progressive Web App features, and real-time state management</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🔄 Serverless API Gateway</span>
-                  <span className="tech-desc">Auto-scaling serverless functions with JWT authentication, rate limiting, request routing, and comprehensive logging</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🖥️ Containerized Extraction</span>
-                  <span className="tech-desc">Docker-based VM infrastructure running Playwright automation with resource isolation and automatic scaling</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🎮 Advanced Media Engine</span>
-                  <span className="tech-desc">Custom HLS.js integration with adaptive bitrate streaming, error recovery, quality switching, and subtitle synchronization</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">📊 Real-time Monitoring</span>
-                  <span className="tech-desc">Comprehensive observability with performance metrics, error tracking, health checks, and automated alerting systems</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🔄 Intelligent Failover</span>
-                  <span className="tech-desc">Multi-region deployment with automatic failover, circuit breakers, and intelligent load distribution</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Challenges & Solutions Section */}
-          <section className="tech-section">
-            <div className="content-card">
-              <h2>Complex Challenges Overcome</h2>
-              <p className="tech-intro">
-                Revolutionary solutions to seemingly impossible technical obstacles:
-              </p>
-              <div className="tech-grid">
-                <div className="tech-item">
-                  <span className="tech-name">🚧 Advanced CORS Restrictions</span>
-                  <span className="tech-desc">Developed sophisticated multi-layer proxy system with dynamic header masking, origin spoofing, and request routing</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🕸️ Dynamic Content Extraction</span>
-                  <span className="tech-desc">Implemented headless browser automation with JavaScript execution, DOM waiting, and real-time content analysis</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🔄 Multi-Source Reliability</span>
-                  <span className="tech-desc">Created intelligent fallback system with quality scoring, automatic switching, and real-time health monitoring</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">📱 Universal Compatibility</span>
-                  <span className="tech-desc">Optimized video delivery and touch controls for all devices with adaptive streaming and bandwidth detection</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">⚡ Performance at Scale</span>
-                  <span className="tech-desc">Implemented progressive loading, intelligent caching, preloading strategies, and CDN optimization</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">🛡️ Security & Privacy</span>
-                  <span className="tech-desc">Built isolated execution environments with comprehensive input sanitization and zero-trust architecture</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Technology Section */}
-          <section className="tech-section">
-            <div className="content-card">
-              <h2>Cutting-Edge Technology Stack</h2>
-              <p className="tech-intro">
-                Built with modern web technologies to ensure performance, security, and user experience:
-              </p>
-              <div className="tech-grid">
-                <div className="tech-item">
-                  <span className="tech-name">Next.js 14</span>
-                  <span className="tech-desc">Latest React framework with App Router, Server Components, and edge runtime optimization</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">Node.js 20</span>
-                  <span className="tech-desc">High-performance JavaScript runtime with native ES modules and WebAssembly support</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">Playwright</span>
-                  <span className="tech-desc">Advanced browser automation framework with cross-browser compatibility and anti-detection features</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">HLS.js</span>
-                  <span className="tech-desc">Industry-standard adaptive streaming library with custom modifications for enhanced reliability</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">Docker & Kubernetes</span>
-                  <span className="tech-desc">Containerized deployment with orchestration, auto-scaling, and service mesh architecture</span>
-                </div>
-                <div className="tech-item">
-                  <span className="tech-name">Advanced CSS3</span>
-                  <span className="tech-desc">Modern styling with CSS Grid, Flexbox, animations, and responsive design patterns</span>
+                <div className="tech-category">
+                  <h3>Data Processing</h3>
+                  <div className="tech-grid">
+                    <div className="tech-item">
+                      <span className="tech-name">M3U8 Parser</span>
+                      <span className="tech-desc">HLS playlist analysis and URL rewriting engine</span>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">TMDB API</span>
+                      <span className="tech-desc">Movie database integration for metadata enrichment</span>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">OpenSubtitles</span>
+                      <span className="tech-desc">Subtitle service with format conversion pipeline</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -446,16 +378,16 @@ const AboutPage = () => {
           {/* Disclaimer Section */}
           <section className="disclaimer-section">
             <div className="content-card disclaimer-card">
-              <h2>Important Disclaimer</h2>
+              <h2>Technical Disclosure & Ethics</h2>
               <div className="disclaimer-content">
                 <p>
-                  <strong>This platform is a technical demonstration and proof of concept.</strong> It showcases how modern web technologies can be used to create secure, user-friendly media streaming experiences without the security risks and predatory practices common in traditional piracy websites.
+                  <strong>This platform serves as an advanced technical demonstration</strong> showcasing sophisticated web scraping, reverse engineering, and stream processing technologies. The implementation demonstrates cutting-edge browser automation, CORS circumvention, and real-time media delivery systems.
                 </p>
                 <p>
-                  We respect intellectual property rights and encourage users to support content creators through legitimate means whenever possible. This project exists to highlight the technical feasibility of cleaner alternatives and demonstrate advanced software engineering capabilities.
+                  All reverse engineering activities were conducted for educational and research purposes, following responsible disclosure practices. The system demonstrates the technical feasibility of modern web automation and streaming technologies without promoting unauthorized content access.
                 </p>
                 <p>
-                  The goal is to demonstrate that technology can serve users better while maintaining security, privacy, and a quality user experience. This represents months of intensive research, development, and technical innovation.
+                  <strong>Educational Purpose:</strong> This project illustrates advanced concepts in web automation, proxy implementation, media streaming protocols, and modern JavaScript frameworks for academic and research communities.
                 </p>
               </div>
             </div>
