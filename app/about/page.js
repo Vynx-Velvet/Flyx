@@ -202,7 +202,7 @@ const AboutPage = () => {
             <div className="content-card">
               <h2>The Technical Deep Dive: How We Actually Built This Monster 🔧</h2>
               <p className="mission-text">
-                Here's the real technical stuff, but explained like we're telling a story at a bar after too many drinks.
+                Here's the real technical stuff, but explained like we're telling a story at a bar after too many Pacific Punch Monster Energy drinks.
               </p>
               
               <div className="implementation-grid">
@@ -248,6 +248,271 @@ const AboutPage = () => {
                     <li><strong>Adaptive Streaming:</strong> The player automatically adjusts quality based on your internet speed, which is more consideration than most streaming services give you.</li>
                     <li><strong>Seeking Support:</strong> Our seeking actually works, unlike that one streaming site where clicking the timeline is basically playing Russian roulette with your sanity.</li>
                   </ul>
+                </div>
+              </div>
+
+              {/* NEW: Actual Code Examples Section */}
+              <div className="code-examples-section">
+                <h3>📝 The Code That Actually Works (Sometimes)</h3>
+                <p className="mission-text">
+                  Here's some actual code from our implementation, with commentary on why we did what we did (and why we regret some of it).
+                </p>
+
+                <div className="code-example">
+                  <h4>🤖 VM Stream Extraction - The Bot That Learned to Act Human</h4>
+                  <pre className="code-block">
+{`// This is how we make our bot act more human than actual humans
+const hlsConfig = {
+  // COMPLETELY DISABLE ALL NATIVE SUBTITLE RENDERING
+  renderTextTracksNatively: false,
+  subtitleTrackController: false,
+  subtitleDisplay: false,
+  
+  // Aggressive high quality settings
+  maxBufferLength: 60,
+  maxMaxBufferLength: 120,
+  maxBufferSize: 60 * 1000 * 1000, // 60MB buffer
+  
+  // Enhanced error recovery - because streams love to break
+  fragLoadingRetryDelay: 500,
+  fragLoadingMaxRetry: 1,
+  fragLoadingMaxRetryTimeout: 5000,
+  
+  // Quality maintenance settings
+  abrBandWidthFactor: 0.8,
+  abrBandWidthUpFactor: 0.7,
+  
+  enableWorker: false, // Disable worker to avoid edge cases
+  lowLatencyMode: false, // Stability over speed
+};`}
+                  </pre>
+                  <p className="code-explanation">
+                    This HLS.js configuration took weeks to perfect. We disabled native subtitle rendering because browsers have opinions about text that don't match ours. The aggressive buffering keeps quality high, and the conservative bandwidth factors prevent the player from getting too ambitious and choking on bad connections.
+                  </p>
+                </div>
+
+                <div className="code-example">
+                  <h4>🛡️ CORS Proxy - The Diplomatic Solution</h4>
+                  <pre className="code-block">
+{`// Smart headers that make servers trust us
+function getStreamHeaders(originalUrl, userAgent, source) {
+  const isVidsrc = source === 'vidsrc';
+  const isSubtitle = originalUrl.includes('.vtt') || originalUrl.includes('.srt');
+  
+  if (isVidsrc || isSubtitle) {
+    // Minimal headers for sensitive sources
+    return {
+      'User-Agent': userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': isSubtitle ? 'text/vtt, text/plain, */*' : '*/*',
+      'Accept-Language': 'en-US,en;q=0.9'
+    };
+  }
+  
+  // Full diplomatic headers for embed.su
+  return {
+    'Referer': 'https://embed.su/',
+    'Origin': 'https://embed.su',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'cross-site',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache'
+  };
+}`}
+                  </pre>
+                  <p className="code-explanation">
+                    Different streaming sources have different trust issues. vidsrc.xyz gets suspicious with too many headers, while embed.su wants the full diplomatic treatment. Our proxy speaks both languages fluently and knows which personality to use for each source.
+                  </p>
+                </div>
+
+                <div className="code-example">
+                  <h4>🎯 Browser Automation - Teaching Robots to Be Human</h4>
+                  <pre className="code-block">
+{`// This is how we make browsers act naturally suspicious
+const browserOptions = {
+  headless: 'new',
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote',
+    '--disable-gpu',
+    '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+    '--disable-ipc-flooding-protection',
+    '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-client-side-phishing-detection',
+    '--disable-sync',
+    '--disable-extensions',
+    '--disable-component-extensions-with-background-pages',
+    '--disable-default-apps',
+    '--mute-audio',
+    '--no-default-browser-check',
+    '--autoplay-policy=user-gesture-required',
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+    '--disable-blink-features=AutomationControlled',
+    '--disable-web-security',
+    '--disable-features=VizDisplayCompositor'
+  ]
+};
+
+// Human-like behavior simulation
+await page.evaluate(() => {
+  // Override webdriver detection
+  Object.defineProperty(navigator, 'webdriver', {
+    get: () => undefined,
+  });
+  
+  // Randomize screen properties
+  Object.defineProperty(screen, 'width', {
+    get: () => 1920 + Math.floor(Math.random() * 100),
+  });
+});`}
+                  </pre>
+                  <p className="code-explanation">
+                    This is our "make the bot look human" spell. We disable automation flags, randomize screen properties, and add natural delays. The browser thinks it's being driven by a slightly confused human with inconsistent mouse movements - which is perfect.
+                  </p>
+                </div>
+
+                <div className="code-example">
+                  <h4>📺 Subtitle Processing - The Universal Translator</h4>
+                  <pre className="code-block">
+{`// Converting SRT to VTT because the world needs more standards
+function srtToVtt(srtContent) {
+  // Add VTT header
+  let vttContent = 'WEBVTT\\n\\n';
+  
+  // Split into subtitle blocks
+  const blocks = srtContent.split(/\\n\\s*\\n/);
+  
+  blocks.forEach(block => {
+    const lines = block.trim().split('\\n');
+    if (lines.length >= 3) {
+      // Skip the sequence number
+      const timestamp = lines[1];
+      const text = lines.slice(2).join('\\n');
+      
+      // Convert SRT timestamp to VTT format
+      const vttTimestamp = timestamp.replace(/,/g, '.');
+      
+      vttContent += \`\${vttTimestamp}\\n\${text}\\n\\n\`;
+    }
+  });
+  
+  return vttContent;
+}
+
+// Quality scoring because not all subtitles are created equal
+function calculateQualityScore(subtitle) {
+  let score = 0;
+  
+  // Language bonus
+  if (subtitle.language === 'en') score += 100;
+  
+  // Download count bonus (popularity)
+  score += Math.min(subtitle.downloadCount || 0, 50);
+  
+  // Movie hash match bonus (perfect sync)
+  if (subtitle.movieHash) score += 200;
+  
+  // Hearing impaired penalty (usually has [music] tags)
+  if (subtitle.hearingImpaired) score -= 25;
+  
+  // File size bonus (more content usually = better)
+  if (subtitle.fileSize > 50000) score += 25;
+  
+  return score;
+}`}
+                  </pre>
+                  <p className="code-explanation">
+                    Our subtitle system is like a picky librarian - it knows exactly what makes a good subtitle file. We score based on language, popularity, synchronization, and file size. The result is subtitles that actually match what people are saying, when they're saying it.
+                  </p>
+                </div>
+
+                <div className="code-example">
+                  <h4>⚡ Real-Time Progress Updates - The Play-by-Play Commentary</h4>
+                  <pre className="code-block">
+{`// Live updates during stream extraction
+const updateProgress = (phase, progress, details) => {
+  const update = {
+    phase: phase,
+    progress: progress,
+    details: details,
+    timestamp: Date.now()
+  };
+  
+  // Send to frontend via WebSocket or polling
+  broadcastUpdate(update);
+  
+  logger.info('Extraction progress update', {
+    phase,
+    progress: \`\${progress}%\`,
+    details,
+    duration: Date.now() - extractionStart
+  });
+};
+
+// Phase progression during extraction
+updateProgress('Initializing', 0, 'Starting browser instance...');
+updateProgress('Navigating', 20, 'Loading embed page...');
+updateProgress('Analyzing', 40, 'Detecting video sources...');
+updateProgress('Extracting', 60, 'Decoding stream URLs...');
+updateProgress('Validating', 80, 'Testing stream quality...');
+updateProgress('Complete', 100, 'Stream ready for playback!');`}
+                  </pre>
+                  <p className="code-explanation">
+                    We give users live updates during extraction because waiting in silence is psychological torture. The frontend gets play-by-play commentary like a sports game: "And here we see the browser navigating to the embed page... OH! A wild CAPTCHA appears!"
+                  </p>
+                </div>
+
+                <div className="code-example">
+                  <h4>🎮 Advanced Error Recovery - The Phoenix System</h4>
+                  <pre className="code-block">
+{`// This is how we handle the inevitable chaos
+const handleStreamError = (error, context) => {
+  const errorMap = {
+    'CORS': () => switchToProxyMode(),
+    'NETWORK_ERROR': () => retryWithBackoff(),
+    'MEDIA_ERR_DECODE': () => switchQuality('lower'),
+    'BUFFER_STALL': () => clearBufferAndResume(),
+    'MANIFEST_LOAD_ERROR': () => findAlternativeSource(),
+    'FRAG_LOAD_ERROR': () => skipToNextSegment(),
+    'LEVEL_SWITCH_ERROR': () => lockToCurrentQuality()
+  };
+  
+  const recovery = errorMap[error.code] || (() => panicAndRestart());
+  
+  logger.error('Stream error detected', {
+    error: error.code,
+    context,
+    recoveryStrategy: recovery.name,
+    timestamp: Date.now()
+  });
+  
+  return recovery();
+};
+
+// Exponential backoff with jitter
+const retryWithBackoff = async (attempt = 1) => {
+  const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+  const jitter = Math.random() * 0.1 * delay;
+  
+  await new Promise(resolve => setTimeout(resolve, delay + jitter));
+  
+  if (attempt < 3) {
+    return retryWithBackoff(attempt + 1);
+  } else {
+    throw new Error('Maximum retries exceeded');
+  }
+};`}
+                  </pre>
+                  <p className="code-explanation">
+                    Our error handling is like a Swiss Army knife for digital disasters. Every error gets a custom recovery strategy, from switching quality levels to finding alternative sources. We've learned that in the streaming world, everything breaks eventually - the key is breaking gracefully.
+                  </p>
                 </div>
               </div>
             </div>
@@ -311,9 +576,9 @@ const AboutPage = () => {
               
               <div className="metrics-grid">
                 <div className="metric-card">
-                  <div className="metric-value">847</div>
-                  <div className="metric-label">Coffee Cups</div>
-                  <div className="metric-desc">Consumed during development. Our local coffee shop named a drink after us. It's called "The Desperate Developer."</div>
+                  <div className="metric-value">1,643</div>
+                  <div className="metric-label">Pacific Punch Monster Energy Cans</div>
+                  <div className="metric-desc">Consumed during development. That's about 6 cans per day of active development. Our local gas station now stocks extra just for us.</div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-value">2.3s</div>
@@ -446,8 +711,16 @@ const AboutPage = () => {
                 Everything that can go wrong will go wrong, and some things that shouldn't be able to go wrong will find creative new ways to break. Embrace the absurdity.
               </p>
               <p className="mission-text">
-                <strong>Lesson 5: Coffee is a Necessary Dependency</strong><br/>
-                Make sure to add caffeine to your package.json. It's not listed as a dev dependency, but it definitely should be. Our entire system runs on coffee and determination.
+                <strong>Lesson 5: Pacific Punch Monster Energy is a Necessary Dependency</strong><br/>
+                Make sure to add caffeine to your package.json. It's not listed as a dev dependency, but it definitely should be. Our entire system runs on Pacific Punch Monster Energy and determination. We went through approximately 6 cans per day during active development - that's 1,643 cans total. The gas station clerk now knows us by name.
+              </p>
+              <p className="mission-text">
+                <strong>Lesson 6: Error Messages Are Suggestions</strong><br/>
+                That "Network Error" could mean literally anything from DNS issues to cosmic radiation. Build your error handling like you're preparing for an alien invasion - expect the unexpected and have backup plans for your backup plans.
+              </p>
+              <p className="mission-text">
+                <strong>Lesson 7: The Browser is Your Frenemy</strong><br/>
+                Browsers will work perfectly for 99.9% of users, then completely break for that one person using Internet Explorer on Windows Vista. Yes, that person still exists, and they will find your website.
               </p>
             </div>
           </section>

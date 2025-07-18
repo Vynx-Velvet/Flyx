@@ -415,55 +415,142 @@
    CODE EXAMPLES SECTION
    ======================================== */
 .code-examples-section {
-  animation-delay: 0.5s;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.code-showcase {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 2rem;
-  margin-top: 2rem;
+.code-examples-section h3 {
+  font-size: clamp(1.5rem, 2.5vw, 1.8rem);
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #00f5ff 0%, #8b5cf6 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .code-example {
-  background: rgba(10, 10, 15, 0.8);
-  border: 1px solid rgba(0, 245, 255, 0.2);
+  background: rgba(10, 10, 20, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
+  margin-bottom: 2rem;
   overflow: hidden;
   transition: all 0.3s ease;
+  position: relative;
+}
+
+.code-example::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
 }
 
 .code-example:hover {
-  border-color: rgba(0, 245, 255, 0.4);
-  box-shadow: 0 10px 25px rgba(0, 245, 255, 0.1);
+  border-color: rgba(139, 92, 246, 0.3);
+  box-shadow: 0 10px 30px rgba(139, 92, 246, 0.1);
 }
 
 .code-example h4 {
-  background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(139, 92, 246, 0.1));
-  color: #00f5ff;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(0, 245, 255, 0.2) 100%);
   padding: 1rem 1.5rem;
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-  border-bottom: 1px solid rgba(0, 245, 255, 0.2);
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .code-block {
-  padding: 1.5rem;
   background: rgba(5, 5, 10, 0.9);
-}
-
-.code-block pre {
-  margin: 0;
-  overflow-x: auto;
-}
-
-.code-block code {
-  color: rgba(255, 255, 255, 0.9);
-  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 1.5rem;
+  font-family: 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 0.9rem;
   line-height: 1.6;
+  color: #e2e8f0;
+  overflow-x: auto;
+  position: relative;
+  background-image: 
+    linear-gradient(45deg, rgba(139, 92, 246, 0.05) 0%, rgba(0, 245, 255, 0.05) 100%);
 }
+
+.code-block::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.3), transparent);
+}
+
+.code-block::-webkit-scrollbar {
+  height: 8px;
+}
+
+.code-block::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.code-block::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.5);
+  border-radius: 4px;
+}
+
+.code-block::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.7);
+}
+
+/* Syntax highlighting colors */
+.code-block {
+  /* Comments */
+  --comment-color: #64748b;
+  /* Keywords */
+  --keyword-color: #8b5cf6;
+  /* Strings */
+  --string-color: #00f5ff;
+  /* Numbers */
+  --number-color: #f59e0b;
+  /* Functions */
+  --function-color: #10b981;
+  /* Variables */
+  --variable-color: #e2e8f0;
+}
+
+.code-explanation {
+  padding: 1rem 1.5rem 1.5rem 1.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.code-explanation strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Code block animations */
+.code-example {
+  animation: fadeInUp 0.8s ease-out both;
+}
+
+.code-example:nth-child(1) { animation-delay: 0.1s; }
+.code-example:nth-child(2) { animation-delay: 0.2s; }
+.code-example:nth-child(3) { animation-delay: 0.3s; }
+.code-example:nth-child(4) { animation-delay: 0.4s; }
+.code-example:nth-child(5) { animation-delay: 0.5s; }
+.code-example:nth-child(6) { animation-delay: 0.6s; }
 
 /* ========================================
    DATA FLOW SECTION
