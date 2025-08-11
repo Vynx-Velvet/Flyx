@@ -78,6 +78,14 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
   };
 
   const handleSeasonChange = (seasonIndex) => {
+    const season = seasons[seasonIndex];
+    console.log('📺 Season changed:', {
+      seasonIndex,
+      seasonNumber: season?.season_number,
+      seasonName: season?.name,
+      episodeCount: season?.episodes?.length
+    });
+    
     setEpisodeLoading(true);
     setSelectedSeason(seasonIndex);
     setSelectedEpisode(null); // Reset the selected episode when the season changes
@@ -109,10 +117,28 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
   };
 
   const handleEpisodeChange = (seasonId, episodeNumber) => {
-    const newSeasonIndex = seasonId - 1; // Convert 1-indexed season to 0-indexed
+    // Find the correct season index by matching season_number (not assuming 1-indexed)
+    const newSeasonIndex = movieDetails.seasons.findIndex(
+      (season) => season.season_number === seasonId
+    );
+    
+    if (newSeasonIndex === -1) {
+      console.error('Season not found:', seasonId);
+      return;
+    }
+    
     const newEpisode = movieDetails.seasons[newSeasonIndex].episodes.find(
       (ep) => ep.episode_number === episodeNumber
     );
+    
+    console.log('🔄 Episode change:', {
+      seasonId,
+      episodeNumber,
+      newSeasonIndex,
+      actualSeasonNumber: movieDetails.seasons[newSeasonIndex].season_number,
+      episodeName: newEpisode?.name
+    });
+    
     setSelectedSeason(newSeasonIndex);
     setSelectedEpisode(newEpisode);
   };
@@ -162,11 +188,21 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
       );
     } else if (movieId.media_type === "tv") {
       // For TV shows, we know selectedEpisode is not null here
+      // Get the actual season number from the season data (handles Specials = Season 0)
+      const actualSeasonNumber = seasons[selectedSeason]?.season_number || selectedSeason + 1;
+      
+      console.log('🎬 Launching media player:', {
+        seasonIndex: selectedSeason,
+        actualSeasonNumber,
+        episodeNumber: selectedEpisode.episode_number,
+        episodeName: selectedEpisode.name
+      });
+      
       return (
         <UniversalMediaPlayer
           mediaType={movieId.media_type}
           movieId={movieId.id}
-          seasonId={selectedSeason + 1} // Season numbers are 1-indexed
+          seasonId={actualSeasonNumber} // Use actual season number (0 for Specials, 1+ for regular seasons)
           episodeId={selectedEpisode.episode_number}
           onBackToShowDetails={handleBackFromMediaPlayer}
         />
@@ -212,7 +248,7 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
                     className={`season-button ${selectedSeason === index ? "active" : ""}`}
                     onClick={() => handleSeasonChange(index)}
                   >
-                    {season.name || `Season ${index + 1}`}
+                    {season.name || (season.season_number === 0 ? 'Specials' : `Season ${season.season_number}`)}
                   </button>
                 ) : null
               )}
