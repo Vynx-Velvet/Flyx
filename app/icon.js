@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og'
 
-export const runtime = 'edge'
+// Remove edge runtime to avoid WASM module issues
+// export const runtime = 'edge'
 
 export const size = {
   width: 32,
