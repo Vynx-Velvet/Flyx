@@ -133,74 +133,150 @@ function validateRequest(request, logger) {
   return { isValid: true };
 }
 
-// Enhanced retry logic with exponential backoff
-async function fetchWithRetry(url, options, logger, retryCount = 0) {
+// Enhanced retry logic with header fallback strategies
+async function fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex = 0, retryCount = 0) {
+  const strategies = getHeaderStrategies(url, userAgent, logger, source);
+  const maxStrategies = strategies.length;
+  
+  // If we've exhausted all strategies, throw the last error
+  if (strategyIndex >= maxStrategies) {
+    throw new Error(`All ${maxStrategies} header strategies failed for URL: ${url.substring(0, 100)}`);
+  }
+  
+  const currentStrategy = strategies[strategyIndex];
+  const options = {
+    ...baseOptions,
+    headers: {
+      ...currentStrategy.headers,
+      // Preserve range header if present
+      ...(baseOptions.headers?.Range && { 'Range': baseOptions.headers.Range })
+    }
+  };
+  
   try {
-    logger.debug('Fetch attempt', { 
+    logger.debug('Fetch attempt with header strategy', { 
       url: url.substring(0, 100), 
-      attempt: retryCount + 1,
+      strategyName: currentStrategy.name,
+      strategyIndex: strategyIndex + 1,
+      totalStrategies: maxStrategies,
+      retryCount: retryCount + 1,
       maxRetries: RETRY_CONFIG.maxRetries 
     });
     
     const response = await fetch(url, options);
     
-    // Consider 5xx errors and specific 4xx errors as retryable
-    if (!response.ok && retryCount < RETRY_CONFIG.maxRetries) {
-      const isRetryable = response.status >= 500 || 
-                         response.status === 408 || // Request Timeout
-                         response.status === 429 || // Too Many Requests
-                         response.status === 502 || // Bad Gateway
-                         response.status === 503 || // Service Unavailable
-                         response.status === 504;   // Gateway Timeout
-      
-      if (isRetryable) {
-        const delay = Math.min(
-          RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffFactor, retryCount),
-          RETRY_CONFIG.maxDelay
-        );
-        
-        logger.warn('Retryable error, waiting before retry', {
-          status: response.status,
-          statusText: response.statusText,
-          retryCount: retryCount + 1,
-          delay,
-          nextAttempt: retryCount + 2
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return fetchWithRetry(url, options, logger, retryCount + 1);
-      }
+    // If response is successful, return it
+    if (response.ok) {
+      logger.info('Fetch successful with header strategy', {
+        strategyName: currentStrategy.name,
+        strategyIndex: strategyIndex + 1,
+        status: response.status,
+        contentType: response.headers.get('content-type')
+      });
+      return response;
     }
     
-    return response;
+    // Handle different types of failures
+    const isHeaderRelated = response.status === 403 || // Forbidden
+                           response.status === 401 || // Unauthorized  
+                           response.status === 405 || // Method Not Allowed
+                           response.status === 406;   // Not Acceptable
+    
+    const isRetryableError = response.status >= 500 || 
+                            response.status === 408 || // Request Timeout
+                            response.status === 429 || // Too Many Requests
+                            response.status === 502 || // Bad Gateway
+                            response.status === 503 || // Service Unavailable
+                            response.status === 504;   // Gateway Timeout
+    
+    if (isHeaderRelated) {
+      // Try next header strategy immediately
+      logger.warn('Header-related error, trying next strategy', {
+        status: response.status,
+        statusText: response.statusText,
+        currentStrategy: currentStrategy.name,
+        nextStrategy: strategies[strategyIndex + 1]?.name || 'none'
+      });
+      
+      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex + 1, 0);
+      
+    } else if (isRetryableError && retryCount < RETRY_CONFIG.maxRetries) {
+      // Retry with same headers after delay
+      const delay = Math.min(
+        RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffFactor, retryCount),
+        RETRY_CONFIG.maxDelay
+      );
+      
+      logger.warn('Retryable error, waiting before retry', {
+        status: response.status,
+        statusText: response.statusText,
+        strategyName: currentStrategy.name,
+        retryCount: retryCount + 1,
+        delay,
+        nextAttempt: retryCount + 2
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex, retryCount + 1);
+      
+    } else {
+      // Try next header strategy for other errors
+      logger.warn('Non-retryable error, trying next header strategy', {
+        status: response.status,
+        statusText: response.statusText,
+        currentStrategy: currentStrategy.name,
+        nextStrategy: strategies[strategyIndex + 1]?.name || 'none'
+      });
+      
+      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex + 1, 0);
+    }
+    
   } catch (error) {
-    if (retryCount < RETRY_CONFIG.maxRetries) {
-      const isRetryable = error.name === 'TypeError' || // Network error
-                         error.name === 'AbortError' || // Timeout
-                         error.code === 'ECONNRESET' ||
-                         error.code === 'ENOTFOUND' ||
-                         error.code === 'ECONNREFUSED';
-      
-      if (isRetryable) {
-        const delay = Math.min(
-          RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffFactor, retryCount),
-          RETRY_CONFIG.maxDelay
-        );
-        
-        logger.warn('Network error, retrying', {
-          error: error.message,
-          retryCount: retryCount + 1,
-          delay,
-          nextAttempt: retryCount + 2
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return fetchWithRetry(url, options, logger, retryCount + 1);
-      }
-    }
+    const isNetworkError = error.name === 'TypeError' || // Network error
+                          error.name === 'AbortError' || // Timeout
+                          error.code === 'ECONNRESET' ||
+                          error.code === 'ENOTFOUND' ||
+                          error.code === 'ECONNREFUSED';
     
-    throw error;
+    if (isNetworkError && retryCount < RETRY_CONFIG.maxRetries) {
+      // Retry with same headers after delay
+      const delay = Math.min(
+        RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffFactor, retryCount),
+        RETRY_CONFIG.maxDelay
+      );
+      
+      logger.warn('Network error, retrying with same strategy', {
+        error: error.message,
+        strategyName: currentStrategy.name,
+        retryCount: retryCount + 1,
+        delay,
+        nextAttempt: retryCount + 2
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex, retryCount + 1);
+      
+    } else {
+      // Try next header strategy
+      logger.warn('Network error, trying next header strategy', {
+        error: error.message,
+        currentStrategy: currentStrategy.name,
+        nextStrategy: strategies[strategyIndex + 1]?.name || 'none'
+      });
+      
+      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex + 1, 0);
+    }
   }
+}
+
+// Legacy function for backward compatibility
+async function fetchWithRetry(url, options, logger, retryCount = 0) {
+  // Extract source and userAgent from options if available
+  const userAgent = options.headers?.['User-Agent'];
+  const source = 'unknown'; // Default source
+  
+  // Use the new header fallback system
+  return fetchWithHeaderFallback(url, options, logger, userAgent, source, 0, retryCount);
 }
 
 // Get client IP address
@@ -239,118 +315,188 @@ function validateStreamUrl(url, logger) {
   }
 }
 
-// Enhanced source-specific header management
-function getStreamHeaders(originalUrl, userAgent, logger, source) {
-  // Check if this is a subtitle file
+// Header fallback strategies for different sources
+function getHeaderStrategies(originalUrl, userAgent, logger, source) {
   const isSubtitle = originalUrl.includes('.vtt') || originalUrl.includes('.srt');
-  
-  // Enhanced source detection
   const isVidsrc = source === 'vidsrc';
   const isShadowlands = originalUrl.includes('shadowlandschronicles');
   const isCloudnestra = originalUrl.includes('cloudnestra.com');
   const isEmbed = source === 'embed.su' || originalUrl.includes('embed.su');
   const isStarpulse = originalUrl.includes('starpulsecreative.xyz');
   
-  // shadowlandschronicles.com specific configuration (Requirement 1.6)
-  if (isShadowlands) {
-    const headers = {
-      'User-Agent': userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': '*/*',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Referer': 'https://cloudnestra.com/',
-      'Origin': 'https://cloudnestra.com',
-      'Sec-Fetch-Dest': 'empty',
-      'Sec-Fetch-Mode': 'cors',
-      'Sec-Fetch-Site': 'cross-site',
-      'Connection': 'keep-alive',
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache'
-    };
-    
-    logger.debug('Using shadowlandschronicles headers', {
-      url: originalUrl.substring(0, 100),
-      referer: headers.Referer,
-      origin: headers.Origin
+  const baseUserAgent = userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+  
+  // Define different header strategies to try in order
+  const strategies = [];
+  
+  if (isVidsrc || isCloudnestra || isStarpulse) {
+    // Strategy 1: Minimal headers (most likely to work for vidsrc.xyz)
+    strategies.push({
+      name: 'minimal',
+      headers: {
+        'User-Agent': baseUserAgent,
+        'Accept': isSubtitle ? 'text/vtt, text/plain, */*' : '*/*'
+      }
     });
     
-    return headers;
+    // Strategy 2: Basic headers with connection keep-alive
+    strategies.push({
+      name: 'basic',
+      headers: {
+        'User-Agent': baseUserAgent,
+        'Accept': isSubtitle ? 'text/vtt, text/plain, */*' : '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive'
+      }
+    });
+    
+    // Strategy 3: No headers at all (sometimes works when servers are picky)
+    strategies.push({
+      name: 'none',
+      headers: {}
+    });
+    
+    // Strategy 4: Only User-Agent (fallback)
+    strategies.push({
+      name: 'user-agent-only',
+      headers: {
+        'User-Agent': baseUserAgent
+      }
+    });
+    
+  } else if (isShadowlands) {
+    // Strategy 1: Full shadowlandschronicles headers
+    strategies.push({
+      name: 'shadowlands-full',
+      headers: {
+        'User-Agent': baseUserAgent,
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Referer': 'https://cloudnestra.com/',
+        'Origin': 'https://cloudnestra.com',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'cross-site',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    
+    // Strategy 2: Minimal shadowlands headers
+    strategies.push({
+      name: 'shadowlands-minimal',
+      headers: {
+        'User-Agent': baseUserAgent,
+        'Accept': '*/*',
+        'Referer': 'https://cloudnestra.com/',
+        'Origin': 'https://cloudnestra.com'
+      }
+    });
+    
+    // Strategy 3: No referer/origin (sometimes works)
+    strategies.push({
+      name: 'shadowlands-no-referer',
+      headers: {
+        'User-Agent': baseUserAgent,
+        'Accept': '*/*'
+      }
+    });
+    
+  } else {
+    // Default strategies for embed.su and others
+    // Strategy 1: Full embed headers
+    strategies.push({
+      name: 'embed-full',
+      headers: {
+        'User-Agent': baseUserAgent,
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Referer': 'https://embed.su/',
+        'Origin': 'https://embed.su',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'cross-site',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    
+    // Strategy 2: Basic headers
+    strategies.push({
+      name: 'basic',
+      headers: {
+        'User-Agent': baseUserAgent,
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive'
+      }
+    });
+    
+    // Strategy 3: Minimal headers
+    strategies.push({
+      name: 'minimal',
+      headers: {
+        'User-Agent': baseUserAgent,
+        'Accept': '*/*'
+      }
+    });
   }
   
-  // Clean headers for vidsrc.xyz, cloudnestra, subtitle files, or starpulsecreative.xyz
-  if (isVidsrc || isCloudnestra || isSubtitle || isStarpulse) {
-    const headers = {
-      'User-Agent': userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': isSubtitle ? 'text/vtt, text/plain, */*' : '*/*',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Connection': 'keep-alive'
-    };
-    
-    // Add cloudnestra-specific headers if needed (but not for starpulsecreative.xyz)
-    if (isCloudnestra && !isStarpulse) {
-      headers['Referer'] = 'https://cloudnestra.com/';
-      headers['Origin'] = 'https://cloudnestra.com';
+  // Add content-type specific Accept headers
+  strategies.forEach(strategy => {
+    if (strategy.headers.Accept && strategy.headers.Accept === '*/*') {
+      if (originalUrl.includes('.m3u8')) {
+        strategy.headers.Accept = 'application/vnd.apple.mpegurl, application/x-mpegURL, */*';
+      } else if (originalUrl.includes('.ts')) {
+        strategy.headers.Accept = 'video/MP2T, */*';
+      } else if (originalUrl.includes('.mp4')) {
+        strategy.headers.Accept = 'video/mp4, */*';
+      } else if (originalUrl.includes('.vtt') || originalUrl.includes('.srt')) {
+        strategy.headers.Accept = 'text/vtt, text/plain, */*';
+      }
     }
-    
-    logger.debug('Using clean headers', {
-      reason: isVidsrc ? 'vidsrc source' : 
-               isCloudnestra ? 'cloudnestra URL' :
-               isSubtitle ? 'subtitle file' :
-               isStarpulse ? 'starpulsecreative.xyz (no header manipulation)' : 'unknown',
-      isVidsrc,
-      isCloudnestra,
-      isSubtitle,
-      isStarpulse
-    });
-    
-    return headers;
-  }
-  
-  // Enhanced headers for embed.su streams (but not starpulsecreative.xyz)
-  const headers = {
-    'User-Agent': userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': '*/*',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Referer': 'https://embed.su/',
-    'Origin': 'https://embed.su',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'cors',
-    'Sec-Fetch-Site': 'cross-site',
-    'Connection': 'keep-alive',
-    'Cache-Control': 'no-cache',
-    'Pragma': 'no-cache'
-  };
-  
-  logger.debug('Using embed.su headers', {
-    source: source || 'unknown'
   });
-
-  // Add specific headers for different stream types
-  if (originalUrl.includes('.m3u8')) {
-    headers['Accept'] = 'application/vnd.apple.mpegurl, application/x-mpegURL, */*';
-  } else if (originalUrl.includes('.ts')) {
-    headers['Accept'] = 'video/MP2T, */*';
-  } else if (originalUrl.includes('.mp4')) {
-    headers['Accept'] = 'video/mp4, */*';
-  } else if (originalUrl.includes('.vtt') || originalUrl.includes('.srt')) {
-    headers['Accept'] = 'text/vtt, text/plain, */*';
-  }
-
-  logger.debug('Request headers prepared', {
-    totalHeaders: Object.keys(headers).length,
-    hasReferer: !!headers.Referer,
-    hasOrigin: !!headers.Origin,
-    contentType: headers.Accept,
+  
+  logger.debug('Header strategies prepared', {
+    totalStrategies: strategies.length,
+    strategyNames: strategies.map(s => s.name),
+    isVidsrc,
     isShadowlands,
     isEmbed,
-    isStarpulse,
-    headerMode: isShadowlands ? 'shadowlandschronicles' : 
-                isStarpulse ? 'starpulsecreative.xyz (clean)' :
-                isEmbed ? 'embed.su' : 'default'
+    isStarpulse
   });
+  
+  return strategies;
+}
 
-  return headers;
+// Enhanced source-specific header management with fallback
+function getStreamHeaders(originalUrl, userAgent, logger, source, strategyIndex = 0) {
+  const strategies = getHeaderStrategies(originalUrl, userAgent, logger, source);
+  
+  if (strategyIndex >= strategies.length) {
+    // Fallback to minimal headers if all strategies exhausted
+    logger.warn('All header strategies exhausted, using minimal fallback');
+    return {
+      'User-Agent': userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    };
+  }
+  
+  const selectedStrategy = strategies[strategyIndex];
+  
+  logger.debug('Using header strategy', {
+    strategyName: selectedStrategy.name,
+    strategyIndex: strategyIndex + 1,
+    totalStrategies: strategies.length,
+    headerCount: Object.keys(selectedStrategy.headers).length,
+    hasReferer: !!selectedStrategy.headers.Referer,
+    hasOrigin: !!selectedStrategy.headers.Origin
+  });
+  
+  return selectedStrategy.headers;
 }
 
 // Handle different response types
@@ -550,31 +696,29 @@ export async function GET(request) {
       method: 'GET'
     });
 
-    // Prepare headers based on source (clean headers for vidsrc, embed.su masking for others)
-    const headers = getStreamHeaders(
-      streamUrl, 
-      request.headers.get('user-agent'),
-      logger,
-      source
-    );
-
-    // Add range header if present in original request
+    // Prepare base fetch options
     const rangeHeader = request.headers.get('range');
+    const userAgent = request.headers.get('user-agent');
+    
+    const baseFetchOptions = {
+      method: 'GET',
+      signal: AbortSignal.timeout(CONNECTION_POOL_CONFIG.timeout),
+      keepalive: true,
+      headers: rangeHeader ? { 'Range': rangeHeader } : {}
+    };
+
     if (rangeHeader) {
-      headers['Range'] = rangeHeader;
       logger.debug('Range request detected', { range: rangeHeader });
     }
 
-    // Enhanced fetch with retry logic and connection pooling (Requirements 4.2, 5.3)
-    const fetchOptions = {
-      method: 'GET',
-      headers,
-      signal: AbortSignal.timeout(CONNECTION_POOL_CONFIG.timeout),
-      // Enable keep-alive for connection pooling
-      keepalive: true
-    };
-
-    const response = await fetchWithRetry(streamUrl, fetchOptions, logger);
+    // Use enhanced fetch with header fallback strategies
+    const response = await fetchWithHeaderFallback(
+      streamUrl, 
+      baseFetchOptions, 
+      logger, 
+      userAgent, 
+      source
+    );
 
     const fetchDuration = logger.timing('Stream fetch', fetchStartTime);
 
@@ -852,17 +996,22 @@ export async function HEAD(request) {
   }
 
   try {
-    const headers = getStreamHeaders(streamUrl, request.headers.get('user-agent'), logger, source);
+    const userAgent = request.headers.get('user-agent');
     
-    // Use enhanced fetch with retry logic
-    const fetchOptions = {
+    // Use enhanced fetch with header fallback strategies
+    const baseFetchOptions = {
       method: 'HEAD',
-      headers,
       signal: AbortSignal.timeout(CONNECTION_POOL_CONFIG.timeout),
       keepalive: true
     };
 
-    const response = await fetchWithRetry(streamUrl, fetchOptions, logger);
+    const response = await fetchWithHeaderFallback(
+      streamUrl, 
+      baseFetchOptions, 
+      logger, 
+      userAgent, 
+      source
+    );
 
     const responseHeaders = getResponseHeaders(response, logger);
     
