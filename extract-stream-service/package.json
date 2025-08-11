@@ -1,0 +1,38 @@
+{
+  "name": "flyx-extract-stream-local",
+  "version": "1.0.0",
+  "description": "Flyx stream extraction service for local debugging",
+  "main": "vm-server.js",
+  "scripts": {
+    "start": "node local-server.js",
+    "dev": "set NODE_ENV=development && node local-server.js",
+    "debug": "set NODE_ENV=development && set DEBUG=* && node local-server.js",
+    "test": "node test-enhanced-extraction.js",
+    "test-chrome": "node test-chrome.js",
+    "test-play": "node test-play-button.js",
+    "test-popup": "node test-popup-blocking.js",
+    "test-comprehensive": "node comprehensive-debug.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "puppeteer": "^21.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "stream",
+    "extraction",
+    "puppeteer",
+    "hls",
+    "m3u8",
+    "vidsrc",
+    "embed"
+  ],
+  "author": "Flyx Team",
+  "license": "MIT"
+}

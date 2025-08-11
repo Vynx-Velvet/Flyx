@@ -2,8 +2,8 @@ import React, { useRef, useEffect, useState } from 'react';
 import styles from './UniversalMediaPlayer.module.css';
 import { usePlayerState } from './hooks/usePlayerState';
 import { useStream } from './hooks/useStream';
-import { useHls } from './hooks/useHls';
-import { useSubtitles } from './hooks/useSubtitles';
+import { useHlsWithPerformance } from './hooks/useHlsWithPerformance';
+import { useEnhancedSubtitles } from '../../hooks/useEnhancedSubtitles';
 import { useFetchMediaDetails } from './hooks/useFetchMediaDetails';
 import PlayerControls from './components/PlayerControls';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -20,6 +20,7 @@ const UniversalMediaPlayer = ({ mediaType, movieId, seasonId, episodeId, onBackT
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekingTo, setSeekingTo] = useState(null);
 
+
   const { state: playerState, actions: playerActions } = usePlayerState();
   const { details: mediaDetails } = useFetchMediaDetails(movieId, mediaType);
   
@@ -27,11 +28,35 @@ const UniversalMediaPlayer = ({ mediaType, movieId, seasonId, episodeId, onBackT
     mediaType, movieId, seasonId, episodeId, shouldFetch: true
   });
 
-  const { subtitles, activeSubtitle, selectSubtitle, loading: subtitlesLoading } = useSubtitles({
-    imdbId: mediaDetails?.imdb_id, season: seasonId, episode: episodeId, enabled: !!mediaDetails,
+  // Use enhanced subtitles with improved parsing and synchronization
+  const { 
+    subtitles, 
+    activeSubtitle, 
+    selectSubtitle, 
+    loading: subtitlesLoading,
+    currentSubtitleText: enhancedSubtitleText,
+    parsingStats,
+    updateSubtitleTime,
+    isEnhanced,
+    integrateWithMemoryManager
+  } = useEnhancedSubtitles({
+    imdbId: mediaDetails?.imdb_id, 
+    season: seasonId, 
+    episode: episodeId, 
+    enabled: !!mediaDetails,
+    videoRef
   });
 
-  const { qualities, setQuality, currentQuality } = useHls(streamUrl, videoRef, streamType, activeSubtitle);
+
+
+  const { qualities, setQuality, currentQuality } = useHlsWithPerformance(
+    streamUrl, 
+    videoRef, 
+    streamType, 
+    activeSubtitle
+  );
+
+
   
   // Fullscreen functionality
   const toggleFullscreen = async () => {
@@ -132,208 +157,53 @@ const UniversalMediaPlayer = ({ mediaType, movieId, seasonId, episodeId, onBackT
     };
   }, []);
   
-  // Enhanced subtitle parser with better debugging
-  const parseVTT = (vttText) => {
-    console.log('🎬 PARSING VTT:', {
-      length: vttText.length,
-      startsWithWebVTT: vttText.startsWith('WEBVTT'),
-      firstLines: vttText.split('\n').slice(0, 10)
-    });
-    
-    // Show the first 500 characters of raw VTT content
-    console.log('📝 RAW VTT CONTENT (first 500 chars):', vttText.substring(0, 500));
-    
-    const lines = vttText.split('\n');
-    console.log('📋 TOTAL LINES:', lines.length);
-    
-    const cues = [];
-    let i = 0;
+  // Enhanced subtitle display using the new synchronizer
+  // The enhanced subtitle hook handles parsing and synchronization automatically
 
-    // Skip WEBVTT header and metadata
-    while (i < lines.length) {
-      const line = lines[i].trim();
-      console.log(`Line ${i}: "${line}"`);
-      if (line === 'WEBVTT' || line.startsWith('NOTE') || line === '') {
-        i++;
-        continue;
-      }
-      break;
-    }
-    
-    console.log(`🔍 Starting cue parsing from line ${i}`);
-
-    // Parse cues
-    let cueCount = 0;
-    while (i < lines.length) {
-      const line = lines[i].trim();
-      console.log(`Processing line ${i}: "${line}"`);
-      
-      // Skip empty lines
-      if (line === '') {
-        i++;
-        continue;
-      }
-      
-      // Look for timestamp line
-      if (line.includes('-->')) {
-        console.log(`🕐 Found timestamp line: "${line}"`);
-        const timeParts = line.split('-->').map(s => s.trim());
-        if (timeParts.length === 2) {
-          const startSeconds = timeToSeconds(timeParts[0]);
-          const endSeconds = timeToSeconds(timeParts[1]);
-          console.log(`⏰ Parsed times: ${startSeconds}s -> ${endSeconds}s`);
-          
-          // Get subtitle text (next non-empty lines until empty line or end)
-          i++;
-          let text = '';
-          const textLines = [];
-          while (i < lines.length && lines[i].trim() !== '') {
-            textLines.push(lines[i].trim());
-            if (text) text += ' ';
-            text += lines[i].trim();
-            i++;
-          }
-          
-          console.log(`📝 Found subtitle text: "${text}" (from ${textLines.length} lines)`);
-          
-          if (text && startSeconds >= 0 && endSeconds >= 0) {
-            const cue = { 
-              start: startSeconds, 
-              end: endSeconds, 
-              text: text.replace(/<[^>]*>/g, '') // Remove HTML tags
-            };
-            cues.push(cue);
-            cueCount++;
-            console.log(`✅ Added cue #${cueCount}:`, cue);
-          } else {
-            console.log(`❌ Skipping invalid cue - text: "${text}", start: ${startSeconds}, end: ${endSeconds}`);
-          }
-        } else {
-          console.log(`❌ Invalid timestamp format: "${line}"`);
-        }
-      } else {
-        // Skip cue identifiers or other non-timestamp lines
-        console.log(`⏭️ Skipping non-timestamp line: "${line}"`);
-        i++;
-      }
-      
-      // Safety break to prevent infinite loops
-      if (i > lines.length + 10) {
-        console.error('❌ Parser safety break triggered!');
-        break;
-      }
-    }
-    
-    console.log('🎬 PARSED CUES:', {
-      totalCues: cues.length,
-      firstCue: cues[0],
-      lastCue: cues[cues.length - 1],
-      sampleTimes: cues.slice(0, 3).map(c => ({ start: c.start, end: c.end, text: c.text.substring(0, 30) }))
-    });
-    
-    return cues;
-  };
-
-  const timeToSeconds = (timeStr) => {
-    try {
-      // Handle both HH:MM:SS.mmm and MM:SS.mmm formats
-      const parts = timeStr.split(':');
-      if (parts.length === 3) {
-        const [hours, minutes, seconds] = parts;
-        return parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseFloat(seconds);
-      } else if (parts.length === 2) {
-        const [minutes, seconds] = parts;
-        return parseInt(minutes) * 60 + parseFloat(seconds);
-      }
-      return 0;
-    } catch (error) {
-      console.error('❌ Time parsing error:', timeStr, error);
-      return 0;
-    }
-  };
-
-  // Load subtitle content when selected
+  // Enhanced subtitle loading with memory management integration
   useEffect(() => {
-    if (activeSubtitle?.blobUrl) {
-      console.log('🎬 LOADING SUBTITLE:', {
+    if (activeSubtitle) {
+      console.log('✅ Enhanced subtitles loaded:', {
         language: activeSubtitle.language,
-        blobUrl: activeSubtitle.blobUrl,
-        id: activeSubtitle.id
+        cues: activeSubtitle.cues?.length || 0,
+        parsingStats: parsingStats
       });
-      
       setSubtitleError('');
       
-      fetch(activeSubtitle.blobUrl)
-        .then(res => {
-          console.log('📡 Fetch response:', {
-            ok: res.ok,
-            status: res.status,
-            headers: Object.fromEntries(res.headers.entries())
-          });
-          return res.text();
-        })
-        .then(vttText => {
-          console.log('📄 VTT TEXT RECEIVED:', {
-            length: vttText.length,
-            startsWithWebVTT: vttText.startsWith('WEBVTT'),
-            preview: vttText.substring(0, 200)
-          });
-          
-          if (!vttText || vttText.length === 0) {
-            throw new Error('Empty VTT content received');
-          }
-          
-          const cues = parseVTT(vttText);
-          
-          if (cues.length === 0) {
-            throw new Error('No subtitle cues found in VTT content');
-          }
-          
-          setSubtitleCues(cues);
-          console.log('✅ SUBTITLES LOADED SUCCESSFULLY:', {
-            cueCount: cues.length,
-            language: activeSubtitle.language,
-            firstCueText: cues[0]?.text,
-            timeRange: `${cues[0]?.start}s - ${cues[cues.length - 1]?.end}s`
-          });
-        })
-        .catch(err => {
-          console.error('❌ SUBTITLE LOAD FAILED:', err);
-          setSubtitleError(`Failed to load ${activeSubtitle.language} subtitles: ${err.message}`);
-          setSubtitleCues([]);
-        });
+      // Log parsing statistics
+      if (parsingStats) {
+        console.log('📊 Enhanced parsing stats:', parsingStats);
+      }
     } else {
-      console.log('🎬 NO ACTIVE SUBTITLE - CLEARING');
-      setSubtitleCues([]);
+      console.log('🎬 No active subtitle - clearing');
       setCurrentSubtitle('');
       setSubtitleError('');
     }
-  }, [activeSubtitle]);
+  }, [activeSubtitle, parsingStats]);
 
-  // Update current subtitle based on video time - MORE FREQUENT UPDATES
+  // Enhanced subtitle synchronization with high-frequency updates (100ms)
   useEffect(() => {
-    if (subtitleCues.length === 0 || !videoRef.current) {
-      setCurrentSubtitle('');
-      return;
-    }
+    if (isEnhanced && enhancedSubtitleText !== undefined) {
+      // Use enhanced subtitle text from the synchronizer
+      setCurrentSubtitle(enhancedSubtitleText);
+    } else if (!isEnhanced) {
+      // Fallback to old synchronization method if enhanced is not available
+      if (subtitleCues.length === 0 || !videoRef.current) {
+        setCurrentSubtitle('');
+        return;
+      }
 
-    const currentTime = playerState.currentTime;
-    const activeCue = subtitleCues.find(cue => 
-      currentTime >= cue.start && currentTime <= cue.end
-    );
+      const currentTime = playerState.currentTime;
+      const activeCue = subtitleCues.find(cue => 
+        currentTime >= cue.start && currentTime <= cue.end
+      );
 
-    const newSubtitle = activeCue ? activeCue.text : '';
-    if (newSubtitle !== currentSubtitle) {
-      setCurrentSubtitle(newSubtitle);
-      if (newSubtitle) {
-        console.log('📝 SUBTITLE SHOWING:', {
-          time: currentTime.toFixed(1),
-          text: newSubtitle,
-          cue: activeCue
-        });
+      const newSubtitle = activeCue ? activeCue.text : '';
+      if (newSubtitle !== currentSubtitle) {
+        setCurrentSubtitle(newSubtitle);
       }
     }
-  }, [playerState.currentTime, subtitleCues, currentSubtitle]);
+  }, [isEnhanced, enhancedSubtitleText, playerState.currentTime, subtitleCues, currentSubtitle]);
 
   // Enhanced seeking functionality
   const handleSeek = (time) => {
@@ -430,6 +300,14 @@ const UniversalMediaPlayer = ({ mediaType, movieId, seasonId, episodeId, onBackT
       playerActions.setDuration(videoRef.current.duration);
     }
   };
+
+
+
+
+
+
+
+
 
   // Video playback sync
   useEffect(() => {
@@ -532,6 +410,8 @@ const UniversalMediaPlayer = ({ mediaType, movieId, seasonId, episodeId, onBackT
         ← Back
       </button>
 
+
+
       {/* Media Controls - Auto-hiding */}
       <div 
         className={`${styles.controlsContainer} ${controlsVisible ? styles.controlsVisible : styles.controlsHidden}`}
@@ -550,6 +430,8 @@ const UniversalMediaPlayer = ({ mediaType, movieId, seasonId, episodeId, onBackT
           activeSubtitle={activeSubtitle}
         />
       </div>
+
+
     </div>
   );
 };

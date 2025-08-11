@@ -5,9 +5,10 @@
 /.pnp
 .pnp.js
 .next
+.cache
 # testing
 /coverage
-
+/extract-stream-service/node_modules
 # production
 /build
 

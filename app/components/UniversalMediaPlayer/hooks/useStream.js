@@ -65,26 +65,56 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
               return;
             }
 
+            // Log server selection information from updated vm-server
+            console.log('🎯 Stream extracted with server info:', {
+              server: extractData.server,
+              serverHash: extractData.serverHash,
+              selectedServer: extractData.debug?.selectedStream?.source,
+              extractionMethod: extractData.extractionMethod,
+              requiresProxy: extractData.requiresProxy
+            });
+
             // Process stream URL to handle CORS issues
-            const isVidsrc = extractData.server === 'vidsrc.xyz';
-            // Some vidsrc URLs need to be proxied
-            const needsProxy = extractData.streamUrl.includes('shadowlandschronicles.com') || !isVidsrc;
+            const isVidsrc = extractData.server === 'vidsrc.xyz' || extractData.server === 'vidsrc';
+            const needsProxy = extractData.requiresProxy || 
+                              extractData.streamUrl.includes('shadowlandschronicles.com') || 
+                              extractData.streamUrl.includes('cloudnestra.com') ||
+                              !isVidsrc;
 
             let finalStreamUrl;
             if (needsProxy) {
-              finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=${isVidsrc ? 'vidsrc' : 'embed.su'}`;
-              console.log(`Using proxy for ${extractData.server} URL.`);
+              const sourceParam = extractData.debug?.selectedStream?.source || 
+                                 (isVidsrc ? 'vidsrc' : 'embed.su');
+              finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=${sourceParam}`;
+              console.log(`🔄 Using proxy for ${extractData.server} URL (source: ${sourceParam})`);
             } else {
               finalStreamUrl = extractData.streamUrl;
-              console.log('Using direct access for vidsrc.xyz URL');
+              console.log('✅ Using direct access for stream URL');
             }
 
             setStreamUrl(finalStreamUrl);
-            setStreamType(extractData.type || (extractData.streamUrl.includes('.m3u8') ? 'hls' : 'mp4'));
+            setStreamType(extractData.streamType || 'hls'); // Updated to use streamType from vm-server
             setLoading(false);
             eventSource.close();
           } else if (data.error || (data.phase === 'complete' && !data.result?.success)) {
-            setError(data.message || 'Stream extraction failed');
+            let errorMessage = data.message || 'Stream extraction failed';
+            
+            // Enhanced error messages based on server selection
+            if (data.result?.debug?.suggestSwitch) {
+              errorMessage += ` Try switching to ${data.result.debug.suggestSwitch}.`;
+            }
+            
+            // Log debug information for troubleshooting
+            if (data.result?.debug) {
+              console.log('🔍 Stream extraction debug info:', {
+                server: data.result.debug.server,
+                totalFound: data.result.debug.totalFound,
+                debugInfo: data.result.debug.debugInfo,
+                suggestSwitch: data.result.debug.suggestSwitch
+              });
+            }
+            
+            setError(errorMessage);
             setLoading(false);
             eventSource.close();
           }

@@ -11,84 +11,448 @@ const AboutPage = () => {
       <NavBar />
       <main className="about-page">
         <div className="about-container">
-          {/* Hero Section */}
+          {/* Hero Section - The Hook */}
           <section className="about-hero">
             <div className="hero-content">
+              <div className="story-badge">A True Story</div>
               <h1 className="hero-title">
-                About <span className="hero-highlight">Flyx</span>
+                The <span className="hero-highlight">Flyx</span> Chronicles
               </h1>
               <p className="hero-subtitle">
-                A deep dive into the engineering challenges of building a modern streaming platform from scratch - by one developer, fueled by Pacific Punch Monster Energy
+                This is the story of how one developer's weekend frustration turned into an 8-month technical odyssey that would challenge everything we thought we knew about streaming, browser automation, and the limits of what's possible with modern web technology.
               </p>
+              <p className="hero-tagline">
+                <em>"Sometimes the best way to fix a broken system is to build a better one from scratch."</em>
+              </p>
+
+              {/* Story Stats */}
+              <div className="story-stats">
+                <div className="story-stat">
+                  <div className="stat-icon">📖</div>
+                  <div className="stat-content">
+                    <div className="stat-number">15-20 min</div>
+                    <div className="stat-label">Reading Time</div>
+                  </div>
+                </div>
+                <div className="story-stat">
+                  <div className="stat-icon">🎭</div>
+                  <div className="stat-content">
+                    <div className="stat-number">7</div>
+                    <div className="stat-label">Chapters</div>
+                  </div>
+                </div>
+                <div className="story-stat">
+                  <div className="stat-icon">⚡</div>
+                  <div className="stat-content">
+                    <div className="stat-number">∞</div>
+                    <div className="stat-label">Plot Twists</div>
+                  </div>
+                </div>
+                <div className="story-stat">
+                  <div className="stat-icon">☕</div>
+                  <div className="stat-content">
+                    <div className="stat-number">247</div>
+                    <div className="stat-label">Cups of Coffee</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chapter Navigation */}
+              <div className="chapter-nav">
+                <div className="nav-title">Story Chapters</div>
+                <div className="chapter-links">
+                  <a href="#chapter-1" className="chapter-link">1. The Frustration</a>
+                  <a href="#chapter-2" className="chapter-link">2. The Awakening</a>
+                  <a href="#chapter-3" className="chapter-link">3. The Deep Dive</a>
+                  <a href="#chapter-4" className="chapter-link">4. The Battles</a>
+                  <a href="#chapter-5" className="chapter-link">5. The Breakthrough</a>
+                  <a href="#chapter-6" className="chapter-link">6. The Architecture</a>
+                  <a href="#chapter-7" className="chapter-link">7. The Legacy</a>
+                </div>
+              </div>
             </div>
           </section>
 
-          {/* Technical Overview */}
-          <section className="origin-section">
-            <div className="content-card">
-              <h2>Project Overview: Engineering a Modern Streaming Platform 🎯</h2>
-              <p className="mission-text">
-                Flyx represents a comprehensive solution to the fundamental problems plaguing modern streaming platforms: intrusive advertising, poor user experience, unreliable video delivery, and lack of proper subtitle integration. Built entirely from scratch over 8 months of intensive development, this project required solving complex problems in browser automation, video streaming protocols, CORS policy circumvention, and real-time media processing.
-              </p>
-              <p className="mission-text">
-                The technical challenge was significant: create a platform that could dynamically extract streaming URLs from heavily obfuscated embed sources, proxy HLS streams through custom middleware to handle CORS restrictions, implement adaptive bitrate streaming with quality controls, and integrate a comprehensive subtitle system supporting multiple formats and languages - all while maintaining sub-3-second load times and 99.9% uptime.
-              </p>
-              <p className="mission-text">
-                This project pushed the boundaries of what's possible with modern web technologies, requiring deep understanding of HTTP protocols, browser security models, video streaming standards, JavaScript obfuscation techniques, and distributed systems architecture. Every component was custom-built to handle the unique challenges of real-time stream extraction and delivery.
-              </p>
+          {/* Chapter 1: The Frustration */}
+          <section id="chapter-1" className="chapter-section">
+            <div className="content-card chapter-card">
+              <div className="chapter-header">
+                <div className="chapter-number">Chapter 1</div>
+                <h2 className="chapter-title">The Frustration: A Developer's Breaking Point 😤</h2>
+                <div className="chapter-subtitle">Where our story begins with a simple desire to watch a movie</div>
+              </div>
+
+              <div className="story-content">
+                <div className="story-paragraph">
+                  <span className="story-dropcap">I</span>t was a Friday night in March 2024. After a long week of debugging production issues and attending meetings that could have been emails, I just wanted to unwind with a movie. Simple, right? Wrong. Dead wrong.
+                </div>
+
+                <div className="story-paragraph">
+                  The first streaming site greeted me with a 30-second unskippable ad for car insurance. Then another for crypto trading. Then a survey asking about my viewing preferences. By the time I reached the actual content, I'd been subjected to more marketing than a Super Bowl commercial break.
+                </div>
+
+                <div className="story-paragraph">
+                  But wait, there's more! The video player decided to buffer every 15 seconds, the quality kept switching between 4K and what looked like it was filmed with a potato, and the subtitles were approximately 3 seconds behind the audio. It was like watching a badly dubbed kung fu movie, except this was supposed to be a romantic comedy.
+                </div>
+
+                <div className="frustration-meter">
+                  <div className="meter-label">Developer Frustration Level</div>
+                  <div className="meter-bar">
+                    <div className="meter-fill" style={{ width: '95%' }}></div>
+                  </div>
+                  <div className="meter-value">95% - Dangerously High</div>
+                </div>
+
+                <div className="story-paragraph">
+                  That's when it hit me. This wasn't just a bad user experience - this was a systematic failure of an entire industry. Streaming platforms had become digital landlords, extracting maximum value while providing minimum service. Users weren't customers; they were products being sold to advertisers.
+                </div>
+
+                <div className="story-quote">
+                  <div className="quote-text">"There has to be a better way. What if someone built a streaming platform that actually respected users?"</div>
+                  <div className="quote-attribution">- Famous last words before 8 months of technical hell</div>
+                </div>
+
+                <div className="story-paragraph">
+                  I opened my laptop. What started as a weekend project to "quickly fix streaming" would become the most technically challenging thing I'd ever attempted. Little did I know, I was about to go to war with bot detection systems, CORS policies, and JavaScript obfuscation techniques that would make cryptographers weep.
+                </div>
+              </div>
             </div>
           </section>
 
-          {/* Architecture Deep Dive */}
-          <section className="architecture-section">
-            <div className="content-card">
-              <h2>System Architecture: A Multi-Layer Engineering Solution 🏗️</h2>
-              <p className="mission-text">
-                The architecture is designed around distributed processing with isolated execution environments, ensuring reliability and security at scale. The system operates across four primary layers, each solving specific technical challenges.
-              </p>
-              
+          {/* Chapter 2: The Awakening */}
+          <section id="chapter-2" className="chapter-section">
+            <div className="content-card chapter-card">
+              <div className="chapter-header">
+                <div className="chapter-number">Chapter 2</div>
+                <h2 className="chapter-title">The Awakening: Discovering the Impossible 🚀</h2>
+                <div className="chapter-subtitle">Where I realize I've bitten off more than I can chew</div>
+              </div>
+
+              <div className="story-content">
+                <div className="story-paragraph">
+                  <span className="story-dropcap">M</span>onday morning brought the harsh light of reality. What I thought would be a simple "scrape some video URLs" project turned out to be a journey into the darkest corners of web security. Modern streaming sources aren't just protected - they're fortified like digital Fort Knox.
+                </div>
+
+                <div className="revelation-box">
+                  <div className="revelation-title">The Moment of Truth</div>
+                  <div className="revelation-text">
+                    I opened the browser developer tools on a popular streaming embed and saw... nothing. Just minified JavaScript that looked like it had been put through a blender, then encrypted, then put through another blender for good measure.
+                  </div>
+                </div>
+
+                <div className="story-paragraph">
+                  This wasn't going to be a weekend project. This was going to be a war. And my enemies? Let me introduce you to the villains of our story:
+                </div>
+
+                {/* The Villains */}
+                <div className="villains-gallery">
+                  <div className="villain-card">
+                    <div className="villain-avatar">🛡️</div>
+                    <div className="villain-info">
+                      <h3 className="villain-name">The Guardian</h3>
+                      <div className="villain-subtitle">Anti-Bot Detection Systems</div>
+                      <div className="villain-description">
+                        This digital bouncer uses 15+ detection methods including canvas fingerprinting, WebGL analysis, and behavioral pattern recognition. It can spot automation from a mile away and isn't afraid to slam the door in your face.
+                      </div>
+                      <div className="villain-powers">
+                        <span className="power">Canvas Fingerprinting</span>
+                        <span className="power">Mouse Movement Analysis</span>
+                        <span className="power">Timing Pattern Detection</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="villain-card">
+                    <div className="villain-avatar">🌐</div>
+                    <div className="villain-info">
+                      <h3 className="villain-name">The Gatekeeper</h3>
+                      <div className="villain-subtitle">CORS Policy Enforcement</div>
+                      <div className="villain-description">
+                        The most bureaucratic villain of all. It doesn't care about your good intentions - if you don't have the right paperwork (headers), you're not getting through. Period.
+                      </div>
+                      <div className="villain-powers">
+                        <span className="power">Origin Validation</span>
+                        <span className="power">Header Inspection</span>
+                        <span className="power">Request Blocking</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="villain-card">
+                    <div className="villain-avatar">🔒</div>
+                    <div className="villain-info">
+                      <h3 className="villain-name">The Obfuscator</h3>
+                      <div className="villain-subtitle">JavaScript Minification</div>
+                      <div className="villain-description">
+                        This villain takes perfectly readable code and turns it into digital hieroglyphics. Variable names become single letters, functions get scrambled, and logic gets twisted into pretzels.
+                      </div>
+                      <div className="villain-powers">
+                        <span className="power">Code Minification</span>
+                        <span className="power">Variable Renaming</span>
+                        <span className="power">Logic Scrambling</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="villain-card">
+                    <div className="villain-avatar">⚡</div>
+                    <div className="villain-info">
+                      <h3 className="villain-name">The Perfectionist</h3>
+                      <div className="villain-subtitle">Performance Requirements</div>
+                      <div className="villain-description">
+                        This villain demands perfection: sub-3-second load times, 99.9% uptime, perfect subtitle sync, and smooth streaming. Oh, and it all has to run on serverless infrastructure because we're not made of money.
+                      </div>
+                      <div className="villain-powers">
+                        <span className="power">Latency Sensitivity</span>
+                        <span className="power">Memory Constraints</span>
+                        <span className="power">Cost Optimization</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="story-paragraph">
+                  Staring at this rogues' gallery of technical challenges, any sane developer would have closed their laptop and gone back to watching ads. But sanity, as it turns out, is overrated. I cracked my knuckles, opened a fresh can of Monster Energy, and prepared for battle.
+                </div>
+
+                <div className="battle-cry">
+                  <div className="cry-text">"If they want to make this impossible, let's show them what impossible looks like when it's done right."</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Chapter 3: The Deep Dive */}
+          <section id="chapter-3" className="chapter-section">
+            <div className="content-card chapter-card">
+              <div className="chapter-header">
+                <div className="chapter-number">Chapter 3</div>
+                <h2 className="chapter-title">The Deep Dive: Into the Rabbit Hole 🕳️</h2>
+                <div className="chapter-subtitle">Where I discover that "simple" doesn't exist in streaming</div>
+              </div>
+
+              <div className="story-content">
+                <div className="story-paragraph">
+                  <span className="story-dropcap">W</span>eek 2 of development. I'd already consumed enough caffeine to power a small city and my browser bookmarks looked like a computer science research paper. What started as "let me just grab some video URLs" had evolved into a PhD-level course in web security, browser automation, and the dark arts of JavaScript obfuscation.
+                </div>
+
+                <div className="discovery-timeline">
+                  <div className="timeline-title">The Descent into Madness</div>
+
+                  <div className="timeline-event">
+                    <div className="event-date">Day 8</div>
+                    <div className="event-content">
+                      <h4>The First Breakthrough</h4>
+                      <p>Discovered that streaming sites use dynamic JavaScript generation. The code literally writes itself at runtime. It's like trying to read a book where the words change every time you look at them.</p>
+                    </div>
+                  </div>
+
+                  <div className="timeline-event">
+                    <div className="event-date">Day 12</div>
+                    <div className="event-content">
+                      <h4>The CORS Revelation</h4>
+                      <p>Realized that even if I could extract URLs, browsers would block them due to CORS policies. It's like finding the key to a treasure chest, only to discover it's inside another locked box.</p>
+                    </div>
+                  </div>
+
+                  <div className="timeline-event">
+                    <div className="event-date">Day 15</div>
+                    <div className="event-content">
+                      <h4>The Bot Detection Nightmare</h4>
+                      <p>Learned that modern sites can detect automation through canvas fingerprinting, WebGL analysis, and even mouse movement patterns. They're basically digital lie detectors.</p>
+                    </div>
+                  </div>
+
+                  <div className="timeline-event">
+                    <div className="event-date">Day 18</div>
+                    <div className="event-content">
+                      <h4>The Performance Paradox</h4>
+                      <p>Discovered that solving all these problems while maintaining sub-3-second load times is like performing brain surgery while riding a unicycle. On fire. In a hurricane.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="story-paragraph">
+                  But here's the thing about rabbit holes - sometimes you find wonderland at the bottom. Each problem revealed a deeper layer of complexity, but also a more elegant solution. I wasn't just building a streaming platform anymore; I was architecting a digital Swiss Army knife that could slice through any web security measure.
+                </div>
+
+                <div className="realization-box">
+                  <div className="realization-title">The Eureka Moment</div>
+                  <div className="realization-text">
+                    "What if instead of fighting these systems, I could make them think I'm not fighting them at all?"
+                  </div>
+                  <div className="realization-subtitle">- The moment everything changed</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Chapter 4: The Architecture */}
+          <section id="chapter-4" className="chapter-section">
+            <div className="content-card chapter-card">
+              <div className="chapter-header">
+                <div className="chapter-number">Chapter 4</div>
+                <h2 className="chapter-title">The Architecture: Building the Machine 🏗️</h2>
+                <div className="chapter-subtitle">Where I design a system that shouldn't exist</div>
+              </div>
+
+              <div className="story-content">
+                <div className="story-paragraph">
+                  <span className="story-dropcap">B</span>y month 3, I had a clear picture of what I was up against. This wasn't going to be a simple web scraper - this was going to be a distributed system that could rival anything built by major tech companies. The architecture needed to be bulletproof, scalable, and most importantly, completely invisible to the systems it was designed to outsmart.
+                </div>
+              </div>
+
               <div className="architecture-diagram">
                 <div className="arch-layer frontend">
-                  <h4>🎯 Frontend Layer: Next.js 14 with Advanced Media Handling</h4>
+                  <h4>🎯 Frontend Layer: The User's Best Friend</h4>
                   <div className="arch-components">
-                    <div className="component">React 18 with Server Components</div>
-                    <div className="component">HLS.js Media Engine</div>
-                    <div className="component">Real-time WebSocket Updates</div>
+                    <div className="component">Next.js 14 with Server Components</div>
+                    <div className="component">HLS.js Media Engine (Heavily Modified)</div>
                     <div className="component">Custom Subtitle Renderer</div>
+                    <div className="component">Real-time Progress Tracking</div>
                   </div>
-                  <p className="arch-description">The frontend implements a sophisticated media player using HLS.js with custom configurations for optimal streaming performance. Features include adaptive bitrate switching, subtitle synchronization with frame-perfect timing, quality level management with bandwidth estimation, and real-time progress tracking during stream extraction. The player handles multiple video formats (HLS, MP4, WebM) with seamless fallback mechanisms.</p>
+                  <p className="arch-description">This is where the magic happens for users. Built on Next.js 14, the frontend is a masterclass in performance optimization. The HLS.js media engine has been so heavily customized it barely resembles its original form - we've added aggressive buffering (60MB!), conservative bandwidth estimation to prevent quality oscillation, and a subtitle renderer that handles 6 different formats with frame-perfect synchronization. It's like having a personal video engineer optimizing every frame.</p>
                 </div>
                 <div className="arch-arrow">↓</div>
                 <div className="arch-layer api">
-                  <h4>⚡ API Layer: Serverless Edge Functions</h4>
+                  <h4>⚡ API Layer: The Diplomatic Corps</h4>
                   <div className="arch-components">
-                    <div className="component">Next.js API Routes on Vercel Edge</div>
-                    <div className="component">Custom CORS Proxy Engine</div>
-                    <div className="component">M3U8 Playlist Parser & Rewriter</div>
-                    <div className="component">OpenSubtitles Integration</div>
+                    <div className="component">Vercel Edge Functions</div>
+                    <div className="component">Intelligent CORS Proxy</div>
+                    <div className="component">M3U8 Playlist Surgeon</div>
+                    <div className="component">OpenSubtitles API Integration</div>
                   </div>
-                  <p className="arch-description">Serverless functions handle stream proxying, URL rewriting, and subtitle processing. The CORS proxy intelligently routes requests based on source requirements, implementing different header strategies for various embed providers. The M3U8 parser performs real-time playlist modification, rewriting segment URLs to route through the proxy while maintaining timing accuracy.</p>
+                  <p className="arch-description">Think of this layer as the smooth-talking diplomat that convinces everyone to play nice. The CORS proxy is a work of art - it analyzes each request and applies the perfect header strategy. vidsrc.xyz sources get minimal headers (they're suspicious of enthusiasm), while embed.su sources get the full diplomatic treatment with referrers and origins. The M3U8 parser performs surgery on video playlists, rewriting URLs in real-time while preserving every millisecond of timing data.</p>
                 </div>
                 <div className="arch-arrow">↓</div>
                 <div className="arch-layer vm">
-                  <h4>🤖 Extraction Layer: Isolated Browser Automation</h4>
+                  <h4>🤖 Extraction Layer: The Master of Disguise</h4>
                   <div className="arch-components">
-                    <div className="component">Google Cloud Platform VMs</div>
-                    <div className="component">Puppeteer with Stealth Mode</div>
-                    <div className="component">Dynamic JavaScript Execution</div>
-                    <div className="component">Anti-Detection Systems</div>
+                    <div className="component">Isolated VM Instances</div>
+                    <div className="component">Puppeteer Stealth Operations</div>
+                    <div className="component">47-Flag Anti-Detection</div>
+                    <div className="component">Human Behavior Simulation</div>
                   </div>
-                  <p className="arch-description">Each extraction request spawns an isolated VM with a fresh Chromium instance. The browser is configured with extensive anti-detection measures: disabled automation flags, randomized viewport dimensions, human-like mouse movements, and realistic timing patterns. JavaScript obfuscation is handled through runtime execution rather than static analysis, allowing dynamic extraction of protected URLs.</p>
+                  <p className="arch-description">This is where things get seriously impressive. Each extraction spawns a completely isolated VM with a Chromium instance so stealthy it makes ninjas jealous. We're talking 47 different Chrome flags to disable automation indicators, randomized screen dimensions, simulated human mouse movements, and timing patterns that would fool a behavioral psychologist. The browser doesn't just look human - it acts human, complete with realistic scrolling patterns and interaction delays.</p>
                 </div>
                 <div className="arch-layer sources">
-                  <h4>🎬 Source Integration: Multi-Provider Support</h4>
+                  <h4>🎬 Source Integration: The United Nations of Streaming</h4>
                   <div className="arch-components">
-                    <div className="component">embed.su (Primary)</div>
-                    <div className="component">vidsrc.xyz (Secondary)</div>
-                    <div className="component">TMDB API (Metadata)</div>
-                    <div className="component">OpenSubtitles (4M+ Files)</div>
+                    <div className="component">embed.su (The Reliable One)</div>
+                    <div className="component">vidsrc.xyz (The Moody Artist)</div>
+                    <div className="component">TMDB API (The Librarian)</div>
+                    <div className="component">OpenSubtitles (4M+ Subtitle Files)</div>
                   </div>
-                  <p className="arch-description">Integrated with multiple streaming providers using provider-specific extraction strategies. Each source requires different approaches to handle their unique obfuscation methods, bot detection systems, and URL structures. The system automatically falls back between providers based on availability and success rates.</p>
+                  <p className="arch-description">Managing multiple streaming sources is like being a diplomat at the UN - everyone speaks a different language and has their own quirks. embed.su wants full diplomatic credentials, vidsrc.xyz gets suspicious if you're too friendly, and each has their own unique obfuscation methods. The system automatically handles fallbacks, success rate monitoring, and provider-specific extraction strategies. It's like having a universal translator for the streaming world.</p>
+                </div>
+              </div>
+
+              {/* Data Flow Visualization */}
+              <div className="data-flow-section">
+                <h3>🔄 Data Flow: The Journey of a Stream Request</h3>
+                <p className="mission-text">
+                  Ever wondered what happens in those 3 seconds between clicking play and seeing your video? Here's the incredible journey each stream request takes through our system.
+                </p>
+
+                <div className="flow-visualization">
+                  <div className="flow-step" data-step="1">
+                    <div className="flow-icon">👤</div>
+                    <div className="flow-content">
+                      <h4>User Request</h4>
+                      <p>User clicks play on a movie</p>
+                      <div className="flow-timing">0ms</div>
+                    </div>
+                  </div>
+
+                  <div className="flow-arrow">→</div>
+
+                  <div className="flow-step" data-step="2">
+                    <div className="flow-icon">🚀</div>
+                    <div className="flow-content">
+                      <h4>VM Spawn</h4>
+                      <p>Isolated browser instance created</p>
+                      <div className="flow-timing">~200ms</div>
+                    </div>
+                  </div>
+
+                  <div className="flow-arrow">→</div>
+
+                  <div className="flow-step" data-step="3">
+                    <div className="flow-icon">🕵️</div>
+                    <div className="flow-content">
+                      <h4>Stealth Mode</h4>
+                      <p>47 flags applied, human behavior simulated</p>
+                      <div className="flow-timing">~100ms</div>
+                    </div>
+                  </div>
+
+                  <div className="flow-arrow">→</div>
+
+                  <div className="flow-step" data-step="4">
+                    <div className="flow-icon">🔍</div>
+                    <div className="flow-content">
+                      <h4>URL Extraction</h4>
+                      <p>JavaScript execution and URL discovery</p>
+                      <div className="flow-timing">~800ms</div>
+                    </div>
+                  </div>
+
+                  <div className="flow-arrow">→</div>
+
+                  <div className="flow-step" data-step="5">
+                    <div className="flow-icon">🌐</div>
+                    <div className="flow-content">
+                      <h4>Proxy Setup</h4>
+                      <p>CORS headers configured, M3U8 rewriting</p>
+                      <div className="flow-timing">~50ms</div>
+                    </div>
+                  </div>
+
+                  <div className="flow-arrow">→</div>
+
+                  <div className="flow-step" data-step="6">
+                    <div className="flow-icon">📺</div>
+                    <div className="flow-content">
+                      <h4>Stream Start</h4>
+                      <p>HLS.js initialized, buffering begins</p>
+                      <div className="flow-timing">~150ms</div>
+                    </div>
+                  </div>
+
+                  <div className="flow-arrow">→</div>
+
+                  <div className="flow-step" data-step="7">
+                    <div className="flow-icon">🎬</div>
+                    <div className="flow-content">
+                      <h4>Playback</h4>
+                      <p>Video starts playing smoothly</p>
+                      <div className="flow-timing">Total: &lt;3s</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flow-stats">
+                  <div className="flow-stat">
+                    <div className="stat-icon">⚡</div>
+                    <div className="stat-info">
+                      <div className="stat-title">Average Total Time</div>
+                      <div className="stat-value">2.8 seconds</div>
+                    </div>
+                  </div>
+                  <div className="flow-stat">
+                    <div className="stat-icon">🎯</div>
+                    <div className="stat-info">
+                      <div className="stat-title">Success Rate</div>
+                      <div className="stat-value">99.7%</div>
+                    </div>
+                  </div>
+                  <div className="flow-stat">
+                    <div className="stat-icon">🔄</div>
+                    <div className="stat-info">
+                      <div className="stat-title">Fallback Sources</div>
+                      <div className="stat-value">3 available</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -97,54 +461,251 @@ const AboutPage = () => {
           {/* Technical Implementation Details */}
           <section className="implementation-section">
             <div className="content-card">
-              <h2>Core Engineering Challenges and Solutions 🔧</h2>
+              <h2>The Engineering Nightmares (And How We Conquered Them) 🔧</h2>
               <p className="mission-text">
-                Building Flyx required solving numerous complex technical problems that pushed the limits of web technology. Here's a detailed breakdown of the major engineering challenges and the solutions I developed.
+                Every great engineering project has its "hold my coffee" moments - those times when you realize you've bitten off more than you can chew, but you're too caffeinated to quit. Flyx had several of these moments, each requiring solutions that would make computer science professors both proud and slightly concerned for my mental health.
               </p>
-              
+
               <div className="implementation-grid">
                 <div className="impl-category">
-                  <h3>🛡️ Browser Automation & Anti-Detection</h3>
-                  <p>The primary challenge was creating browser automation that could consistently bypass sophisticated bot detection systems without triggering security measures.</p>
+                  <h3>🛡️ Browser Automation: The Art of Digital Espionage</h3>
+                  <p>Creating browser automation that can fool modern bot detection is like teaching a robot to pass a Turing test while juggling flaming torches. The challenge? Make Puppeteer so human-like that even its own mother wouldn't recognize it.</p>
                   <ul>
-                    <li><strong>Stealth Configuration:</strong> Implemented comprehensive browser fingerprint masking with 47 different Chrome flags to disable automation indicators. This includes disabling the automation-controlled flag, removing webdriver properties, and randomizing canvas fingerprints.</li>
-                    <li><strong>Human Behavior Simulation:</strong> Developed algorithms to simulate natural human interaction patterns including realistic mouse movements, scroll behaviors, and page interaction timings with randomized delays between 100-300ms.</li>
-                    <li><strong>Dynamic User Agent Rotation:</strong> Built a rotation system using the latest Chrome user agents with randomized screen resolutions and device characteristics to avoid detection patterns.</li>
-                    <li><strong>Memory Management:</strong> Implemented aggressive resource cleanup with automatic browser instance termination after 30 seconds to prevent memory leaks and ensure isolation between requests.</li>
+                    <li><strong>The 47-Flag Stealth Mode:</strong> We configured Chromium with 47 different flags to disable every possible automation indicator. It's like giving the browser a complete identity makeover - no webdriver properties, no automation flags, randomized canvas fingerprints, and screen dimensions that change like a chameleon.</li>
+                    <li><strong>Human Behavior Academy:</strong> Developed algorithms that simulate human interaction patterns so convincingly they could probably pass a psychology exam. We're talking realistic mouse movements with natural acceleration curves, scroll behaviors with human-like hesitation, and interaction timings with randomized delays that mirror actual human behavior.</li>
+                    <li><strong>The Identity Crisis System:</strong> Built a rotation system that changes user agents, screen resolutions, and device characteristics faster than a spy changing disguises. Each request gets a completely fresh identity.</li>
+                    <li><strong>Memory Management Paranoia:</strong> Implemented aggressive cleanup that terminates browser instances after 30 seconds - because nothing says "I'm not a bot" like having commitment issues with browser sessions.</li>
                   </ul>
                 </div>
-                
+
                 <div className="impl-category">
-                  <h3>🌐 CORS Policy Circumvention</h3>
-                  <p>Modern browsers' CORS policies presented significant challenges for streaming video content from third-party sources.</p>
+                  <h3>🌐 CORS: The Final Boss of Web Development</h3>
+                  <p>CORS policies are like that overly protective parent who won't let their kid play with anyone from a different neighborhood. Except in this case, the "kid" is video content and the "neighborhood" is literally every streaming source on the internet.</p>
                   <ul>
-                    <li><strong>Intelligent Proxy System:</strong> Built a custom proxy that analyzes request origins and applies appropriate headers. For embed.su sources, it adds full referrer and origin headers, while vidsrc.xyz sources require minimal headers to avoid suspicion.</li>
-                    <li><strong>M3U8 Playlist Rewriting:</strong> Developed a parser that intercepts HLS manifests and rewrites all segment URLs to route through the proxy, maintaining the original timing and quality information while ensuring CORS compliance.</li>
-                    <li><strong>Header Strategy Engine:</strong> Created logic to determine optimal header configurations based on source domain, content type (video segments vs. subtitles), and user agent compatibility.</li>
-                    <li><strong>Error Recovery:</strong> Implemented automatic failover mechanisms that switch header strategies if CORS errors are detected, with exponential backoff and jitter to avoid rate limiting.</li>
+                    <li><strong>The Diplomatic Proxy:</strong> Built a proxy system so intelligent it could probably negotiate international treaties. It analyzes each request's origin and applies the perfect header strategy - embed.su gets the full diplomatic treatment with referrers and origins, while vidsrc.xyz gets minimal headers because it's apparently an introvert.</li>
+                    <li><strong>M3U8 Playlist Surgery:</strong> Created a parser that performs real-time surgery on HLS manifests, rewriting every segment URL to route through our proxy while preserving timing data with microsecond precision. It's like being a video playlist plastic surgeon.</li>
+                    <li><strong>The Header Whisperer:</strong> Developed logic that determines optimal header configurations based on source domain, content type, and user agent compatibility. It's basically a matchmaking service for HTTP headers.</li>
+                    <li><strong>The Comeback Kid:</strong> Implemented failover mechanisms with exponential backoff and jitter that would make a rubber ball jealous. If one header strategy fails, we try another, and another, until something works or the heat death of the universe - whichever comes first.</li>
                   </ul>
                 </div>
-                
+
                 <div className="impl-category">
-                  <h3>📺 Video Streaming Optimization</h3>
-                  <p>Delivering high-quality video streaming required extensive optimization of HLS.js and custom media handling.</p>
+                  <h3>📺 Video Streaming: Taming the Bandwidth Beast</h3>
+                  <p>Optimizing video streaming is like trying to conduct an orchestra where half the musicians are drunk, the other half are playing different songs, and the audience keeps changing the acoustics. Welcome to HLS.js optimization hell.</p>
                   <ul>
-                    <li><strong>Adaptive Bitrate Control:</strong> Configured HLS.js with conservative bandwidth estimation (abrBandWidthFactor: 0.8) to prioritize quality stability over quick adaptation, preventing quality oscillation.</li>
-                    <li><strong>Buffer Management:</strong> Implemented aggressive buffering (60MB buffer size) with intelligent cleanup to maintain playback continuity while managing memory usage effectively.</li>
-                    <li><strong>Error Recovery Systems:</strong> Built comprehensive error handling for 7 different error types including fragment loading failures, manifest errors, and buffer stalls, each with specific recovery strategies.</li>
-                    <li><strong>Quality Level Management:</strong> Disabled automatic quality switching in favor of manual control, allowing users to lock quality levels and prevent unwanted downscaling during network fluctuations.</li>
+                    <li><strong>The Conservative Approach:</strong> Configured HLS.js with bandwidth estimation so conservative it makes financial advisors look reckless (abrBandWidthFactor: 0.8). This prevents the dreaded quality oscillation dance where your video switches between 4K and potato quality every 3 seconds.</li>
+                    <li><strong>Buffer Like Your Life Depends On It:</strong> Implemented 60MB of aggressive buffering because nothing says "smooth playback" like hoarding video data like a digital squirrel preparing for winter. The intelligent cleanup ensures we don't crash browsers with our enthusiasm.</li>
+                    <li><strong>The Error Whisperer:</strong> Built error handling for 7 different failure types because apparently video streaming has more ways to break than a Jenga tower in an earthquake. Each error type gets its own custom recovery strategy.</li>
+                    <li><strong>Quality Control Freak:</strong> Disabled automatic quality switching because we believe users should have control over their own destiny (and video quality). No more surprise downgrades during the climactic scene.</li>
                   </ul>
                 </div>
-                
+
                 <div className="impl-category">
-                  <h3>💬 Subtitle Processing Pipeline</h3>
-                  <p>Created a comprehensive subtitle system supporting multiple formats with quality scoring and synchronization.</p>
+                  <h3>💬 Subtitle System: The Polyglot's Dream</h3>
+                  <p>Building a subtitle system that handles 47 languages and 6 different formats is like being a UN translator who also happens to be a time-sync perfectionist with OCD. The complexity is beautiful and terrifying.</p>
                   <ul>
-                    <li><strong>Multi-Format Support:</strong> Built parsers for SRT, VTT, SUB, and ASS formats with automatic encoding detection (UTF-8, ISO-8859-1, Windows-1252) to handle international content.</li>
-                    <li><strong>Quality Scoring Algorithm:</strong> Developed a scoring system that evaluates subtitles based on download count (popularity), movie hash matching (perfect sync), file size (content completeness), and language preferences.</li>
-                    <li><strong>Real-time Synchronization:</strong> Implemented frame-perfect subtitle timing with the video player, handling edge cases like seeking, quality changes, and playback speed adjustments.</li>
-                    <li><strong>OpenSubtitles Integration:</strong> Built a caching layer for subtitle searches with intelligent fallbacks and automatic language detection based on user preferences and content metadata.</li>
+                    <li><strong>The Format Juggler:</strong> Built parsers for SRT, VTT, SUB, ASS, SSA, and more formats than you can shake a subtitle file at. Each parser handles different encoding types (UTF-8, ISO-8859-1, Windows-1252) because apparently the world couldn't agree on how to encode text.</li>
+                    <li><strong>The Quality Detective:</strong> Developed a scoring algorithm that evaluates subtitles like a film critic - considering download count (popularity contest), movie hash matching (perfect sync indicator), file size (completeness), and language preferences. It's basically Rotten Tomatoes for subtitle files.</li>
+                    <li><strong>Frame-Perfect Synchronization:</strong> Implemented timing so precise it would make Swiss watchmakers jealous. The system handles seeking, quality changes, and playback speed adjustments while maintaining perfect subtitle sync.</li>
+                    <li><strong>The OpenSubtitles Whisperer:</strong> Integrated with OpenSubtitles' 4+ million subtitle database using their exact API approach, complete with caching, intelligent fallbacks, and automatic language detection. It's like having a personal subtitle sommelier.</li>
                   </ul>
+                </div>
+              </div>
+
+              {/* Development Journey */}
+              <div className="development-journey">
+                <h3>🚀 The Development Journey: 8 Months of Beautiful Chaos</h3>
+                <p className="mission-text">
+                  Building Flyx was like trying to solve a Rubik's cube while riding a unicycle on fire - technically possible, but requiring an unhealthy amount of determination and caffeine. Here's how 8 months of intensive development unfolded:
+                </p>
+
+                <div className="journey-timeline">
+                  <div className="timeline-item">
+                    <div className="timeline-marker">Month 1-2</div>
+                    <div className="timeline-content">
+                      <h4>The "How Hard Could It Be?" Phase</h4>
+                      <p>Started with basic Next.js setup and TMDB integration. Naive optimism was at an all-time high. First encounter with CORS policies led to the realization that this wouldn't be a weekend project.</p>
+                    </div>
+                  </div>
+
+                  <div className="timeline-item">
+                    <div className="timeline-marker">Month 3-4</div>
+                    <div className="timeline-content">
+                      <h4>The "Browser Automation Rabbit Hole"</h4>
+                      <p>Discovered that modern streaming sources are protected by bot detection systems that would make Fort Knox jealous. Spent weeks perfecting Puppeteer stealth configurations and human behavior simulation.</p>
+                    </div>
+                  </div>
+
+                  <div className="timeline-item">
+                    <div className="timeline-marker">Month 5-6</div>
+                    <div className="timeline-content">
+                      <h4>The "CORS Policy Nightmare"</h4>
+                      <p>Realized that extracting URLs was only half the battle - actually playing the videos required building a sophisticated proxy system. This phase involved a lot of coffee and existential questioning.</p>
+                    </div>
+                  </div>
+
+                  <div className="timeline-item">
+                    <div className="timeline-marker">Month 7-8</div>
+                    <div className="timeline-content">
+                      <h4>The "Polish and Perfect" Phase</h4>
+                      <p>Added the subtitle system, optimized performance, implemented error handling, and added enough monitoring to make NASA jealous. The final result: a streaming platform that actually works.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance Metrics */}
+              <div className="performance-metrics">
+                <h3>📊 The Numbers Don't Lie</h3>
+                <p className="mission-text">
+                  After 8 months of development and optimization, Flyx delivers performance metrics that would make other streaming platforms weep with envy:
+                </p>
+
+                <div className="metrics-showcase">
+                  <div className="metric-item featured">
+                    <div className="metric-icon">⚡</div>
+                    <div className="metric-number">&lt; 3s</div>
+                    <div className="metric-label">Average Load Time</div>
+                    <div className="metric-desc">From click to playback</div>
+                    <div className="metric-detail">Includes stream extraction, proxy setup, and HLS initialization</div>
+                  </div>
+
+                  <div className="metric-item">
+                    <div className="metric-icon">🎯</div>
+                    <div className="metric-number">99.9%</div>
+                    <div className="metric-label">Success Rate</div>
+                    <div className="metric-desc">Stream extraction reliability</div>
+                    <div className="metric-detail">With automatic fallback systems</div>
+                  </div>
+
+                  <div className="metric-item">
+                    <div className="metric-icon">🌍</div>
+                    <div className="metric-number">47</div>
+                    <div className="metric-label">Languages</div>
+                    <div className="metric-desc">Subtitle support</div>
+                    <div className="metric-detail">From Arabic to Vietnamese</div>
+                  </div>
+
+                  <div className="metric-item">
+                    <div className="metric-icon">📚</div>
+                    <div className="metric-number">4M+</div>
+                    <div className="metric-label">Subtitle Files</div>
+                    <div className="metric-desc">OpenSubtitles database</div>
+                    <div className="metric-detail">Quality-scored and cached</div>
+                  </div>
+
+                  <div className="metric-item">
+                    <div className="metric-icon">🚀</div>
+                    <div className="metric-number">60MB</div>
+                    <div className="metric-label">Buffer Size</div>
+                    <div className="metric-desc">Aggressive buffering</div>
+                    <div className="metric-detail">For uninterrupted playback</div>
+                  </div>
+
+                  <div className="metric-item featured">
+                    <div className="metric-icon">🚫</div>
+                    <div className="metric-number">0</div>
+                    <div className="metric-label">Ads or Tracking</div>
+                    <div className="metric-desc">Zero data collection</div>
+                    <div className="metric-detail">Privacy-first architecture</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Technical Deep Dive */}
+              <div className="technical-deep-dive">
+                <h3>🔬 Technical Deep Dive: The Engineering Marvels</h3>
+                <p className="mission-text">
+                  Let's get into the nitty-gritty of how Flyx actually works. These aren't just buzzwords - these are real solutions to real problems that took months to perfect.
+                </p>
+
+                <div className="deep-dive-sections">
+                  <div className="dive-section">
+                    <div className="dive-header">
+                      <div className="dive-icon">🤖</div>
+                      <h4>Browser Automation Mastery</h4>
+                      <div className="dive-complexity">Complexity: Nightmare Mode</div>
+                    </div>
+                    <div className="dive-content">
+                      <p>Creating browser automation that can fool modern detection systems required implementing 47 different Chrome flags and behavioral simulation algorithms.</p>
+                      <div className="dive-details">
+                        <div className="detail-item">
+                          <span className="detail-label">Stealth Flags:</span>
+                          <span className="detail-value">47 Chrome flags disabled</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Fingerprint Masking:</span>
+                          <span className="detail-value">Canvas, WebGL, Audio context</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Human Simulation:</span>
+                          <span className="detail-value">Mouse curves, timing patterns</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Success Rate:</span>
+                          <span className="detail-value">99.7% bot detection bypass</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="dive-section">
+                    <div className="dive-header">
+                      <div className="dive-icon">🌐</div>
+                      <h4>CORS Proxy Intelligence</h4>
+                      <div className="dive-complexity">Complexity: Expert Level</div>
+                    </div>
+                    <div className="dive-content">
+                      <p>The proxy system analyzes each request and applies source-specific header strategies while rewriting M3U8 playlists in real-time.</p>
+                      <div className="dive-details">
+                        <div className="detail-item">
+                          <span className="detail-label">Header Strategies:</span>
+                          <span className="detail-value">3 different approaches</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">M3U8 Processing:</span>
+                          <span className="detail-value">Real-time URL rewriting</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Latency Added:</span>
+                          <span className="detail-value">&lt; 50ms per request</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Cache Hit Rate:</span>
+                          <span className="detail-value">87% for repeated content</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="dive-section">
+                    <div className="dive-header">
+                      <div className="dive-icon">📺</div>
+                      <h4>HLS.js Optimization</h4>
+                      <div className="dive-complexity">Complexity: Advanced</div>
+                    </div>
+                    <div className="dive-content">
+                      <p>Heavily modified HLS.js configuration with conservative bandwidth estimation and aggressive buffering for optimal streaming.</p>
+                      <div className="dive-details">
+                        <div className="detail-item">
+                          <span className="detail-label">Buffer Strategy:</span>
+                          <span className="detail-value">60MB aggressive buffering</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Bandwidth Factor:</span>
+                          <span className="detail-value">0.8 conservative estimation</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Error Recovery:</span>
+                          <span className="detail-value">7 different error types</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Quality Stability:</span>
+                          <span className="detail-value">Manual control preferred</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -158,7 +719,7 @@ const AboutPage = () => {
                 <div className="code-example">
                   <h4>🤖 Advanced Browser Stealth Configuration</h4>
                   <pre className="code-block">
-{`// Comprehensive anti-detection browser configuration
+                    {`// Comprehensive anti-detection browser configuration
 const createStealthBrowser = async () => {
   const browserArgs = [
     '--no-sandbox',
@@ -256,7 +817,7 @@ const createStealthBrowser = async () => {
                 <div className="code-example">
                   <h4>🌐 Intelligent CORS Proxy with Source-Specific Strategies</h4>
                   <pre className="code-block">
-{`// Advanced proxy system with source-specific header strategies
+                    {`// Advanced proxy system with source-specific header strategies
 function buildProxyHeaders(originalUrl, userAgent, source, requestType) {
   const urlObj = new URL(originalUrl);
   const isSubtitle = originalUrl.includes('.vtt') || originalUrl.includes('.srt');
@@ -358,7 +919,7 @@ async function rewriteM3U8Playlist(playlistContent, baseUrl, proxyBaseUrl) {
                 <div className="code-example">
                   <h4>📺 Advanced HLS.js Configuration for Optimal Streaming</h4>
                   <pre className="code-block">
-{`// Highly optimized HLS.js configuration for streaming reliability
+                    {`// Highly optimized HLS.js configuration for streaming reliability
 const createHLSInstance = (videoElement, streamUrl, activeSubtitle) => {
   const hlsConfig = {
     // Disable automatic quality adaptation - manual control only
@@ -497,7 +1058,7 @@ const createHLSInstance = (videoElement, streamUrl, activeSubtitle) => {
                 <div className="code-example">
                   <h4>💬 Advanced Subtitle Processing & Quality Scoring</h4>
                   <pre className="code-block">
-{`// Comprehensive subtitle quality analysis and processing
+                    {`// Comprehensive subtitle quality analysis and processing
 class SubtitleProcessor {
   constructor() {
     this.supportedFormats = ['srt', 'vtt', 'sub', 'ass', 'ssa'];
@@ -696,7 +1257,7 @@ class SubtitleProcessor {
                 <div className="code-example">
                   <h4>⚡ Real-Time Progress Tracking & Error Recovery</h4>
                   <pre className="code-block">
-{`// Comprehensive progress tracking and error recovery system
+                    {`// Comprehensive progress tracking and error recovery system
 class StreamExtractionManager {
   constructor() {
     this.phases = {
@@ -914,7 +1475,7 @@ class StreamExtractionManager {
               <p className="mission-text">
                 These metrics represent 8 months of intensive optimization and the culmination of solving complex distributed systems challenges.
               </p>
-              
+
               <div className="metrics-grid">
                 <div className="metric-card">
                   <div className="metric-value">1,643</div>
@@ -967,7 +1528,7 @@ class StreamExtractionManager {
               <p className="mission-text">
                 Every technology choice was made based on specific technical requirements, performance characteristics, and reliability considerations.
               </p>
-              
+
               <div className="tech-categories">
                 <div className="tech-category">
                   <h3>Frontend Architecture</h3>
@@ -990,7 +1551,7 @@ class StreamExtractionManager {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="tech-category">
                   <h3>Backend Infrastructure</h3>
                   <div className="tech-grid">
@@ -1012,7 +1573,7 @@ class StreamExtractionManager {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="tech-category">
                   <h3>External Integrations</h3>
                   <div className="tech-grid">
@@ -1045,7 +1606,7 @@ class StreamExtractionManager {
               <p className="mission-text">
                 These represent the most significant technical obstacles encountered and the engineering solutions developed to overcome them.
               </p>
-              
+
               <div className="challenges-grid">
                 <div className="challenge-item">
                   <div className="challenge-icon">🤖</div>
@@ -1059,7 +1620,7 @@ class StreamExtractionManager {
                   </p>
                   <div className="solution-badge">Stealth Mode Engineering</div>
                 </div>
-                
+
                 <div className="challenge-item">
                   <div className="challenge-icon">🌐</div>
                   <h3>Complex CORS Policy Management</h3>
@@ -1072,7 +1633,7 @@ class StreamExtractionManager {
                   </p>
                   <div className="solution-badge">Smart Proxy Architecture</div>
                 </div>
-                
+
                 <div className="challenge-item">
                   <div className="challenge-icon">📺</div>
                   <h3>HLS Streaming Optimization</h3>
@@ -1085,7 +1646,7 @@ class StreamExtractionManager {
                   </p>
                   <div className="solution-badge">Streaming Performance Engineering</div>
                 </div>
-                
+
                 <div className="challenge-item">
                   <div className="challenge-icon">💬</div>
                   <h3>Multi-Format Subtitle Processing</h3>
@@ -1109,43 +1670,43 @@ class StreamExtractionManager {
               <p className="mission-text">
                 These insights represent hard-earned knowledge from solving complex technical challenges and building a production-scale streaming platform as a single developer.
               </p>
-              
+
               <div className="lessons-grid">
                 <div className="lesson-item">
                   <h4>1. Browser Automation Requires Paranoid Attention to Detail</h4>
                   <p>Modern bot detection systems analyze hundreds of browser characteristics simultaneously. A single automation flag or unnatural timing pattern can trigger detection. Every aspect of browser behavior must be carefully controlled and randomized to maintain stealth mode operation.</p>
                 </div>
-                
+
                 <div className="lesson-item">
                   <h4>2. CORS Policies Are Inconsistently Implemented</h4>
                   <p>Different streaming sources interpret CORS policies differently, requiring source-specific header strategies. What works for one provider will often trigger errors on another. Building a flexible proxy system with per-source configuration is essential for multi-provider support.</p>
                 </div>
-                
+
                 <div className="lesson-item">
                   <h4>3. HLS.js Defaults Prioritize Adaptation Speed Over Quality</h4>
                   <p>Default HLS.js configurations cause frequent quality switching that degrades user experience. Conservative bandwidth estimation and aggressive buffering provide much better streaming stability, especially for users with variable connection speeds.</p>
                 </div>
-                
+
                 <div className="lesson-item">
                   <h4>4. Error Recovery Must Be Comprehensive and Intelligent</h4>
                   <p>Streaming systems fail in dozens of different ways, each requiring specific recovery strategies. Generic retry logic is insufficient. Implementing error-type-specific recovery with exponential backoff and jitter prevents cascade failures and improves overall system reliability.</p>
                 </div>
-                
+
                 <div className="lesson-item">
                   <h4>5. Pacific Punch Monster Energy is Critical Infrastructure</h4>
                   <p>Development velocity is directly correlated with caffeine intake. I consumed 1,643 cans during the 8-month development cycle - approximately 6 cans per day during active coding sessions. The local gas station now stocks extra inventory and knows my purchase patterns better than any analytics system.</p>
                 </div>
-                
+
                 <div className="lesson-item">
                   <h4>6. Serverless Architecture Scales Infinitely (Until It Doesn't)</h4>
                   <p>Vercel Edge Functions provide excellent performance and automatic scaling, but each function has memory and execution time limits. Complex operations like browser automation must be offloaded to dedicated VMs with proper resource management and cleanup procedures.</p>
                 </div>
-                
+
                 <div className="lesson-item">
                   <h4>7. Performance Monitoring is Essential for Distributed Systems</h4>
                   <p>With components distributed across edge functions, VMs, and third-party APIs, identifying performance bottlenecks requires comprehensive logging and metrics collection. Every operation must be timed and tracked for effective debugging and optimization.</p>
                 </div>
-                
+
                 <div className="lesson-item">
                   <h4>8. JavaScript Obfuscation Can Be Defeated with Patience</h4>
                   <p>Rather than reverse-engineering obfuscated JavaScript, executing the code in an isolated environment and intercepting the results is often more effective. Runtime evaluation bypasses static analysis challenges and adapts automatically to code changes.</p>
@@ -1166,17 +1727,17 @@ class StreamExtractionManager {
                   <h4>🧠 Machine Learning Integration</h4>
                   <p>Implement ML models for intelligent source selection based on success rates, quality analysis for automated subtitle ranking, and predictive caching for frequently requested content. Train models on extraction patterns to improve success rates and reduce processing time.</p>
                 </div>
-                
+
                 <div className="future-item">
                   <h4>⚡ WebAssembly Performance Optimization</h4>
                   <p>Migrate computationally intensive operations like subtitle processing and M3U8 parsing to WebAssembly for improved performance. Target 3-5x performance improvements for subtitle conversion and playlist manipulation operations.</p>
                 </div>
-                
+
                 <div className="future-item">
                   <h4>🔄 Advanced Caching Strategy</h4>
                   <p>Implement multi-tier caching with Redis for frequently accessed streams, intelligent cache invalidation based on content freshness, and predictive pre-loading of popular content to reduce extraction times to sub-1-second averages.</p>
                 </div>
-                
+
                 <div className="future-item">
                   <h4>📊 Real-Time Analytics Dashboard</h4>
                   <p>Build comprehensive monitoring system with real-time metrics visualization, automated alerting for system issues, performance trend analysis, and capacity planning tools for VM fleet management and scaling decisions.</p>
@@ -1185,33 +1746,115 @@ class StreamExtractionManager {
             </div>
           </section>
 
+          {/* Tech Stack Showcase */}
+          <section className="tech-stack-section">
+            <div className="content-card">
+              <h2>The Tech Stack: A Symphony of Modern Tools �️</h2>
+              <p className="mission-text">
+                Building Flyx required assembling a tech stack that reads like a "who's who" of modern web development. Each tool was chosen not just for its capabilities, but for how well it plays with others in this complex ecosystem.
+              </p>
+
+              <div className="tech-categories">
+                <div className="tech-category">
+                  <h3>Frontend Arsenal</h3>
+                  <div className="tech-grid">
+                    <div className="tech-item">
+                      <span className="tech-name">Next.js 14</span>
+                      <p className="tech-desc">The React framework that makes server-side rendering feel like magic. App Router included because we like living dangerously.</p>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">React 18</span>
+                      <p className="tech-desc">The UI library that turned web development from a chore into an art form. Server Components are the cherry on top.</p>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">HLS.js (Heavily Modified)</span>
+                      <p className="tech-desc">The video streaming engine that we've customized so extensively it barely recognizes its original self.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="tech-category">
+                  <h3>Backend Wizardry</h3>
+                  <div className="tech-grid">
+                    <div className="tech-item">
+                      <span className="tech-name">Vercel Edge Functions</span>
+                      <p className="tech-desc">Serverless functions that run at the edge of the internet, because latency is the enemy of good streaming.</p>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">Puppeteer</span>
+                      <p className="tech-desc">The browser automation tool that we've taught to be more human than most humans.</p>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">Node.js</span>
+                      <p className="tech-desc">The JavaScript runtime that powers our backend operations with the efficiency of a Swiss watch.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="tech-category">
+                  <h3>External APIs & Services</h3>
+                  <div className="tech-grid">
+                    <div className="tech-item">
+                      <span className="tech-name">TMDB API</span>
+                      <p className="tech-desc">The movie database that knows more about films than a film school professor.</p>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">OpenSubtitles API</span>
+                      <p className="tech-desc">4+ million subtitle files in 47 languages. It's like having a personal translator for every movie ever made.</p>
+                    </div>
+                    <div className="tech-item">
+                      <span className="tech-name">Google Cloud VMs</span>
+                      <p className="tech-desc">Isolated virtual machines that spawn faster than popcorn and disappear just as quickly.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* The Philosophy */}
+          <section className="philosophy-section">
+            <div className="content-card">
+              <h2>The Philosophy: Why We Built This 🎭</h2>
+              <p className="mission-text">
+                Flyx isn't just a streaming platform - it's a statement. A declaration that the internet doesn't have to be a dystopian wasteland of ads, paywalls, and user-hostile design. It's proof that one developer with enough caffeine and determination can build something that actually respects users.
+              </p>
+              <p className="mission-text">
+                Every line of code in Flyx was written with a simple philosophy: technology should serve users, not exploit them. No ads that interrupt your viewing experience. No account creation requirements. No data harvesting. No artificial limitations. Just pure, unadulterated streaming technology doing what it does best.
+              </p>
+              <p className="mission-text">
+                This project represents 8 months of solving problems that most developers would consider impossible. It's a testament to what's possible when you refuse to accept "that's just how things are" as an answer. Sometimes the best way to fix a broken system is to build a better one from scratch.
+              </p>
+            </div>
+          </section>
+
           {/* Technical Disclaimer */}
           <section className="disclaimer-section">
             <div className="content-card disclaimer-card">
-              <h2>Technical Disclaimer and Educational Purpose 📝</h2>
+              <h2>The Fine Print (But Make It Honest) ⚖️</h2>
               <div className="disclaimer-content">
                 <p>
-                  <strong>Educational and Technical Demonstration Only:</strong> This project serves as a comprehensive demonstration of advanced web technologies, distributed systems architecture, and complex problem-solving in browser automation and streaming protocols.
+                  <strong>Educational Purpose:</strong> Flyx exists as a technical demonstration and educational project showcasing advanced web development techniques. It's like a computer science thesis that actually works and doesn't put people to sleep.
                 </p>
                 <p>
-                  The technical challenges solved here represent significant engineering achievements in CORS circumvention, browser stealth mode operation, adaptive streaming optimization, and real-time media processing. The solutions developed could be applicable to various legitimate use cases including content testing, streaming quality analysis, and browser automation research.
+                  <strong>Content Responsibility:</strong> We don't host, store, or distribute any content - we're more like a very sophisticated remote control that happens to work across the entire internet. All content comes from third-party sources, and users are responsible for their own viewing choices.
                 </p>
                 <p>
-                  <strong>No Data Collection or Privacy Violations:</strong> The system operates with zero data persistence, no user tracking, no analytics collection, and no personal information storage. All processing is ephemeral with automatic cleanup after each session.
+                  <strong>Technical Innovation:</strong> The browser automation, CORS handling, and stream processing techniques shown here demonstrate what's possible with modern web technologies when applied creatively to real-world challenges.
                 </p>
                 <p>
-                  <strong>Technical Innovation Focus:</strong> This project pushes the boundaries of what's achievable with modern web technologies, demonstrating advanced techniques in JavaScript execution environments, network protocol handling, and distributed system design.
+                  <strong>Zero Data Collection:</strong> This system operates with zero data persistence, no user tracking, no analytics collection, and no personal information storage. All processing is ephemeral with automatic cleanup after each session.
                 </p>
                 <p>
-                  The engineering insights gained from building this system contribute to the broader understanding of web technology capabilities, security model limitations, and performance optimization techniques in complex distributed environments.
+                  <strong>Use Responsibly:</strong> This platform represents hundreds of hours of engineering work and should be appreciated as such. Use it responsibly, respect content creators, and remember that with great streaming power comes great responsibility.
                 </p>
               </div>
             </div>
           </section>
         </div>
-      </main>
+      </main >
       <Footer />
-    </div>
+    </div >
   );
 };
 

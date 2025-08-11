@@ -3,126 +3,208 @@ import { NextResponse } from 'next/server';
 // VM extractor configuration
 const VM_EXTRACTOR_URL = process.env.VM_EXTRACTOR_URL || 'http://35.188.123.210:3001';
 
-// Progress streaming endpoint
-export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  console.log(`[${requestId}] Starting progress stream for extraction`);
-
-  // Create ReadableStream for Server-Sent Events
-  const stream = new ReadableStream({
-    start(controller) {
-      // Function to send SSE data
-      const sendEvent = (data) => {
-        const event = `data: ${JSON.stringify(data)}\n\n`;
-        controller.enqueue(new TextEncoder().encode(event));
-      };
-
-      // Start the VM extraction with progress monitoring
-      startVMExtractionWithProgress(searchParams, sendEvent, controller, requestId);
+// Utility function for structured logging
+function createLogger(requestId) {
+  return {
+    info: (message, data = {}) => {
+      console.log(`[${requestId}] INFO: ${message}`, JSON.stringify(data, null, 2));
     },
-  });
-
-  // Return SSE response
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control',
+    warn: (message, data = {}) => {
+      console.warn(`[${requestId}] WARN: ${message}`, JSON.stringify(data, null, 2));
     },
-  });
+    error: (message, error = null, data = {}) => {
+      console.error(`[${requestId}] ERROR: ${message}`, {
+        error: error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : null,
+        ...data
+      });
+    },
+    debug: (message, data = {}) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug(`[${requestId}] DEBUG: ${message}`, JSON.stringify(data, null, 2));
+      }
+    }
+  };
 }
 
-async function startVMExtractionWithProgress(searchParams, sendEvent, controller, requestId) {
-  try {
-    // Build VM request parameters
-    const vmParams = new URLSearchParams();
-    for (const [key, value] of searchParams.entries()) {
-      vmParams.append(key, value);
-    }
+// Generate unique request ID for tracking
+function generateRequestId() {
+  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
 
-    // Create EventSource connection to VM server's streaming endpoint
-    const vmStreamUrl = `${VM_EXTRACTOR_URL}/extract-stream?${vmParams}`;
-    console.log(`[${requestId}] Starting VM stream from:`, vmStreamUrl);
+// Build VM extractor URL with query parameters
+function buildVMUrl(searchParams, logger) {
+  const vmUrl = new URL(`${VM_EXTRACTOR_URL}/extract-stream`);
+  
+  // Forward all query parameters to the VM
+  const paramsToForward = ['url', 'mediaType', 'movieId', 'seasonId', 'episodeId', 'server'];
+  
+  paramsToForward.forEach(param => {
+    const value = searchParams.get(param);
+    if (value) {
+      vmUrl.searchParams.set(param, value);
+    }
+  });
+
+  logger.info('Built VM extractor streaming URL', {
+    vmBaseUrl: VM_EXTRACTOR_URL,
+    vmFullUrl: vmUrl.toString(),
+    forwardedParams: Object.fromEntries(vmUrl.searchParams)
+  });
+
+  return vmUrl.toString();
+}
+
+// Server-Sent Events proxy for real-time progress updates
+export async function GET(request) {
+  const requestId = generateRequestId();
+  const logger = createLogger(requestId);
+  
+  logger.info('SSE proxy request started', {
+    timestamp: new Date().toISOString(),
+    userAgent: request.headers.get('user-agent'),
+    referer: request.headers.get('referer')
+  });
+
+  try {
+    // Parse parameters and build VM URL
+    const { searchParams } = new URL(request.url);
+    const vmUrl = buildVMUrl(searchParams, logger);
     
-    // Note: Using fetch with streaming response instead of EventSource to handle server-side streaming
-    const vmResponse = await fetch(vmStreamUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'User-Agent': 'Flyx-Serverless-Proxy/1.0'
-      },
-      signal: AbortSignal.timeout(60000) // 60 second timeout
+    logger.info('Forwarding SSE request to VM extractor', {
+      vmUrl: vmUrl.substring(0, 200) + (vmUrl.length > 200 ? '...' : ''),
+      vmBaseUrl: VM_EXTRACTOR_URL
     });
 
-    if (!vmResponse.ok) {
-      throw new Error(`VM stream service returned ${vmResponse.status}: ${vmResponse.statusText}`);
-    }
+    // Create a readable stream for Server-Sent Events
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // Forward request to VM extractor's streaming endpoint
+          const vmResponse = await fetch(vmUrl, {
+            method: 'GET',
+            headers: {
+              'User-Agent': request.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+              'Accept': 'text/event-stream',
+              'Cache-Control': 'no-cache'
+            },
+            // Set a reasonable timeout for the VM request
+            signal: AbortSignal.timeout(180000) // 3 minutes timeout for streaming
+          });
 
-    const reader = vmResponse.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+          if (!vmResponse.ok) {
+            logger.error('VM extractor streaming returned error', null, {
+              status: vmResponse.status,
+              statusText: vmResponse.statusText,
+              vmUrl: vmUrl.substring(0, 100)
+            });
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Process complete SSE events
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const eventData = JSON.parse(line.slice(6));
-              console.log(`[${requestId}] VM Progress:`, eventData.phase, `(${eventData.progress}%)`);
-              
-              // Log completion data for debugging
-              if (eventData.phase === 'complete') {
-                console.log(`[${requestId}] Completion data:`, JSON.stringify(eventData, null, 2));
-              }
-              
-              // Forward the progress event to the client
-              sendEvent(eventData);
-              
-              // Break if we receive completion or error
-              if (eventData.phase === 'complete' || eventData.phase === 'error' || eventData.phase === 'autoswitch') {
-                console.log(`[${requestId}] VM extraction ${eventData.phase} - ending stream`);
-                return;
-              }
-              
-            } catch (parseError) {
-              console.warn(`[${requestId}] Error parsing VM progress data:`, parseError.message);
-              console.warn(`[${requestId}] Raw line:`, line);
-            }
+            // Send error event to client
+            const errorData = JSON.stringify({
+              error: true,
+              message: `VM extractor error: ${vmResponse.status} ${vmResponse.statusText}`,
+              phase: 'error',
+              progress: 0,
+              requestId
+            });
+            controller.enqueue(`data: ${errorData}\n\n`);
+            controller.close();
+            return;
           }
+
+          // Stream the response from VM extractor to client
+          const reader = vmResponse.body.getReader();
+          const decoder = new TextDecoder();
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              
+              if (done) {
+                logger.info('VM extractor stream completed');
+                break;
+              }
+
+              // Decode and forward the chunk
+              const chunk = decoder.decode(value, { stream: true });
+              
+              // Log progress updates for debugging
+              if (chunk.includes('data:')) {
+                try {
+                  const dataMatch = chunk.match(/data: (.+)/);
+                  if (dataMatch) {
+                    const progressData = JSON.parse(dataMatch[1]);
+                    logger.debug('Progress update', {
+                      phase: progressData.phase,
+                      progress: progressData.progress,
+                      message: progressData.message
+                    });
+                  }
+                } catch (e) {
+                  // Ignore JSON parse errors for progress logging
+                }
+              }
+
+              // Forward the chunk to the client
+              controller.enqueue(chunk);
+            }
+          } finally {
+            reader.releaseLock();
+          }
+
+          controller.close();
+
+        } catch (error) {
+          logger.error('SSE proxy stream error', error);
+
+          // Send error event to client
+          const errorData = JSON.stringify({
+            error: true,
+            message: error.name === 'AbortError' ? 'Request timeout' : 'Stream extraction failed',
+            phase: 'error',
+            progress: 0,
+            requestId,
+            debug: {
+              errorType: error.name,
+              errorMessage: error.message
+            }
+          });
+          controller.enqueue(`data: ${errorData}\n\n`);
+          controller.close();
         }
       }
-    } finally {
-      reader.releaseLock();
-    }
-
-    console.log(`[${requestId}] VM stream completed`);
-    
-  } catch (error) {
-    console.error(`[${requestId}] VM progress stream error:`, error);
-    
-    sendEvent({
-      phase: 'error',
-      progress: 0,
-      message: error.message || 'VM extraction failed',
-      timestamp: Date.now(),
-      error: true
     });
-  } finally {
-    // Close the stream
-    controller.close();
+
+    // Return Server-Sent Events response
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control',
+      },
+    });
+
+  } catch (error) {
+    logger.error('SSE proxy initialization failed', error);
+
+    // Return error response
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to initialize stream extraction',
+        requestId,
+        debug: {
+          vmUrl: VM_EXTRACTOR_URL,
+          errorType: error.name,
+          errorMessage: error.message
+        }
+      },
+      { status: 500 }
+    );
   }
-} 
+}

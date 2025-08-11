@@ -1,5 +1,6 @@
 // Frontend subtitle service based on cloudnestra's approach
 // This moves subtitle fetching from vm-server to frontend for better performance
+import { parseVTTEnhanced, parseTimeEnhanced } from '../utils/enhancedVttParser';
 
 class SubtitleService {
   constructor() {
@@ -191,14 +192,29 @@ class SubtitleService {
         vttContent = 'WEBVTT\n\n' + vttContent;
       }
 
-      // Validate VTT content format
-      const validation = this.validateVttContent(vttContent);
-      if (!validation.valid) {
-        console.warn('⚠️ VTT validation issues found:', validation.issues);
-        console.log('📊 VTT validation info:', validation.info);
-      } else {
-        console.log('✅ VTT content validation passed:', validation.summary);
+      // Use enhanced VTT parser for validation and improved parsing
+      console.log('🔍 Using enhanced VTT parser for validation...');
+      const enhancedParseResult = parseVTTEnhanced(vttContent, {
+        strictMode: false,
+        enableErrorRecovery: true,
+        sanitizeHtml: true,
+        validateTiming: true
+      });
+
+      if (enhancedParseResult.metadata.errors.length > 0) {
+        console.warn('⚠️ Enhanced VTT parsing found errors:', enhancedParseResult.metadata.errors);
       }
+      
+      if (enhancedParseResult.metadata.warnings.length > 0) {
+        console.warn('⚠️ Enhanced VTT parsing warnings:', enhancedParseResult.metadata.warnings);
+      }
+
+      console.log('✅ Enhanced VTT validation completed:', {
+        cues: enhancedParseResult.cues.length,
+        errors: enhancedParseResult.metadata.errors.length,
+        warnings: enhancedParseResult.metadata.warnings.length,
+        processingTime: `${enhancedParseResult.metadata.processingTime.toFixed(2)}ms`
+      });
 
       // Show first 400 characters of VTT content for debugging
       console.log('📄 VTT Content (first 400 chars):\n' + vttContent.substring(0, 400) + '\n[...truncated...]');

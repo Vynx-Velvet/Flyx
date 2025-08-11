@@ -1,0 +1,632 @@
+/* Performance Dashboard Styles */
+
+.performance-dashboard {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dashboard-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.monitoring-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.status-indicator {
+  font-size: 0.8rem;
+}
+
+.control-button {
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.control-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.control-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.close-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dashboard-tabs {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tab {
+  padding: 1rem 2rem;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.tab:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab.active {
+  color: white;
+  border-bottom-color: #4CAF50;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dashboard-content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+/* Overview Tab Styles */
+.performance-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.metric-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.metric-card h3 {
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.recommendations-section {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.recommendations-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.recommendations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recommendation {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 4px solid;
+}
+
+.recommendation.critical {
+  background: rgba(244, 67, 54, 0.1);
+  border-left-color: #F44336;
+}
+
+.recommendation.high {
+  background: rgba(255, 152, 0, 0.1);
+  border-left-color: #FF9800;
+}
+
+.recommendation.medium {
+  background: rgba(33, 150, 243, 0.1);
+  border-left-color: #2196F3;
+}
+
+.recommendation-icon {
+  font-size: 1.2rem;
+}
+
+.recommendation-content {
+  flex: 1;
+}
+
+.recommendation-message {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.recommendation-type {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.no-recommendations {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+.recent-optimizations {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.recent-optimizations h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.optimizations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.optimization-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.optimization-time {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  min-width: 80px;
+}
+
+.optimization-details {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+}
+
+.optimization-type {
+  font-weight: 500;
+  color: #4CAF50;
+}
+
+.optimization-action {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.optimization-reason {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+.no-optimizations {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+/* Buffer Tab Styles */
+.buffer-monitoring {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.buffer-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.buffer-health-chart,
+.segment-metrics,
+.quality-metrics {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.buffer-health-chart h3,
+.segment-metrics h3,
+.quality-metrics h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.health-bar {
+  width: 100%;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.health-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 10px;
+}
+
+.health-details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.segment-stats,
+.quality-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.stat value {
+  font-weight: 600;
+  color: white;
+}
+
+/* Network Tab Styles */
+.network-monitoring {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.network-status,
+.streaming-recommendations {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.network-status h3,
+.streaming-recommendations h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.network-grid,
+.recommendations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.network-metric,
+.param {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.network-metric label,
+.param label {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.network-metric value,
+.param value {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.network-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.action-button {
+  padding: 0.75rem 1.5rem;
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid #4CAF50;
+  color: #4CAF50;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.action-button:hover {
+  background: rgba(76, 175, 80, 0.3);
+}
+
+.action-button.danger {
+  background: rgba(244, 67, 54, 0.2);
+  border-color: #F44336;
+  color: #F44336;
+}
+
+.action-button.danger:hover {
+  background: rgba(244, 67, 54, 0.3);
+}
+
+/* Memory Tab Styles */
+.memory-monitoring {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.memory-status,
+.resource-tracking {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.memory-status h3,
+.resource-tracking h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.memory-bar {
+  width: 100%;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.memory-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 12px;
+}
+
+.memory-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.pressure-indicator {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pressure-indicator.low {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4CAF50;
+}
+
+.pressure-indicator.medium {
+  background: rgba(255, 152, 0, 0.2);
+  color: #FF9800;
+}
+
+.pressure-indicator.high {
+  background: rgba(255, 87, 34, 0.2);
+  color: #FF5722;
+}
+
+.pressure-indicator.critical {
+  background: rgba(244, 67, 54, 0.2);
+  color: #F44336;
+}
+
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.resource-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.resource-metric label {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.resource-metric value {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.memory-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+/* Connection Tab Styles */
+.connection-monitoring {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.cdn-status,
+.connection-metrics {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.cdn-status h3,
+.connection-metrics h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.cdn-info,
+.connection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.cdn-metric,
+.connection-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cdn-metric label,
+.connection-metric label {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cdn-metric value,
+.connection-metric value {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .header-controls {
+    justify-content: space-between;
+  }
+
+  .dashboard-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .tab {
+    flex-shrink: 0;
+  }
+
+  .dashboard-content {
+    padding: 1rem;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .buffer-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .network-grid,
+  .recommendations-grid,
+  .resource-grid,
+  .connection-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
