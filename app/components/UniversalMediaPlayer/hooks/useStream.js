@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch = true }) => {
   const [server, setServer] = useState("Vidsrc.xyz");
@@ -8,48 +8,87 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
   const [error, setError] = useState(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingPhase, setLoadingPhase] = useState('initializing');
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [maxRetries] = useState(3);
+  
+  // Use refs to track extraction state and prevent race conditions
+  const extractionRef = useRef({ isExtracting: false, eventSource: null, retryTimeout: null });
+  const isMountedRef = useRef(true);
 
-  useEffect(() => {
-    // CRITICAL: Only fetch streams when explicitly requested
-    if (!shouldFetch) {
-      console.log('🚫 Stream fetching disabled - useStream in view-only mode');
-      setLoading(false);
+  // Helper function to determine if an error is retryable
+  const isRetryableError = (errorMessage, data) => {
+    const nonRetryableErrors = [
+      'invalid tmdb id',
+      'media not found',
+      'invalid parameters',
+      'unsupported media type',
+      'rate limited',
+      'blocked by provider'
+    ];
+    
+    const errorLower = errorMessage.toLowerCase();
+    return !nonRetryableErrors.some(nonRetryable => errorLower.includes(nonRetryable));
+  };
+
+  // Cleanup function to properly close connections and clear timeouts
+  const cleanup = () => {
+    if (extractionRef.current.eventSource) {
+      extractionRef.current.eventSource.close();
+      extractionRef.current.eventSource = null;
+    }
+    if (extractionRef.current.retryTimeout) {
+      clearTimeout(extractionRef.current.retryTimeout);
+      extractionRef.current.retryTimeout = null;
+    }
+    extractionRef.current.isExtracting = false;
+  };
+
+  // Extract stream function with proper retry logic
+  const extractStream = async (attemptNumber = 1) => {
+    // Prevent multiple simultaneous extraction attempts
+    if (extractionRef.current.isExtracting && attemptNumber === 1) {
+      console.log('🚫 Extraction already in progress, skipping duplicate request');
       return;
     }
 
-    if (!movieId || (mediaType === 'tv' && (!seasonId || !episodeId))) {
-      setLoading(false);
+    // Clean up any existing connections
+    cleanup();
+    
+    if (!isMountedRef.current) {
+      console.log('🚫 Component unmounted, aborting extraction');
       return;
     }
 
-    console.log('🚀 STARTING STREAM EXTRACTION for:', { mediaType, movieId, seasonId, episodeId });
+    extractionRef.current.isExtracting = true;
+    
+    setLoading(true);
+    setError(null);
+    setStreamUrl(null);
+    setLoadingProgress(0);
+    setLoadingPhase(attemptNumber > 1 ? `retrying (attempt ${attemptNumber}/${maxRetries})` : 'initializing');
+    setRetryAttempt(attemptNumber);
 
-    let isMounted = true;
-    let eventSource;
+    console.log(`🔄 Stream extraction attempt ${attemptNumber}/${maxRetries} for:`, { mediaType, movieId, seasonId, episodeId });
 
-    const extractStream = async () => {
-      setLoading(true);
-      setError(null);
-      setStreamUrl(null);
-      setLoadingProgress(0);
-      setLoadingPhase('initializing');
+    try {
+      const params = new URLSearchParams({
+        mediaType,
+        movieId: movieId.toString(),
+        server: server === "Vidsrc.xyz" ? "vidsrc.xyz" : "embed.su",
+        ...(mediaType === 'tv' && { 
+          seasonId: seasonId.toString(), 
+          episodeId: episodeId.toString() 
+        }),
+      });
 
-      try {
-        const params = new URLSearchParams({
-          mediaType,
-          movieId: movieId.toString(),
-          server: server === "Vidsrc.xyz" ? "vidsrc.xyz" : "embed.su",
-          ...(mediaType === 'tv' && { 
-            seasonId: seasonId.toString(), 
-            episodeId: episodeId.toString() 
-          }),
-        });
+      const progressUrl = `/api/extract-stream-progress?${params.toString()}`;
+      const eventSource = new EventSource(progressUrl);
+      extractionRef.current.eventSource = eventSource;
 
-        const progressUrl = `/api/extract-stream-progress?${params.toString()}`;
-        eventSource = new EventSource(progressUrl);
-
-        eventSource.onmessage = (event) => {
-          if (!isMounted) return;
+      eventSource.onmessage = (event) => {
+        if (!isMountedRef.current) return;
+        
+        try {
           const data = JSON.parse(event.data);
 
           if (data.progress) setLoadingProgress(data.progress);
@@ -59,9 +98,8 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
             const extractData = data.result;
 
             if (!extractData.streamUrl) {
-              setError('Stream extraction succeeded but no URL was found.');
-              setLoading(false);
-              eventSource.close();
+              console.log(`❌ Stream extraction succeeded but no URL found on attempt ${attemptNumber}/${maxRetries}`);
+              handleExtractionFailure('Stream extraction succeeded but no URL was found.', attemptNumber, data);
               return;
             }
 
@@ -92,10 +130,14 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
               console.log('✅ Using direct access for stream URL');
             }
 
+            // Success - clean up and set results
+            cleanup();
             setStreamUrl(finalStreamUrl);
-            setStreamType(extractData.streamType || 'hls'); // Updated to use streamType from vm-server
+            setStreamType(extractData.streamType || 'hls');
             setLoading(false);
-            eventSource.close();
+            setRetryAttempt(0);
+            console.log(`✅ Stream extraction succeeded on attempt ${attemptNumber}/${maxRetries}`);
+            
           } else if (data.error || (data.phase === 'complete' && !data.result?.success)) {
             let errorMessage = data.message || 'Stream extraction failed';
             
@@ -114,37 +156,105 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
               });
             }
             
-            setError(errorMessage);
-            setLoading(false);
-            eventSource.close();
+            handleExtractionFailure(errorMessage, attemptNumber, data);
           }
-        };
-
-        eventSource.onerror = () => {
-          if (isMounted) {
-            setError('Connection to stream service failed.');
-            setLoading(false);
-            eventSource.close();
-          }
-        };
-
-      } catch (err) {
-        if (isMounted) {
-          setError('Failed to initialize stream extraction.');
-          setLoading(false);
+        } catch (parseError) {
+          console.error('❌ Error parsing EventSource data:', parseError);
+          handleExtractionFailure('Failed to parse server response', attemptNumber, null);
         }
-      }
-    };
+      };
 
-    extractStream();
+      // Handle extraction failure with retry logic
+      const handleExtractionFailure = (errorMessage, attemptNumber, data) => {
+        console.log(`❌ Stream extraction failed on attempt ${attemptNumber}/${maxRetries}:`, errorMessage);
+        
+        // Check if this error should trigger a retry
+        const shouldRetry = isRetryableError(errorMessage, data) && attemptNumber < maxRetries;
+        
+        if (shouldRetry) {
+          console.log(`🔄 Retrying stream extraction in 5 seconds... (attempt ${attemptNumber + 1}/${maxRetries})`);
+          cleanup();
+          
+          // Use longer delay between retries to avoid overwhelming the server
+          extractionRef.current.retryTimeout = setTimeout(() => {
+            if (isMountedRef.current) {
+              extractStream(attemptNumber + 1);
+            }
+          }, 5000); // Increased to 5 seconds
+        } else {
+          // All retries exhausted or non-retryable error
+          cleanup();
+          const finalMessage = attemptNumber >= maxRetries 
+            ? `${errorMessage} (Failed after ${maxRetries} attempts)`
+            : errorMessage;
+          
+          console.log(attemptNumber >= maxRetries ? `💥 All ${maxRetries} extraction attempts failed` : '🚫 Non-retryable error encountered');
+          setError(finalMessage);
+          setLoading(false);
+          setRetryAttempt(0);
+        }
+      };
+
+      eventSource.onerror = () => {
+        if (isMountedRef.current) {
+          console.log(`❌ Connection error on attempt ${attemptNumber}/${maxRetries}`);
+          handleExtractionFailure('Connection to stream service failed', attemptNumber, null);
+        }
+      };
+
+    } catch (err) {
+      if (isMountedRef.current) {
+        console.log(`❌ Initialization error on attempt ${attemptNumber}/${maxRetries}:`, err.message);
+        handleExtractionFailure('Failed to initialize stream extraction', attemptNumber, null);
+      }
+    }
+  };
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    // CRITICAL: Only fetch streams when explicitly requested
+    if (!shouldFetch) {
+      console.log('🚫 Stream fetching disabled - useStream in view-only mode');
+      setLoading(false);
+      return;
+    }
+
+    if (!movieId || (mediaType === 'tv' && (!seasonId || !episodeId))) {
+      setLoading(false);
+      return;
+    }
+
+    console.log('🚀 STARTING STREAM EXTRACTION for:', { mediaType, movieId, seasonId, episodeId });
+
+    extractStream(1);
 
     return () => {
-      isMounted = false;
-      if (eventSource) {
-        eventSource.close();
-      }
+      isMountedRef.current = false;
+      cleanup();
     };
   }, [server, mediaType, movieId, seasonId, episodeId, shouldFetch]);
 
-  return { streamUrl, streamType, loading, error, loadingProgress, loadingPhase, setServer };
+  // Manual retry function for external use
+  const retryExtraction = () => {
+    if (!extractionRef.current.isExtracting) {
+      console.log('🔄 Manual retry triggered');
+      extractStream(1);
+    } else {
+      console.log('🚫 Extraction already in progress, ignoring manual retry');
+    }
+  };
+
+  return { 
+    streamUrl, 
+    streamType, 
+    loading, 
+    error, 
+    loadingProgress, 
+    loadingPhase, 
+    setServer, 
+    retryAttempt, 
+    maxRetries,
+    retryExtraction 
+  };
 }; 

@@ -420,7 +420,7 @@ export const useHlsWithPerformance = (streamUrl, videoRef, streamType, activeSub
       
       console.log('🧹 HLS cleanup completed');
     };
-  }, [streamUrl, streamType, activeSubtitle]);
+  }, [streamUrl, streamType]); // Removed activeSubtitle dependency to prevent video reload
 
   // Quality switching function
   const setQuality = (qualityId) => {

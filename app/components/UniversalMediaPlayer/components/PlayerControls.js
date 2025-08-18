@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import styles from '../UniversalMediaPlayer.module.css';
+import { useTimelinePreview } from '../hooks/useTimelinePreview';
+import TimelinePreview from './TimelinePreview';
 
 const PlayerControls = ({
   playerState,
@@ -11,13 +13,28 @@ const PlayerControls = ({
   currentQuality,
   subtitles,
   onSelectSubtitle,
-  activeSubtitle
+  activeSubtitle,
+  videoRef
 }) => {
   const [isDraggingVolume, setIsDraggingVolume] = useState(false);
   const [isDraggingTimeline, setIsDraggingTimeline] = useState(false);
   const volumeSliderRef = useRef(null);
   const timelineRef = useRef(null);
   const lastSeekTimeRef = useRef(0);
+
+  // Timeline preview functionality
+  const {
+    handleTimelineHover,
+    handleTimelineLeave,
+    previewVisible,
+    previewTime,
+    previewPosition,
+    thumbnailUrl,
+    canvasRef
+  } = useTimelinePreview({
+    duration: playerState.duration,
+    videoRef
+  });
   
   const calculateTimeFromEvent = (e) => {
     if (!timelineRef.current) return 0;
@@ -180,17 +197,34 @@ const PlayerControls = ({
 
   return (
     <div>
+      {/* Hidden canvas for thumbnail generation */}
+      <canvas 
+        ref={canvasRef} 
+        style={{ display: 'none' }}
+        width="160" 
+        height="90"
+      />
+
       {/* Timeline */}
       <div 
         ref={timelineRef}
         className={`${styles.timeline} ${playerState.isSeeking ? styles.timelineSeeking : ''} ${isDraggingTimeline ? styles.timelineDragging : ''}`}
         onClick={handleProgressClick}
         onMouseDown={handleTimelineMouseDown}
+        onMouseMove={(e) => !isDraggingTimeline && handleTimelineHover(e, timelineRef.current)}
+        onMouseLeave={handleTimelineLeave}
         style={{ 
           cursor: playerState.isSeeking ? 'wait' : (isDraggingTimeline ? 'grabbing' : 'pointer'),
           opacity: playerState.isSeeking ? 0.7 : 1 
         }}
       >
+        {/* Timeline Preview */}
+        <TimelinePreview
+          visible={previewVisible && !isDraggingTimeline && !playerState.isSeeking}
+          position={previewPosition}
+          time={previewTime}
+          thumbnailUrl={thumbnailUrl}
+        />
         {/* Buffered Progress */}
         {playerState.buffered > 0 && (
           <div

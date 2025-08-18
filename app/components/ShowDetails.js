@@ -116,32 +116,7 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
     handlePlayEpisode(episode);
   };
 
-  const handleEpisodeChange = (seasonId, episodeNumber) => {
-    // Find the correct season index by matching season_number (not assuming 1-indexed)
-    const newSeasonIndex = movieDetails.seasons.findIndex(
-      (season) => season.season_number === seasonId
-    );
-    
-    if (newSeasonIndex === -1) {
-      console.error('Season not found:', seasonId);
-      return;
-    }
-    
-    const newEpisode = movieDetails.seasons[newSeasonIndex].episodes.find(
-      (ep) => ep.episode_number === episodeNumber
-    );
-    
-    console.log('🔄 Episode change:', {
-      seasonId,
-      episodeNumber,
-      newSeasonIndex,
-      actualSeasonNumber: movieDetails.seasons[newSeasonIndex].season_number,
-      episodeName: newEpisode?.name
-    });
-    
-    setSelectedSeason(newSeasonIndex);
-    setSelectedEpisode(newEpisode);
-  };
+
 
   // FIXED: Properly clear media player state and return to show details (NOT home)
   const handleBackFromMediaPlayer = () => {
@@ -153,6 +128,50 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
     
     // DO NOT call clearMovie - stay in the modal/show details view
     console.log('✅ Media player closed - returned to show details modal');
+  };
+
+  // Handle episode navigation (including cross-season)
+  const handleEpisodeChange = ({ seasonId, episodeId, episodeData, crossSeason }) => {
+    console.log('📺 Episode navigation:', { seasonId, episodeId, episodeData, crossSeason });
+    
+    if (crossSeason) {
+      // Handle cross-season navigation
+      const newSeasonIndex = movieDetails?.seasons?.findIndex(
+        season => season.season_number === seasonId
+      );
+      
+      if (newSeasonIndex !== -1 && movieDetails.seasons[newSeasonIndex]) {
+        const newSeasonData = movieDetails.seasons[newSeasonIndex];
+        const newEpisode = newSeasonData.episodes?.find(ep => ep.episode_number === episodeId);
+        
+        if (newEpisode) {
+          console.log('✅ Cross-season navigation:', {
+            fromSeason: selectedSeason,
+            toSeason: newSeasonIndex,
+            episode: newEpisode.name
+          });
+          
+          setSelectedSeason(newSeasonIndex);
+          setSelectedEpisode(newEpisode);
+        } else {
+          console.warn('❌ Episode not found in new season:', episodeId);
+        }
+      } else {
+        console.warn('❌ Season not found:', seasonId);
+      }
+    } else {
+      // Handle same-season navigation
+      const currentSeasonData = movieDetails?.seasons?.[selectedSeason];
+      if (currentSeasonData && currentSeasonData.episodes) {
+        const newEpisode = currentSeasonData.episodes.find(ep => ep.episode_number === episodeId);
+        if (newEpisode) {
+          setSelectedEpisode(newEpisode);
+          console.log('✅ Episode changed to:', newEpisode.name);
+        } else {
+          console.warn('❌ Episode not found:', episodeId);
+        }
+      }
+    }
   };
 
   // FIXED: Reset state when movieId changes (switching between different media)
@@ -184,6 +203,7 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
           seasonId={null}
           episodeId={null}
           onBackToShowDetails={handleBackFromMediaPlayer}
+          onEpisodeChange={handleEpisodeChange}
         />
       );
     } else if (movieId.media_type === "tv") {
@@ -205,6 +225,7 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
           seasonId={actualSeasonNumber} // Use actual season number (0 for Specials, 1+ for regular seasons)
           episodeId={selectedEpisode.episode_number}
           onBackToShowDetails={handleBackFromMediaPlayer}
+          onEpisodeChange={handleEpisodeChange}
         />
       );
     }

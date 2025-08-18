@@ -516,42 +516,338 @@
   padding: 10px;
 }
 
-/* Loading Spinner */
-.loadingContainer {
+/* Futuristic Loading Spinner */
+.futuristicLoadingContainer {
   position: absolute;
   inset: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.9);
-  color: white;
   z-index: 200;
+  overflow: hidden;
 }
 
-.spinner {
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top: 4px solid #3b82f6;
+.loadingBackdrop {
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(147, 51, 234, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.1) 0%, transparent 70%),
+    linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.98) 100%);
+  animation: backdropShift 8s ease-in-out infinite;
+}
+
+@keyframes backdropShift {
+  0%, 100% { 
+    background: 
+      radial-gradient(circle at 30% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(147, 51, 234, 0.15) 0%, transparent 50%),
+      radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.1) 0%, transparent 70%),
+      linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.98) 100%);
+  }
+  50% { 
+    background: 
+      radial-gradient(circle at 70% 30%, rgba(59, 130, 246, 0.2) 0%, transparent 50%),
+      radial-gradient(circle at 20% 70%, rgba(147, 51, 234, 0.2) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.15) 0%, transparent 70%),
+      linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.98) 100%);
+  }
+}
+
+.particleField {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.particle {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  background: radial-gradient(circle, rgba(59, 130, 246, var(--opacity)) 0%, transparent 70%);
   border-radius: 50%;
-  width: 50px;
-  height: 50px;
-  animation: spin 1s linear infinite;
-  margin-bottom: 20px;
+  animation: floatParticle 6s ease-in-out infinite;
+  animation-delay: var(--delay);
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.particle:nth-child(odd) {
+  background: radial-gradient(circle, rgba(147, 51, 234, var(--opacity)) 0%, transparent 70%);
+  animation-duration: 8s;
 }
 
-.loadingText {
-  font-size: 18px;
-  margin-bottom: 10px;
+.particle:nth-child(3n) {
+  background: radial-gradient(circle, rgba(16, 185, 129, var(--opacity)) 0%, transparent 70%);
+  animation-duration: 7s;
 }
 
-.loadingPhase {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+@keyframes floatParticle {
+  0% {
+    transform: translate(calc(50vw - 50%), calc(100vh + 20px)) scale(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+    transform: translate(calc(50vw - 50%), calc(90vh)) scale(1);
+  }
+  90% {
+    opacity: 1;
+    transform: translate(calc(50vw - 50% + 100px * sin(var(--delay) * 10)), calc(10vh)) scale(1);
+  }
+  100% {
+    transform: translate(calc(50vw - 50% + 100px * sin(var(--delay) * 10)), calc(-20px)) scale(0);
+    opacity: 0;
+  }
+}
+
+.loadingContent {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+}
+
+.outerGlow {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: 
+    radial-gradient(circle, transparent 60%, rgba(59, 130, 246, 0.1) 70%, transparent 80%),
+    radial-gradient(circle, transparent 70%, rgba(147, 51, 234, 0.08) 80%, transparent 90%);
+  animation: outerGlowPulse 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes outerGlowPulse {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% { 
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.progressContainer {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progressSvg {
+  width: 100%;
+  height: 100%;
+  transform: scale(1);
+  filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3));
+}
+
+.progressBackground {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-linecap: round;
+}
+
+.progressCircle {
+  stroke: url(#progressGradient);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progressInner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.progressDisplay {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+}
+
+.progressNumber {
+  font-size: 48px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 
+    0 0 20px rgba(59, 130, 246, 0.8),
+    0 0 40px rgba(59, 130, 246, 0.4);
+  animation: numberGlow 2s ease-in-out infinite alternate;
+}
+
+.progressPercent {
+  font-size: 24px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+}
+
+@keyframes numberGlow {
+  0% { 
+    text-shadow: 
+      0 0 20px rgba(59, 130, 246, 0.8),
+      0 0 40px rgba(59, 130, 246, 0.4);
+  }
+  100% { 
+    text-shadow: 
+      0 0 30px rgba(59, 130, 246, 1),
+      0 0 60px rgba(59, 130, 246, 0.6),
+      0 0 80px rgba(59, 130, 246, 0.3);
+  }
+}
+
+.phaseIndicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.phaseText {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(147, 51, 234, 0.6);
+}
+
+.phaseDots {
+  display: flex;
+  gap: 6px;
+}
+
+.phaseDots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(147, 51, 234, 0.6);
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+
+.phaseDots span:nth-child(1) { animation-delay: 0s; }
+.phaseDots span:nth-child(2) { animation-delay: 0.2s; }
+.phaseDots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotPulse {
+  0%, 60%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  30% {
+    transform: scale(1.4);
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(147, 51, 234, 0.8);
+  }
+}
+
+.loadingBars {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+}
+
+.loadingBar {
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(
+    to top,
+    rgba(16, 185, 129, 0.8) 0%,
+    rgba(59, 130, 246, 0.8) 50%,
+    rgba(147, 51, 234, 0.8) 100%
+  );
+  border-radius: 2px;
+  animation: barPulse 1.2s ease-in-out infinite;
+  animation-delay: var(--delay);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+@keyframes barPulse {
+  0%, 100% {
+    transform: scaleY(0.3);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* Progress circle animation */
+.progressCircle {
+  animation: progressRotate 3s linear infinite;
+}
+
+@keyframes progressRotate {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .progressContainer {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .outerGlow {
+    width: 240px;
+    height: 240px;
+  }
+  
+  .progressNumber {
+    font-size: 40px;
+  }
+  
+  .progressPercent {
+    font-size: 20px;
+  }
+  
+  .phaseText {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .progressContainer {
+    width: 160px;
+    height: 160px;
+  }
+  
+  .outerGlow {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .progressNumber {
+    font-size: 32px;
+  }
+  
+  .progressPercent {
+    font-size: 16px;
+  }
+  
+  .phaseText {
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+  
+  .loadingContent {
+    gap: 30px;
+  }
 }
 
 /* Error Overlay */
@@ -578,6 +874,31 @@
   font-size: 16px;
   margin-bottom: 24px;
   max-width: 500px;
+}
+
+.errorActions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.retryButton {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.retryButton:hover {
+  background: #059669;
 }
 
 .backButton {
@@ -810,4 +1131,566 @@
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.6);
   transform: scale(1.05);
+}
+
+/* Episode Navigation Container */
+.episodeNavigationContainer {
+  position: absolute;
+  bottom: 120px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 85;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Episode Navigation */
+.episodeNavigation {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.8) 0%,
+    rgba(0, 0, 0, 0.9) 100%
+  );
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.episodeNavButton {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  min-height: 40px;
+}
+
+.episodeNavButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+.episodeNavButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.episodeNavIcon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.episodeNavText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.nextEpisode .episodeNavText {
+  align-items: flex-end;
+}
+
+.episodeNavLabel {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.episodeNavTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
+.currentEpisodeInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.currentEpisodeNumber {
+  font-size: 14px;
+  font-weight: 700;
+  color: #3b82f6;
+  text-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+}
+
+.currentEpisodeName {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Responsive Episode Navigation */
+@media (max-width: 768px) {
+  .episodeNavigationContainer {
+    bottom: 100px;
+  }
+  
+  .episodeNavigation {
+    gap: 12px;
+    padding: 10px 16px;
+  }
+  
+  .episodeNavButton {
+    padding: 6px 10px;
+    min-height: 36px;
+  }
+  
+  .episodeNavTitle {
+    max-width: 60px;
+    font-size: 12px;
+  }
+  
+  .currentEpisodeInfo {
+    padding: 6px 12px;
+  }
+  
+  .currentEpisodeName {
+    max-width: 100px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .episodeNavigationContainer {
+    bottom: 90px;
+  }
+  
+  .episodeNavigation {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  
+  .episodeNavButton {
+    padding: 4px 8px;
+    min-height: 32px;
+  }
+  
+  .episodeNavText {
+    display: none;
+  }
+  
+  .episodeNavIcon {
+    font-size: 14px;
+  }
+  
+  .currentEpisodeInfo {
+    padding: 4px 8px;
+  }
+  
+  .currentEpisodeNumber {
+    font-size: 12px;
+  }
+  
+  .currentEpisodeName {
+    font-size: 10px;
+    max-width: 80px;
+  }
+}
+
+/* Next Episode Prompt */
+.nextEpisodePrompt {
+  position: absolute;
+  top: 50%;
+  right: 30px;
+  transform: translateY(-50%);
+  z-index: 150;
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateY(-50%) translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(-50%) translateX(0);
+    opacity: 1;
+  }
+}
+
+.promptContent {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(20, 20, 20, 0.95) 100%
+  );
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  width: 320px;
+  overflow: hidden;
+  position: relative;
+}
+
+.promptHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.promptHeader h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #3b82f6;
+  text-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+.promptCloseButton {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.promptCloseButton:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.promptBody {
+  padding: 16px 20px 20px;
+}
+
+.nextEpisodeInfo {
+  margin-bottom: 16px;
+}
+
+.episodeNumber {
+  font-size: 14px;
+  font-weight: 700;
+  color: #3b82f6;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.episodeTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+.episodeOverview {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
+.promptActions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.playNextButton {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  width: 100%;
+  justify-content: center;
+}
+
+.playNextButton:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+.playIcon {
+  font-size: 12px;
+}
+
+.autoAdvanceInfo {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+}
+
+.promptProgress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.progressBar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 0 3px 3px 0;
+}
+
+/* Responsive Next Episode Prompt */
+@media (max-width: 768px) {
+  .nextEpisodePrompt {
+    right: 20px;
+    left: 20px;
+    right: auto;
+    transform: translateY(-50%);
+  }
+  
+  .promptContent {
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+  }
+  
+  .promptHeader {
+    padding: 12px 16px 8px;
+  }
+  
+  .promptBody {
+    padding: 12px 16px 16px;
+  }
+  
+  .episodeTitle {
+    font-size: 15px;
+  }
+  
+  .episodeOverview {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .nextEpisodePrompt {
+    top: auto;
+    bottom: 140px;
+    right: 15px;
+    left: 15px;
+    transform: none;
+  }
+  
+  .promptContent {
+    width: 100%;
+    max-width: none;
+  }
+  
+  .promptHeader {
+    padding: 10px 12px 6px;
+  }
+  
+  .promptHeader h3 {
+    font-size: 14px;
+  }
+  
+  .promptBody {
+    padding: 10px 12px 12px;
+  }
+  
+  .nextEpisodeInfo {
+    margin-bottom: 12px;
+  }
+  
+  .episodeNumber {
+    font-size: 12px;
+  }
+  
+  .episodeTitle {
+    font-size: 14px;
+  }
+  
+  .episodeOverview {
+    font-size: 11px;
+  }
+  
+  .playNextButton {
+    padding: 10px 20px;
+    font-size: 13px;
+  }
+  
+  .autoAdvanceInfo {
+    font-size: 11px;
+  }
+}
+
+/* Timeline Preview */
+.timelinePreview {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 10px;
+  z-index: 200;
+  pointer-events: none;
+  animation: previewFadeIn 0.2s ease-out;
+}
+
+@keyframes previewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.previewContent {
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+}
+
+.previewThumbnail {
+  width: 160px;
+  height: 90px;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.previewTimeOnly {
+  width: 120px;
+  height: 60px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.timeIcon {
+  font-size: 24px;
+  opacity: 0.7;
+}
+
+.thumbnailImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.previewTime {
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.previewArrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid rgba(0, 0, 0, 0.9);
+}
+
+/* Timeline container needs relative positioning for preview */
+.timeline {
+  position: relative;
+}
+
+/* Responsive Timeline Preview */
+@media (max-width: 768px) {
+  .previewThumbnail {
+    width: 120px;
+    height: 68px;
+  }
+  
+  .previewTimeOnly {
+    width: 100px;
+    height: 50px;
+  }
+  
+  .timeIcon {
+    font-size: 20px;
+  }
+  
+  .previewTime {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .previewThumbnail {
+    width: 100px;
+    height: 56px;
+  }
+  
+  .previewTimeOnly {
+    width: 80px;
+    height: 40px;
+  }
+  
+  .timeIcon {
+    font-size: 16px;
+  }
+  
+  .previewTime {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
 } 
