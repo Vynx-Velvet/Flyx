@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // Unified VM extractor configuration - Handles all extraction types
-const VM_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL;
+const VM_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || 'http://localhost:3001';
 
 // Utility function for structured logging
 function createLogger(requestId) {
@@ -40,7 +40,7 @@ function buildVMUrl(searchParams, logger) {
   const vmUrl = new URL(`${VM_EXTRACTOR_URL}/api/extract/bulletproof`);
 
   // Forward all query parameters to the unified VM extractor
-  const paramsToForward = ['url', 'mediaType', 'movieId', 'seasonId', 'episodeId', 'server', 'method'];
+  const paramsToForward = ['url', 'mediaType', 'tmdbId', 'seasonId', 'episodeId', 'server', 'method'];
 
   paramsToForward.forEach(param => {
     const value = searchParams.get(param);
