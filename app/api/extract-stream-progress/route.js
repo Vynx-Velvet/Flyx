@@ -37,7 +37,7 @@ function generateRequestId() {
 
 // Build unified VM extractor URL with query parameters
 function buildVMUrl(searchParams, logger) {
-  const vmUrl = new URL(`${VM_EXTRACTOR_URL}/extract-stream`);
+  const vmUrl = new URL(`${VM_EXTRACTOR_URL}/api/extract/bulletproof`);
 
   // Forward all query parameters to the unified VM extractor
   const paramsToForward = ['url', 'mediaType', 'movieId', 'seasonId', 'episodeId', 'server', 'method'];

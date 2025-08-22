@@ -667,7 +667,7 @@ async function createStealthBrowser(logger, options = {}) {
   }
   
   const browser = await puppeteer.launch({
-    headless: false, // Keep visible for now to ensure compatibility
+    headless: 'new', // Keep visible for now to ensure compatibility
     userDataDir: profilePath,
     args: launchArgs,
     ignoreHTTPSErrors: true,
@@ -1404,9 +1404,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`\n🚀 Bulletproof VM Server running on port ${PORT}`);
+// Start server on all interfaces (0.0.0.0) for public access
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`\n🚀 Bulletproof VM Server running on ${HOST}:${PORT}`);
+  console.log('\n🌐 Server is accessible from:');
+  console.log(`   - Local: http://localhost:${PORT}`);
+  console.log(`   - Network: http://${HOST}:${PORT}`);
+  console.log(`   - Public: http://<your-public-ip>:${PORT}`);
   console.log('\n📋 Configuration:');
   console.log(`   - Proxies configured: ${CONFIG.proxies.length}`);
   console.log(`   - Retry attempts: ${CONFIG.timing.retryAttempts}`);
@@ -1420,8 +1425,8 @@ app.listen(PORT, () => {
   console.log(`   GET /test - Test the extraction service`);
   console.log(`   GET /health - Check service health`);
   console.log('\n🔗 Example GET request:');
-  console.log(`   GET /api/extract/bulletproof?tmdbId=550`);
-  console.log(`   GET /api/extract/bulletproof?tmdbId=1396&season=1&episode=1\n`);
+  console.log(`   GET http://${HOST}:${PORT}/api/extract/bulletproof?tmdbId=550`);
+  console.log(`   GET http://${HOST}:${PORT}/api/extract/bulletproof?tmdbId=1396&season=1&episode=1\n`);
 });
 
 export default app;
