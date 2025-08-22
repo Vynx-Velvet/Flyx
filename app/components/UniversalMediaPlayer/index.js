@@ -196,7 +196,7 @@ export const quickStart = {
   // Basic movie player
   createMoviePlayer: (movieId, config = {}) => ({
     mediaType: 'movie',
-    movieId,
+    tmdbId: movieId,
     seasonId: null,
     episodeId: null,
     ...createPlayerInstance(config)
@@ -205,7 +205,7 @@ export const quickStart = {
   // TV show player
   createTVPlayer: (showId, seasonId, episodeId, config = {}) => ({
     mediaType: 'tv',
-    movieId: showId,
+    tmdbId: showId,
     seasonId,
     episodeId,
     ...createPlayerInstance(config)
