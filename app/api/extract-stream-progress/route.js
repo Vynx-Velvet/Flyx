@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // Unified VM extractor configuration - Handles all extraction types
-const VM_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || 'http://localhost:3001';
+const VM_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL;
 
 // Utility function for structured logging
 function createLogger(requestId) {

@@ -46,7 +46,7 @@ function generateRequestId() {
 
 // Build VM extractor URL with query parameters
 function buildVMUrl(searchParams, logger) {
-  const vmUrl = new URL(`${VM_EXTRACTOR_URL}/extract`);
+  const vmUrl = new URL(`${VM_EXTRACTOR_URL}/api/extract/bulletproof`);
   
   // Forward all query parameters to the VM
   const paramsToForward = ['url', 'mediaType', 'movieId', 'seasonId', 'episodeId', 'server'];
@@ -152,16 +152,10 @@ export async function GET(request) {
     const extractorType = getExtractorType(searchParams);
     
     let extractorUrl;
-    if (extractorType === 'bulletproof') {
+
       extractorUrl = buildBulletproofUrl(searchParams, logger);
       logger.info('Using Bulletproof extractor', { extractorUrl });
-    } else if (extractorType === 'vidsrccc') {
-      extractorUrl = buildVidSrcCcUrl(searchParams, logger);
-      logger.info('Using VidSrc.cc extractor', { extractorUrl });
-    } else {
-      extractorUrl = buildVMUrl(searchParams, logger);
-      logger.info('Using VM extractor', { extractorUrl });
-    }
+
     
     logger.info('Forwarding request to extractor', {
       extractorUrl: extractorUrl.substring(0, 200) + (extractorUrl.length > 200 ? '...' : ''),
