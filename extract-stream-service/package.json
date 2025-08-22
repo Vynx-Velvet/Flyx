@@ -1,38 +1,27 @@
 {
-  "name": "flyx-extract-stream-local",
+  "name": "vidsrccc-extraction-service",
   "version": "1.0.0",
-  "description": "Flyx stream extraction service for local debugging",
-  "main": "vm-server.js",
+  "description": "A service to extract M3U8 URLs from vidsrc.cc",
+  "main": "vidsrccc-extraction.js",
+  "type": "module",
   "scripts": {
-    "start": "node local-server.js",
-    "dev": "set NODE_ENV=development && node local-server.js",
-    "debug": "set NODE_ENV=development && set DEBUG=* && node local-server.js",
-    "test": "node test-enhanced-extraction.js",
-    "test-chrome": "node test-chrome.js",
-    "test-play": "node test-play-button.js",
-    "test-popup": "node test-popup-blocking.js",
-    "test-comprehensive": "node comprehensive-debug.js"
+    "start": "node vm-server.js",
+    "test": "node test-vidsrccc-extraction.js",
+    "vm-extractor": "node vm-server.js",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "puppeteer": "^21.11.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "puppeteer": "^19.0.0",
+    "node-fetch": "^3.3.0"
   },
   "keywords": [
-    "stream",
-    "extraction",
-    "puppeteer",
-    "hls",
-    "m3u8",
     "vidsrc",
-    "embed"
+    "m3u8",
+    "extraction",
+    "puppeteer"
   ],
-  "author": "Flyx Team",
+  "author": "Flyx",
   "license": "MIT"
 }

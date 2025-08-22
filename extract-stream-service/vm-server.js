@@ -1,8 +1,17 @@
-const express = require('express');
-const cors = require('cors');
-const puppeteer = require('puppeteer-core');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import cors from 'cors';
+import puppeteer from 'puppeteer';
+import fetch from 'node-fetch';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { stealthInjections } from './stealth-injections.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -11,935 +20,1408 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Simple logging system for extraction service (CommonJS compatible)
-function createLogger(requestId) {
-  const logPrefix = `[${requestId}]`;
+// Advanced configuration
+const CONFIG = {
+  // Proxy configuration
+  proxies: process.env.PROXIES ? process.env.PROXIES.split(',') : [],
+  proxyAuth: process.env.PROXY_AUTH || null, // username:password
+  
+  // Browser profiles directory
+  profilesDir: path.join(__dirname, 'browser-profiles'),
+  cookiesDir: path.join(__dirname, 'cookies'),
+  
+  // Advanced timing configuration
+  timing: {
+    humanDelayMin: 0,
+    humanDelayMax: 0,
+    mouseMovementSpeed: 100,
+    typingSpeed: { min: 50, max: 150 },
+    scrollSpeed: { min: 300, max: 700 },
+    pageLoadTimeout: 15000,
+    challengeTimeout: 10000,
+    retryAttempts: 2,
+    retryDelay: 500
+  },
+  
+  // Fingerprint pools
+  fingerprints: {
+    screens: [
+      { width: 1920, height: 1080, availWidth: 1920, availHeight: 1040, colorDepth: 24, pixelDepth: 24 },
+      { width: 1366, height: 768, availWidth: 1366, availHeight: 728, colorDepth: 24, pixelDepth: 24 },
+      { width: 1440, height: 900, availWidth: 1440, availHeight: 860, colorDepth: 24, pixelDepth: 24 },
+      { width: 1536, height: 864, availWidth: 1536, availHeight: 824, colorDepth: 24, pixelDepth: 24 },
+      { width: 2560, height: 1440, availWidth: 2560, availHeight: 1400, colorDepth: 24, pixelDepth: 24 },
+      { width: 1680, height: 1050, availWidth: 1680, availHeight: 1010, colorDepth: 24, pixelDepth: 24 }
+    ],
+    languages: [
+      ['en-US', 'en'],
+      ['en-GB', 'en'],
+      ['en-CA', 'en'],
+      ['en-AU', 'en'],
+      ['en-US', 'en', 'es'],
+      ['en-US', 'en', 'fr'],
+      ['en-US', 'en', 'de']
+    ],
+    timezones: [
+      'America/New_York',
+      'America/Chicago',
+      'America/Denver',
+      'America/Los_Angeles',
+      'America/Phoenix',
+      'America/Detroit',
+      'Europe/London',
+      'Europe/Paris',
+      'Europe/Berlin'
+    ],
+    webGLVendors: [
+      'Intel Inc.',
+      'NVIDIA Corporation',
+      'AMD',
+      'Apple Inc.',
+      'Microsoft Corporation'
+    ],
+    webGLRenderers: [
+      'Intel Iris OpenGL Engine',
+      'NVIDIA GeForce GTX 1060 6GB/PCIe/SSE2',
+      'AMD Radeon Pro 5500M OpenGL Engine',
+      'ANGLE (NVIDIA GeForce GTX 1660 Ti Direct3D11 vs_5_0 ps_5_0)',
+      'ANGLE (Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0)'
+    ]
+  }
+};
 
+// Ensure directories exist
+[CONFIG.profilesDir, CONFIG.cookiesDir].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
+// Enhanced logging with request tracking
+function createLogger(requestId) {
+  const prefix = `[${requestId}]`;
+  
   return {
     info: (message, data = {}) => {
-      const timestamp = new Date().toISOString();
-      console.log(`ℹ️  ${timestamp} ${logPrefix} ${message}`, data && Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : '');
+      console.log(`${prefix} INFO: ${message}`, data);
     },
     warn: (message, data = {}) => {
-      const timestamp = new Date().toISOString();
-      console.log(`⚠️  ${timestamp} ${logPrefix} ${message}`, data && Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : '');
+      console.warn(`${prefix} WARN: ${message}`, data);
     },
     error: (message, error = null, data = {}) => {
-      const timestamp = new Date().toISOString();
-      const errorMsg = error?.message || error || '';
-      console.log(`❌ ${timestamp} ${logPrefix} ${message}`, errorMsg, data && Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : '');
+      console.error(`${prefix} ERROR: ${message}`, error?.message || error, data);
     },
     debug: (message, data = {}) => {
-      const timestamp = new Date().toISOString();
-      console.log(`🔍 ${timestamp} ${logPrefix} ${message}`, data && Object.keys(data).length > 0 ? JSON.stringify(data, null, 2) : '');
+      if (process.env.NODE_ENV === 'development') {
+        console.debug(`${prefix} DEBUG: ${message}`, data);
+      }
     },
     timing: (label, startTime) => {
       const duration = Date.now() - startTime;
-      const timestamp = new Date().toISOString();
-      console.log(`⏱️  ${timestamp} ${logPrefix} Timer: ${label} - ${duration}ms`);
+      console.log(`${prefix} TIMING: ${label} - ${duration}ms`);
       return duration;
     }
   };
 }
 
-// Generate unique request ID for tracking
+// Generate unique request ID
 function generateRequestId() {
-  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `req_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
 }
 
-// Advanced user agent rotation with realistic browser fingerprints
-function getAdvancedUserAgent() {
-  const browserFingerprints = [
-    {
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      platform: 'Win32',
-      vendor: 'Google Inc.',
-      language: 'en-US',
-      languages: ['en-US', 'en'],
-      hardwareConcurrency: 8,
-      deviceMemory: 8,
-      maxTouchPoints: 0,
-      colorDepth: 24,
-      pixelDepth: 24,
-      screenWidth: 1920,
-      screenHeight: 1080,
-      availWidth: 1920,
-      availHeight: 1040,
-      timezone: 'America/New_York'
-    },
-    {
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-      platform: 'Win32',
-      vendor: 'Google Inc.',
-      language: 'en-US',
-      languages: ['en-US', 'en'],
-      hardwareConcurrency: 12,
-      deviceMemory: 16,
-      maxTouchPoints: 0,
-      colorDepth: 24,
-      pixelDepth: 24,
-      screenWidth: 2560,
-      screenHeight: 1440,
-      availWidth: 2560,
-      availHeight: 1400,
-      timezone: 'America/Los_Angeles'
-    }
-  ];
-
-  return browserFingerprints[Math.floor(Math.random() * browserFingerprints.length)];
-}
-
-// Cross-platform Chrome executable detection
-function findChromeExecutable() {
-  const os = require('os');
-  const fs = require('fs');
-  const path = require('path');
-
-  const platform = os.platform();
-
-  if (platform === 'win32') {
-    // Windows Chrome paths
-    const windowsPaths = [
-      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-      path.join(os.homedir(), 'AppData\\Local\\Google\\Chrome\\Application\\chrome.exe'),
-      path.join(os.homedir(), 'AppData\\Local\\Chromium\\Application\\chrome.exe')
+// Advanced user agent generation
+class UserAgentGenerator {
+  constructor() {
+    this.chromeVersions = ['120', '121', '122', '123', '124', '125', '126', '127', '128', '129', '130', '131', '132'];
+    this.platforms = [
+      { platform: 'Windows NT 10.0; Win64; x64', weight: 0.6 },
+      { platform: 'Windows NT 11.0; Win64; x64', weight: 0.2 },
+      { platform: 'Macintosh; Intel Mac OS X 10_15_7', weight: 0.15 },
+      { platform: 'X11; Linux x86_64', weight: 0.05 }
     ];
+  }
 
-    for (const chromePath of windowsPaths) {
-      if (fs.existsSync(chromePath)) {
-        return chromePath;
+  generate() {
+    const chromeVersion = this.chromeVersions[Math.floor(Math.random() * this.chromeVersions.length)];
+    const platform = this.weightedRandom(this.platforms);
+    
+    return `Mozilla/5.0 (${platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion}.0.0.0 Safari/537.36`;
+  }
+
+  weightedRandom(items) {
+    const total = items.reduce((sum, item) => sum + item.weight, 0);
+    let random = Math.random() * total;
+    
+    for (const item of items) {
+      random -= item.weight;
+      if (random <= 0) {
+        return item.platform;
       }
     }
+    
+    return items[0].platform;
   }
-
-  // Fallback - let Puppeteer find Chrome automatically
-  return null;
 }
 
-// Enhanced stealth browser configuration
-async function getBrowserConfig(logger) {
-  const platform = require('os').platform();
-  logger.debug(`Using enhanced stealth Chrome configuration for ${platform}`);
-
-  const fingerprint = getAdvancedUserAgent();
-  const chromeExecutable = findChromeExecutable();
-
-  if (chromeExecutable) {
-    logger.debug(`Found Chrome executable: ${chromeExecutable}`);
-  } else {
-    logger.debug('Using Puppeteer auto-detection for Chrome');
+// Human behavior simulator
+class HumanBehaviorSimulator {
+  constructor(page, logger) {
+    this.page = page;
+    this.logger = logger;
   }
 
-  // Determine headless mode based on platform and environment
-  const isWindows = platform === 'win32';
-  const forceHeadless = process.env.FORCE_HEADLESS === 'true';
-  const forceVisible = process.env.FORCE_VISIBLE === 'true';
-
-  let headlessMode = true; // Default to headless
-
-  if (forceVisible) {
-    headlessMode = false;
-    logger.info('Running in visible mode (FORCE_VISIBLE=true)');
-  } else if (forceHeadless) {
-    headlessMode = true;
-    logger.info('Running in headless mode (FORCE_HEADLESS=true)');
-  } else if (isWindows) {
-    headlessMode = false;
-    logger.info('Running in visible mode on Windows for debugging');
-  } else {
-    headlessMode = true;
-    logger.info('Running in headless mode on Linux/production');
+  async simulateReading(duration = 2000) {
+    const startTime = Date.now();
+    const endTime = startTime + duration;
+    
+    while (Date.now() < endTime) {
+      // Random scroll
+      if (Math.random() > 0.7) {
+        await this.smoothScroll(Math.random() * 200 - 100);
+      }
+      
+      // Random mouse movement
+      if (Math.random() > 0.5) {
+        await this.moveMouseNaturally();
+      }
+      
+      // Random pause
+      await this.humanDelay(300, 800);
+    }
   }
 
-  const config = {
-    headless: headlessMode,
-    args: [
-      // Core sandbox and security
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-web-security',
-
-      // Enhanced anti-detection
-      '--disable-blink-features=AutomationControlled',
-      '--disable-features=VizDisplayCompositor',
-      '--disable-features=TranslateUI',
-      '--disable-features=ScriptStreaming',
-      '--disable-ipc-flooding-protection',
-      '--disable-renderer-backgrounding',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-background-timer-throttling',
-
-      // Browser behavior normalization
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-default-apps',
-      '--disable-extensions',
-      '--disable-component-update',
-      '--disable-sync',
-      '--disable-translate',
-
-      // Performance and stealth
-      '--disable-prompt-on-repost',
-      '--disable-hang-monitor',
-      '--disable-client-side-phishing-detection',
-      '--disable-popup-blocking',
-      '--disable-print-preview',
-      '--force-color-profile=srgb',
-      '--metrics-recording-only',
-      '--password-store=basic',
-      '--use-mock-keychain',
-      '--hide-scrollbars',
-      '--mute-audio',
-      '--disable-gpu',
-
-      // Use advanced fingerprint user agent
-      '--user-agent=' + fingerprint.userAgent,
-
-      // Window size matching fingerprint
-      `--window-size=${fingerprint.screenWidth},${fingerprint.screenHeight}`
-    ],
-
-    // Store fingerprint for later use
-    fingerprint: fingerprint
-  };
-
-  // Only set executablePath if we found Chrome, otherwise let Puppeteer auto-detect
-  if (chromeExecutable) {
-    config.executablePath = chromeExecutable;
-  }
-
-  return config;
-}
-
-// Enhanced stream interception
-function setupEnhancedStreamInterception(page, logger, targetUrl = '') {
-  const streamUrls = [];
-  let responseCount = 0;
-
-  // Intercept network responses with enhanced M3U8 detection
-  page.on('response', async (response) => {
-    responseCount++;
-    const responseUrl = response.url();
-    const contentType = response.headers()['content-type'] || '';
-    const status = response.status();
-
+  async moveMouseNaturally() {
     try {
-      // Enhanced M3U8 content detection
-      const isM3U8Response =
-        contentType.includes('mpegurl') ||
-        contentType.includes('m3u8') ||
-        contentType.includes('vnd.apple.mpegurl') ||
-        contentType.includes('application/x-mpegurl') ||
-        responseUrl.includes('.m3u8') ||
-        responseUrl.includes('master') ||
-        responseUrl.includes('playlist');
-
-      if (isM3U8Response && status === 200) {
-        logger.info('Stream URL detected', {
-          url: responseUrl.substring(0, 150),
-          contentType,
-          status
-        });
-
-        try {
-          const responseText = await response.text();
-          const isActualM3U8 = responseText.includes('#EXTM3U') || responseText.includes('#EXT-X-');
-
-          if (isActualM3U8) {
-            const streamInfo = {
-              url: responseUrl,
-              contentType,
-              status,
-              source: targetUrl.includes('vidsrc') ? 'vidsrc' : 'generic',
-              priority: 0,
-              isMaster: responseUrl.includes('master'),
-              extractionMethod: 'enhanced_interception',
-              timestamp: Date.now()
-            };
-
-            streamUrls.push(streamInfo);
-            logger.info('Valid M3U8 stream found', {
-              url: responseUrl.substring(0, 150),
-              source: streamInfo.source,
-              isMaster: streamInfo.isMaster
-            });
-          }
-        } catch (contentError) {
-          logger.warn('Could not read response content', {
-            url: responseUrl.substring(0, 100),
-            error: contentError.message
-          });
-        }
+      const viewport = await this.page.viewport();
+      const currentX = Math.random() * viewport.width;
+      const currentY = Math.random() * viewport.height;
+      const targetX = Math.random() * viewport.width;
+      const targetY = Math.random() * viewport.height;
+      
+      // Generate bezier curve points for natural movement
+      const steps = 20 + Math.floor(Math.random() * 20);
+      const curve = this.generateBezierCurve(
+        { x: currentX, y: currentY },
+        { x: targetX, y: targetY },
+        steps
+      );
+      
+      for (const point of curve) {
+        await this.page.mouse.move(point.x, point.y);
+        await this.humanDelay(10, 30);
       }
-    } catch (error) {
-      logger.warn('Error in response processing', {
-        url: responseUrl.substring(0, 100),
-        error: error.message
+    } catch (e) {
+      this.logger.debug('Mouse movement error', { error: e.message });
+    }
+  }
+
+  generateBezierCurve(start, end, steps) {
+    const curve = [];
+    const cp1 = {
+      x: start.x + (Math.random() - 0.5) * 200,
+      y: start.y + (Math.random() - 0.5) * 200
+    };
+    const cp2 = {
+      x: end.x + (Math.random() - 0.5) * 200,
+      y: end.y + (Math.random() - 0.5) * 200
+    };
+    
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = Math.pow(1 - t, 3) * start.x +
+                3 * Math.pow(1 - t, 2) * t * cp1.x +
+                3 * (1 - t) * Math.pow(t, 2) * cp2.x +
+                Math.pow(t, 3) * end.x;
+      const y = Math.pow(1 - t, 3) * start.y +
+                3 * Math.pow(1 - t, 2) * t * cp1.y +
+                3 * (1 - t) * Math.pow(t, 2) * cp2.y +
+                Math.pow(t, 3) * end.y;
+      curve.push({ x: Math.round(x), y: Math.round(y) });
+    }
+    
+    return curve;
+  }
+
+  async smoothScroll(distance) {
+    try {
+      const steps = Math.abs(distance) / 10;
+      const stepSize = distance / steps;
+      
+      for (let i = 0; i < steps; i++) {
+        await this.page.evaluate((scrollBy) => {
+          window.scrollBy(0, scrollBy);
+        }, stepSize);
+        await this.humanDelay(20, 50);
+      }
+    } catch (e) {
+      this.logger.debug('Scroll error', { error: e.message });
+    }
+  }
+
+  async humanType(text, element = null) {
+    if (element) {
+      await element.click();
+      await this.humanDelay(100, 300);
+    }
+    
+    for (const char of text) {
+      await this.page.keyboard.type(char);
+      await this.humanDelay(
+        CONFIG.timing.typingSpeed.min,
+        CONFIG.timing.typingSpeed.max
+      );
+      
+      // Occasional typo and correction
+      if (Math.random() < 0.03) {
+        const typo = String.fromCharCode(97 + Math.floor(Math.random() * 26));
+        await this.page.keyboard.type(typo);
+        await this.humanDelay(100, 200);
+        await this.page.keyboard.press('Backspace');
+        await this.humanDelay(50, 150);
+      }
+    }
+  }
+
+  async humanDelay(min = CONFIG.timing.humanDelayMin, max = CONFIG.timing.humanDelayMax) {
+    const delay = min + Math.random() * (max - min);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+
+  async simulateTabSwitch() {
+    // Simulate user switching tabs
+    await this.page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', {
+        value: true,
+        writable: true
       });
-    }
-  });
-
-  return { streamUrls };
-}
-
-// Enhanced Cloudflare challenge detection and handling
-async function detectAndHandleCloudflareChallenge(page, logger) {
-  try {
-    logger.info('Checking for Cloudflare challenges');
-
-    // Wait briefly for page to load
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Check for Cloudflare challenge indicators
-    const challengeIndicators = await page.evaluate(() => {
-      const indicators = {
-        hasTurnstile: !!document.querySelector('[data-sitekey]') || !!document.querySelector('.cf-turnstile'),
-        hasCloudflareText: document.body.innerText.includes('Cloudflare') || document.body.innerText.includes('Just a moment'),
-        hasChallengePage: document.title.includes('Just a moment') || document.title.includes('Cloudflare'),
-        hasRayId: !!document.querySelector('[data-ray]') || document.body.innerText.includes('Ray ID'),
-        pageSize: document.body.innerText.length
-      };
-      return indicators;
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'hidden',
+        writable: true
+      });
+      window.dispatchEvent(new Event('blur'));
     });
-
-    if (challengeIndicators.hasTurnstile || challengeIndicators.hasCloudflareText ||
-      challengeIndicators.hasChallengePage || (challengeIndicators.pageSize < 3000 && challengeIndicators.hasRayId)) {
-
-      logger.warn('Cloudflare challenge detected', challengeIndicators);
-
-      try {
-        // Wait up to 30 seconds for challenge to complete
-        await page.waitForFunction(() => {
-          return !document.body.innerText.includes('Just a moment') &&
-            !document.body.innerText.includes('Checking your browser') &&
-            document.body.innerText.length > 3000;
-        }, { timeout: 30000 });
-
-        logger.info('Cloudflare challenge appears to have resolved');
-        return { challengeDetected: true, resolved: true };
-
-      } catch (timeoutError) {
-        logger.error('Cloudflare challenge did not resolve within timeout');
-        return { challengeDetected: true, resolved: false, error: 'Challenge timeout' };
-      }
-    }
-
-    logger.info('No Cloudflare challenge detected');
-    return { challengeDetected: false, resolved: true };
-
-  } catch (error) {
-    logger.error('Error detecting Cloudflare challenge', error);
-    return { challengeDetected: false, resolved: false, error: error.message };
-  }
-}
-
-// Tab management utility functions
-async function handleNewTabsAndFocus(browser, originalPage, logger) {
-  try {
-    const allPages = await browser.pages();
-
-    if (allPages.length > 1) {
-      logger.info(`Detected ${allPages.length} tabs, closing popups`);
-
-      for (const page of allPages) {
-        if (page !== originalPage) {
-          try {
-            const pageUrl = await page.url();
-            logger.info(`Closing popup: ${pageUrl.substring(0, 100)}`);
-            await page.close();
-          } catch (e) {
-            logger.warn('Could not close popup', { error: e.message });
-          }
-        }
-      }
-
-      await originalPage.bringToFront();
-      await originalPage.focus();
-      logger.info('Successfully closed all popups and restored focus');
-    }
-
-    return true;
-  } catch (error) {
-    logger.warn('Error managing tabs', { error: error.message });
-    return false;
-  }
-}
-
-// Enhanced click function that handles popups
-async function safeClick(element, page, browser, logger, description = 'element') {
-  try {
-    logger.info(`Attempting to click ${description}`);
-
-    const initialPages = await browser.pages();
-    const initialTabCount = initialPages.length;
-
-    await element.click();
-
-    // Check for new tabs and handle them
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const afterPages = await browser.pages();
-
-    if (afterPages.length > initialTabCount) {
-      logger.info(`New tabs opened after clicking ${description}`);
-      await handleNewTabsAndFocus(browser, page, logger);
-    }
-
-    logger.info(`Successfully clicked ${description}`);
-    return true;
-
-  } catch (error) {
-    logger.error(`Error clicking ${description}`, error);
-    return false;
-  }
-}
-
-// Interact with the page to trigger stream loading
-async function interactWithPage(page, logger, browser, requestStart = Date.now(), sendProgress = null) {
-  const interactionStart = Date.now();
-
-  // Helper function for progress updates
-  const updateProgress = (phase, percentage, message) => {
-    if (sendProgress && typeof sendProgress === 'function') {
-      sendProgress(phase, percentage, message);
-    }
-  };
-
-  try {
-    logger.info('Starting page interaction');
-
-    // Wait briefly for page to load
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Look for play buttons
-    const playSelectors = [
-      '#pl_but',
-      '.fas.fa-play',
-      'button[class*="play"]',
-      '.play-button',
-      '.video-play-button',
-      'button[aria-label*="play" i]',
-      '.play',
-      '.btn-play'
-    ];
-
-    let playButtonFound = false;
-
-    for (const selector of playSelectors) {
-      try {
-        const elements = await page.$$(selector);
-
-        if (elements.length > 0) {
-          logger.info('Found play button element', { selector });
-
-          for (const element of elements) {
-            try {
-              const isVisible = await element.evaluate(el => {
-                const rect = el.getBoundingClientRect();
-                return rect.width > 0 && rect.height > 0 &&
-                  window.getComputedStyle(el).visibility !== 'hidden' &&
-                  window.getComputedStyle(el).display !== 'none';
-              });
-
-              if (isVisible) {
-                logger.info('Found visible play button, clicking it', { selector });
-
-                await element.hover();
-                await new Promise(resolve => setTimeout(resolve, 200));
-
-                const clickSuccess = await safeClick(element, page, browser, logger, 'play button');
-
-                if (clickSuccess) {
-                  playButtonFound = true;
-                  updateProgress('extracting', 80, 'Play button clicked, waiting for streams');
-
-                  // Wait for streams to load
-                  await new Promise(resolve => setTimeout(resolve, 3000));
-                  break;
-                }
-              }
-            } catch (e) {
-              logger.debug('Error interacting with play button element', { error: e.message });
-            }
-          }
-
-          if (playButtonFound) break;
-        }
-      } catch (e) {
-        logger.debug('Error with play button selector', { selector, error: e.message });
-      }
-    }
-
-    // If no play button found, try clicking on video elements
-    if (!playButtonFound) {
-      logger.warn('No play button found, trying video center clicking');
-      updateProgress('extracting', 78, 'Attempting video center clicking as fallback');
-
-      const videoSelectors = [
-        'video',
-        'iframe[src*="embed"]',
-        'iframe[src*="player"]',
-        '.video-player',
-        '.player'
-      ];
-
-      for (const selector of videoSelectors) {
-        try {
-          const element = await page.$(selector);
-          if (element) {
-            logger.info('Found video element for center clicking', { selector });
-
-            const elementInfo = await element.evaluate(el => {
-              const rect = el.getBoundingClientRect();
-              return {
-                visible: el.offsetParent !== null,
-                rect: {
-                  x: rect.x,
-                  y: rect.y,
-                  width: rect.width,
-                  height: rect.height,
-                  centerX: rect.x + rect.width / 2,
-                  centerY: rect.y + rect.height / 2
-                }
-              };
-            });
-
-            if (elementInfo.visible && elementInfo.rect.width > 0 && elementInfo.rect.height > 0) {
-              logger.info('Clicking center of video element');
-
-              // Two-click pattern
-              await page.mouse.click(elementInfo.rect.centerX, elementInfo.rect.centerY);
-              await new Promise(resolve => setTimeout(resolve, 100));
-              await page.mouse.click(elementInfo.rect.centerX, elementInfo.rect.centerY);
-
-              playButtonFound = true;
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              break;
-            }
-          }
-        } catch (e) {
-          logger.debug('Error with video center clicking', { selector, error: e.message });
-        }
-      }
-    }
-
-    // Trigger additional events
-    await page.evaluate(() => {
+    
+    await this.humanDelay(2000, 5000);
+    
+    await this.page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', {
+        value: false,
+        writable: true
+      });
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
+        writable: true
+      });
       window.dispatchEvent(new Event('focus'));
-      window.dispatchEvent(new Event('click'));
-      document.dispatchEvent(new Event('visibilitychange'));
     });
-
-    // Final wait for streams
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    logger.info('Page interaction completed', { playButtonFound });
-
-  } catch (error) {
-    logger.warn('Page interaction error', { error: error.message });
   }
 }
 
-// Validate request parameters
-function validateParameters(query, logger) {
-  const url = query.url;
-  const mediaType = query.mediaType;
-  const movieId = query.movieId;
-  const seasonId = query.seasonId;
-  const episodeId = query.episodeId;
-  const server = query.server || 'vidsrc.xyz';
-
-  logger.info('Request parameters received', {
-    url: url ? url.substring(0, 100) + (url.length > 100 ? '...' : '') : null,
-    mediaType,
-    movieId,
-    seasonId,
-    episodeId,
-    server,
-    hasUrl: !!url
-  });
-
-  let finalUrl = url;
-
-  // If no URL provided but we have media info, construct URL
-  if (!url && mediaType && movieId) {
-    if (server.toLowerCase() === 'vidsrc.xyz' || server.toLowerCase() === 'vidsrc') {
-      if (mediaType === 'movie') {
-        finalUrl = `https://vidsrc.xyz/embed/movie?tmdb=${movieId}`;
-      } else if (mediaType === 'tv' && seasonId && episodeId) {
-        finalUrl = `https://vidsrc.xyz/embed/tv?tmdb=${movieId}&season=${seasonId}&episode=${episodeId}`;
-      } else if (mediaType === 'tv') {
-        return {
-          isValid: false,
-          error: 'TV shows require seasonId and episodeId parameters'
-        };
-      }
-    }
+// Advanced fingerprint manager
+class FingerprintManager {
+  constructor() {
+    this.userAgentGen = new UserAgentGenerator();
   }
 
-  if (!finalUrl) {
+  generateFingerprint() {
+    const screen = CONFIG.fingerprints.screens[Math.floor(Math.random() * CONFIG.fingerprints.screens.length)];
+    const languages = CONFIG.fingerprints.languages[Math.floor(Math.random() * CONFIG.fingerprints.languages.length)];
+    const timezone = CONFIG.fingerprints.timezones[Math.floor(Math.random() * CONFIG.fingerprints.timezones.length)];
+    const webGLVendor = CONFIG.fingerprints.webGLVendors[Math.floor(Math.random() * CONFIG.fingerprints.webGLVendors.length)];
+    const webGLRenderer = CONFIG.fingerprints.webGLRenderers[Math.floor(Math.random() * CONFIG.fingerprints.webGLRenderers.length)];
+    
     return {
-      isValid: false,
-      error: 'Either url parameter or mediaType+movieId (and seasonId/episodeId for TV) are required'
+      userAgent: this.userAgentGen.generate(),
+      screen,
+      languages,
+      timezone,
+      webGL: {
+        vendor: webGLVendor,
+        renderer: webGLRenderer
+      },
+      hardwareConcurrency: [2, 4, 6, 8, 12, 16][Math.floor(Math.random() * 6)],
+      deviceMemory: [2, 4, 8, 16, 32][Math.floor(Math.random() * 5)],
+      platform: this.getPlatformForUserAgent(),
+      canvas: {
+        noise: Math.random() * 0.0001
+      }
     };
   }
 
-  // Validate URL format
-  try {
-    new URL(finalUrl);
-  } catch (e) {
-    return { isValid: false, error: 'Invalid URL format' };
+  getPlatformForUserAgent() {
+    const platforms = {
+      'Windows NT': 'Win32',
+      'Macintosh': 'MacIntel',
+      'X11': 'Linux x86_64'
+    };
+    
+    const userAgent = this.userAgentGen.generate();
+    for (const [key, value] of Object.entries(platforms)) {
+      if (userAgent.includes(key)) {
+        return value;
+      }
+    }
+    
+    return 'Win32';
+  }
+}
+
+// Browser profile manager
+class BrowserProfileManager {
+  constructor(profilesDir) {
+    this.profilesDir = profilesDir;
+    this.profiles = new Map();
   }
 
-  return {
-    isValid: true,
-    params: { url: finalUrl, mediaType, movieId, seasonId, episodeId, server }
-  };
+  async getProfile(domain) {
+    if (!this.profiles.has(domain)) {
+      const profilePath = path.join(this.profilesDir, `profile_${domain.replace(/[^a-z0-9]/gi, '_')}`);
+      
+      if (!fs.existsSync(profilePath)) {
+        fs.mkdirSync(profilePath, { recursive: true });
+      }
+      
+      this.profiles.set(domain, profilePath);
+    }
+    
+    return this.profiles.get(domain);
+  }
 }
+
+// Proxy manager
+class ProxyManager {
+  constructor(proxies, auth) {
+    this.proxies = proxies;
+    this.auth = auth;
+    this.currentIndex = 0;
+    this.blacklist = new Set();
+  }
+
+  getNext() {
+    if (this.proxies.length === 0) return null;
+    
+    let attempts = 0;
+    while (attempts < this.proxies.length) {
+      const proxy = this.proxies[this.currentIndex];
+      this.currentIndex = (this.currentIndex + 1) % this.proxies.length;
+      
+      if (!this.blacklist.has(proxy)) {
+        return {
+          server: proxy,
+          auth: this.auth
+        };
+      }
+      
+      attempts++;
+    }
+    
+    // All proxies blacklisted, clear blacklist and start over
+    this.blacklist.clear();
+    return this.getNext();
+  }
+
+  blacklistProxy(proxy) {
+    this.blacklist.add(proxy);
+  }
+}
+
+// Enhanced cookie management
+class CookieManager {
+  constructor(cookiesDir) {
+    this.cookiesDir = cookiesDir || CONFIG.cookiesDir;
+    if (!fs.existsSync(this.cookiesDir)) {
+      fs.mkdirSync(this.cookiesDir, { recursive: true });
+    }
+  }
+
+  async save(page, domain, logger) {
+    try {
+      const cookies = await page.cookies();
+      const filename = `cookies_${domain.replace(/[^a-z0-9]/gi, '_')}.json`;
+      const filepath = path.join(this.cookiesDir, filename);
+      
+      fs.writeFileSync(filepath, JSON.stringify(cookies, null, 2), 'utf8');
+      logger.info('Saved cookies', { domain, count: cookies.length, filepath });
+      
+      return true;
+    } catch (error) {
+      logger.error('Failed to save cookies', error, { domain });
+      return false;
+    }
+  }
+
+  async restore(page, domain, logger) {
+    try {
+      const filename = `cookies_${domain.replace(/[^a-z0-9]/gi, '_')}.json`;
+      const filepath = path.join(this.cookiesDir, filename);
+      
+      if (!fs.existsSync(filepath)) {
+        logger.debug('No cookies file found', { domain, filepath });
+        return false;
+      }
+      
+      const cookies = JSON.parse(fs.readFileSync(filepath, 'utf8'));
+      
+      // Filter out expired cookies
+      const validCookies = cookies.filter(cookie => {
+        if (!cookie.expires || cookie.expires === -1) return true;
+        return cookie.expires * 1000 > Date.now();
+      });
+      
+      if (validCookies.length > 0) {
+        await page.setCookie(...validCookies);
+        logger.info('Restored cookies', { domain, count: validCookies.length });
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      logger.error('Failed to restore cookies', error, { domain });
+      return false;
+    }
+  }
+}
+
+// Advanced Cloudflare challenge solver
+class CloudflareSolver {
+  constructor(page, behaviorSimulator, logger) {
+    this.page = page;
+    this.behaviorSimulator = behaviorSimulator;
+    this.logger = logger;
+  }
+
+  async waitForChallenge(timeout = CONFIG.timing.challengeTimeout) {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeout) {
+      const hasChallenge = await this.detectChallenge();
+      
+      if (hasChallenge) {
+        this.logger.info('Cloudflare challenge detected');
+        return true;
+      }
+      
+      // Check if page has loaded normally
+      const isLoaded = await this.page.evaluate(() => {
+        return document.readyState === 'complete' &&
+               !document.querySelector('.cf-turnstile') &&
+               !document.querySelector('#challenge-form');
+      });
+      
+      if (isLoaded) {
+        return false;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    return false;
+  }
+
+  async detectChallenge() {
+    return await this.page.evaluate(() => {
+      const indicators = [
+        '.cf-turnstile',
+        '#challenge-form',
+        'div[class*="challenge"]',
+        'div[class*="captcha"]',
+        'iframe[src*="challenges.cloudflare.com"]',
+        'script[src*="challenges.cloudflare.com"]'
+      ];
+      
+      return indicators.some(selector => document.querySelector(selector) !== null);
+    });
+  }
+
+  async solveChallenge() {
+    this.logger.info('Attempting to solve Cloudflare challenge');
+    
+    // Wait for challenge to appear
+    try {
+      await this.page.waitForSelector('.cf-turnstile, #challenge-form', { 
+        timeout: 10000,
+        visible: true 
+      });
+    } catch (e) {
+      this.logger.debug('Challenge selector not found in time');
+    }
+    
+    // Minimal delay for challenge to load
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Check for checkbox-style challenge
+    const checkboxChallenge = await this.page.$('input[type="checkbox"]');
+    if (checkboxChallenge) {
+      this.logger.info('Found checkbox challenge');
+      const box = await checkboxChallenge.boundingBox();
+      if (box) {
+        // Move to checkbox naturally
+        await this.behaviorSimulator.moveMouseNaturally();
+        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await this.behaviorSimulator.humanDelay(300, 700);
+        await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        this.logger.info('Clicked checkbox challenge');
+      }
+    }
+    
+    // Wait for challenge to be solved
+    const solved = await this.waitForSolution();
+    
+    if (solved) {
+      this.logger.info('Cloudflare challenge solved successfully');
+    } else {
+      this.logger.warn('Cloudflare challenge may not have been solved');
+    }
+    
+    return solved;
+  }
+
+  async waitForSolution(timeout = 30000) {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeout) {
+      const hasChallenge = await this.detectChallenge();
+      
+      if (!hasChallenge) {
+        // Check if we're on the target page
+        const url = this.page.url();
+        if (!url.includes('challenges.cloudflare.com')) {
+          return true;
+        }
+      }
+      
+      // Check for specific success indicators
+      const hasPassed = await this.page.evaluate(() => {
+        return document.querySelector('video') !== null ||
+               document.querySelector('#player_parent') !== null ||
+               document.querySelector('iframe[src*="prorcp"]') !== null ||
+               (document.body && document.body.innerHTML.includes('prorcp'));
+      });
+      
+      if (hasPassed) {
+        return true;
+      }
+      
+      await this.behaviorSimulator.humanDelay(500, 1000);
+    }
+    
+    return false;
+  }
+}
+
+// Create browser with advanced stealth
+async function createStealthBrowser(logger, options = {}) {
+  const fingerprintManager = new FingerprintManager();
+  const fingerprint = fingerprintManager.generateFingerprint();
+  const profileManager = new BrowserProfileManager(CONFIG.profilesDir);
+  const proxyManager = new ProxyManager(CONFIG.proxies, CONFIG.proxyAuth);
+  
+  const proxy = proxyManager.getNext();
+  const profilePath = await profileManager.getProfile(options.domain || 'default');
+  
+  logger.info('Creating stealth browser', {
+    fingerprint: {
+      userAgent: fingerprint.userAgent.substring(0, 50) + '...',
+      screen: fingerprint.screen,
+      timezone: fingerprint.timezone
+    },
+    proxy: proxy ? proxy.server : 'none',
+    profile: profilePath
+  });
+  
+  const launchArgs = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-blink-features=AutomationControlled',
+    '--disable-features=IsolateOrigins,site-per-process',
+    '--flag-switches-begin',
+    '--disable-site-isolation-trials',
+    '--flag-switches-end',
+    `--window-size=${fingerprint.screen.width},${fingerprint.screen.height}`,
+    '--start-maximized',
+    '--disable-web-security',
+    '--disable-features=CrossSiteDocumentBlockingIfIsolating',
+    '--disable-site-isolation-for-policy',
+    '--disable-features=BlockInsecurePrivateNetworkRequests',
+    '--allow-running-insecure-content',
+    '--disable-features=AutomationControlled',
+    '--disable-automation',
+    '--disable-infobars',
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--disable-features=TranslateUI',
+    '--disable-ipc-flooding-protection',
+    '--enable-features=NetworkService,NetworkServiceInProcess',
+    '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
+    '--disable-webrtc-hw-encoding',
+    '--disable-webrtc-hw-decoding',
+    '--disable-webrtc-multiple-routes',
+    '--disable-webrtc-nonproxied-udp',
+    `--lang=${fingerprint.languages[0]}`,
+  ];
+  
+  if (proxy) {
+    launchArgs.push(`--proxy-server=${proxy.server}`);
+  }
+  
+  const browser = await puppeteer.launch({
+    headless: false, // Keep visible for now to ensure compatibility
+    userDataDir: profilePath,
+    args: launchArgs,
+    ignoreHTTPSErrors: true,
+    ignoreDefaultArgs: ['--enable-automation', '--enable-blink-features=AutomationControlled'],
+    defaultViewport: null
+  });
+  
+  // Apply fingerprint to all pages
+  browser.on('targetcreated', async (target) => {
+    const page = await target.page();
+    if (page) {
+      await applyFingerprint(page, fingerprint, logger);
+    }
+  });
+  
+  return { browser, fingerprint, proxy, proxyManager };
+}
+
+// Apply fingerprint to page
+async function applyFingerprint(page, fingerprint, logger) {
+  try {
+    // Set user agent
+    await page.setUserAgent(fingerprint.userAgent);
+    
+    // Set viewport
+    await page.setViewport({
+      width: fingerprint.screen.width,
+      height: fingerprint.screen.height,
+      deviceScaleFactor: 1,
+      hasTouch: false,
+      isLandscape: fingerprint.screen.width > fingerprint.screen.height,
+      isMobile: false
+    });
+    
+    // Apply stealth injections
+    await page.evaluateOnNewDocument(stealthInjections(fingerprint));
+    
+    // Additional fingerprinting
+    await page.evaluateOnNewDocument(`
+      // Set timezone
+      Object.defineProperty(Intl.DateTimeFormat.prototype, 'resolvedOptions', {
+        value: function() {
+          return Object.assign(
+            Object.getOwnPropertyDescriptor(Intl.DateTimeFormat.prototype, 'resolvedOptions').value.call(this),
+            { timeZone: '${fingerprint.timezone}' }
+          );
+        }
+      });
+      
+      // Set languages
+      Object.defineProperty(navigator, 'languages', {
+        get: () => ${JSON.stringify(fingerprint.languages)}
+      });
+      Object.defineProperty(navigator, 'language', {
+        get: () => '${fingerprint.languages[0]}'
+      });
+    `);
+    
+    logger.debug('Applied fingerprint to page');
+  } catch (error) {
+    logger.error('Failed to apply fingerprint', error);
+  }
+}
+
+// Extract CloudNestra URL from VidSrc HTML
+function extractCloudNestraUrl(html, logger) {
+  logger.info('Extracting CloudNestra URL from VidSrc HTML...');
+
+  const patterns = [
+    /<iframe[^>]*src\s*=\s*["']([^"']*cloudnestra\.com\/rcp[^"']*)["'][^>]*>/gi,
+    /src\s*=\s*["']([^"']*cloudnestra\.com\/rcp[^\s"']*)/gi,
+    /https:\/\/cloudnestra\.com\/rcp\/[^\s"'>]*/gi,
+    /["'](https:\/\/cloudnestra\.com\/rcp\/[^"']*)["']/gi,
+    /\/\/cloudnestra\.com\/rcp\/[^\s"'>]*/gi
+  ];
+
+  for (const pattern of patterns) {
+    const matches = html.match(pattern);
+    if (matches) {
+      for (const match of matches) {
+        let url = match;
+        
+        if (match.includes('<iframe')) {
+          const srcMatch = match.match(/src\s*=\s*["']([^"']*)["']/i);
+          if (srcMatch && srcMatch[1]) {
+            url = srcMatch[1];
+          }
+        } else if (match.match(/^["'][^]*["']$/)) {
+          url = match.substring(1, match.length - 1);
+        }
+        
+        url = url.trim();
+        
+        if (url.includes('cloudnestra.com/rcp')) {
+          if (url.startsWith('//')) {
+            url = `https:${url}`;
+          } else if (!url.startsWith('http')) {
+            url = `https://${url}`;
+          }
+          
+          const urlEndIndex = url.search(/(%3E|>|%20|\s)/);
+          if (urlEndIndex > 0) {
+            url = url.substring(0, urlEndIndex);
+          }
+          
+          logger.info('Found CloudNestra URL:', url);
+          return url;
+        }
+      }
+    }
+  }
+
+  logger.error('CloudNestra URL not found in VidSrc HTML');
+  return null;
+}
+
+// Extract ProRCP URL from CloudNestra HTML
+export function extractProRcpUrl(html, logger) {
+  logger.info('Extracting ProRCP URL from CloudNestra HTML...');
+
+  const patterns = [
+    /\$\(\'<iframe>\'[\s\S]*?src:\s*\'(\/prorcp\/[^\']+)\'/g,
+    /src:\s*['"]\/prorcp\/([^'"]+)['"]/g,
+    /\/prorcp\/[A-Za-z0-9+\/=]+/g,
+    /'\/prorcp\/([^']+)'/g,
+    /"\/prorcp\/([^"]+)"/g,
+    /iframe[^>]*src\s*=\s*["']([^"']*prorcp[^"']*)["']/gi,
+    /<iframe[^>]*src=["']([^"']*prorcp[^"']*)["'][^>]*>/gi,
+    /file:\s*["']([^"']*prorcp[^"']*)/gi,
+    /var\s+\w+\s*=\s*["']([^"']*prorcp[^"']*)/gi
+  ];
+
+  if (html.includes('player_parent') || html.includes('Playerjs') || html.includes('plyr')) {
+    logger.info('Direct player detected, no ProRCP URL needed');
+    return null;
+  }
+
+  for (const pattern of patterns) {
+    const matches = [...html.matchAll(pattern)];
+    if (matches.length > 0) {
+      for (const match of matches) {
+        let url = match[1] || match[0];
+        
+        // Clean up the URL
+        url = url.replace(/^["']|["']$/g, '');
+        
+        // Skip if it's not a ProRCP URL
+        if (!url.includes('prorcp')) continue;
+        
+        // Add domain if it's a relative URL
+        if (url.startsWith('/prorcp/')) {
+          url = `https://cloudnestra.com${url}`;
+        } else if (!url.startsWith('http')) {
+          url = `https://${url}`;
+        }
+        
+        logger.info('Found ProRCP URL:', url);
+        return url;
+      }
+    }
+  }
+
+  logger.error('ProRCP URL not found');
+  return null;
+}
+
+// Extract stream URL from Shadowlands HTML
+function extractStreamFromShadowlands(html, logger) {
+  logger.info('Extracting stream URL from Shadowlands HTML...');
+
+  const patterns = [
+    /['"]?file['"]?\s*:\s*['"]([^'"]+)['"]/gi,
+    /source\s*:\s*['"]([^'"]+)['"]/gi,
+    /src\s*:\s*['"]([^'"]+m3u8[^'"]*)['"]/gi,
+    /['"]([^'"]*m3u8[^'"]*)['"]/gi,
+    /https:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/gi
+  ];
+
+  for (const pattern of patterns) {
+    const matches = html.match(pattern);
+    if (matches) {
+      for (const match of matches) {
+        let url = match;
+        
+        // Extract URL from the match
+        const fileMatch = match.match(/['"]?(?:file|source|src)['"]?\s*:\s*['"]([^'"]+)['"]/i);
+        if (fileMatch) {
+          url = fileMatch[1];
+        } else if (match.startsWith('"') || match.startsWith("'")) {
+          url = match.slice(1, -1);
+        }
+        
+        // Skip non-stream URLs
+        if (!url.includes('.m3u8') && !url.includes('/stream/') && !url.includes('/hls/')) {
+          continue;
+        }
+        
+        // Ensure it's a full URL
+        if (!url.startsWith('http')) {
+          if (url.startsWith('//')) {
+            url = `https:${url}`;
+          } else if (url.startsWith('/')) {
+            url = `https://tmstr2.shadowlandschronicles.com${url}`;
+          }
+        }
+        
+        logger.info('Found stream URL:', url);
+        return url;
+      }
+    }
+  }
+
+  logger.error('Stream URL not found in Shadowlands HTML');
+  return null;
+}
+
+// Extract Shadowlands URL from ProRCP HTML
+function extractShadowlandsUrlFromProRCP(html, logger) {
+  logger.info('Extracting Shadowlands URL from ProRCP HTML...');
+  
+  // Patterns to find Shadowlands URL in ProRCP HTML
+  const patterns = [
+    // Look for direct shadowlands URLs
+    /https?:\/\/[^\s"'<>]*shadowlands[^\s"'<>]*/gi,
+    /['"]([^'"]*shadowlands[^'"]*)['"]/gi,
+    
+    // Look for iframe src with shadowlands
+    /<iframe[^>]*src\s*=\s*["']([^"']*shadowlands[^"']*)["'][^>]*>/gi,
+    /iframe\.src\s*=\s*["']([^"']*shadowlands[^'"]*)['"]/gi,
+    
+    // Look for any URL pattern that might be shadowlands
+    /src\s*[:=]\s*["']([^"']*(?:shadow|lands|player)[^'"]*)['"]/gi,
+    
+    // Look in JavaScript code
+    /(?:url|src|source|file)\s*[:=]\s*["']([^"']*shadowlands[^'"]*)['"]/gi,
+    
+    // Look for base64 encoded URLs that might contain shadowlands
+    /atob\(['"]([^'"]+)['"]\)/gi,
+    
+    // Look for any iframe src
+    /<iframe[^>]*src\s*=\s*["']([^"']*)["'][^>]*>/gi,
+    /iframe\.src\s*=\s*["']([^'"]+)['"]/gi
+  ];
+  
+  // First try to find direct shadowlands URLs
+  for (const pattern of patterns.slice(0, 6)) {
+    const matches = [...html.matchAll(pattern)];
+    for (const match of matches) {
+      let url = match[1] || match[0];
+      
+      // Clean up the URL
+      url = url.replace(/^["']|["']$/g, '').trim();
+      
+      if (url.includes('shadowlands') || url.includes('shadow') || url.includes('lands')) {
+        // Ensure it's a full URL
+        if (!url.startsWith('http')) {
+          if (url.startsWith('//')) {
+            url = `https:${url}`;
+          } else if (url.startsWith('/')) {
+            url = `https://shadowlands.com${url}`; // Adjust domain as needed
+          } else {
+            url = `https://${url}`;
+          }
+        }
+        
+        logger.info('Found Shadowlands URL:', url);
+        return url;
+      }
+    }
+  }
+  
+  // Try to decode base64 URLs
+  const base64Matches = [...html.matchAll(/atob\(['"]([^'"]+)['"]\)/gi)];
+  for (const match of base64Matches) {
+    try {
+      const decoded = Buffer.from(match[1], 'base64').toString('utf-8');
+      if (decoded.includes('shadowlands') || decoded.includes('http')) {
+        logger.info('Found base64 encoded Shadowlands URL:', decoded);
+        return decoded;
+      }
+    } catch (e) {
+      // Invalid base64
+    }
+  }
+  
+  // Last resort: find any iframe src and check if it might be shadowlands
+  const iframeMatches = [...html.matchAll(/<iframe[^>]*src\s*=\s*["']([^"']*)["'][^>]*>/gi)];
+  for (const match of iframeMatches) {
+    let url = match[1].trim();
+    
+    if (url && !url.includes('about:blank') && !url.includes('javascript:')) {
+      // Ensure it's a full URL
+      if (!url.startsWith('http')) {
+        if (url.startsWith('//')) {
+          url = `https:${url}`;
+        } else if (url.startsWith('/')) {
+          url = `https://prorcp.cc${url}`;
+        } else {
+          url = `https://${url}`;
+        }
+      }
+      
+      logger.info('Found potential Shadowlands iframe URL:', url);
+      return url;
+    }
+  }
+  
+  logger.error('Shadowlands URL not found in ProRCP HTML');
+  return null;
+}
+
+// Bulletproof extraction function with all anti-detection features
+async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
+  const logger = createLogger(requestId);
+  const startTime = Date.now();
+  
+  logger.info('Starting bulletproof extraction', { url, tmdbId, season, episode });
+  
+  const cookieManager = new CookieManager();
+  let browser = null;
+  let browserInfo = null;
+  let attempt = 0;
+  let lastError = null;
+  
+  while (attempt < CONFIG.timing.retryAttempts) {
+    attempt++;
+    logger.info(`Attempt ${attempt}/${CONFIG.timing.retryAttempts}`);
+    
+    try {
+      // Create stealth browser
+      browserInfo = await createStealthBrowser(logger, { domain: 'vidsrc.cc' });
+      browser = browserInfo.browser;
+      const { fingerprint, proxy, proxyManager } = browserInfo;
+      
+      const page = await browser.newPage();
+      const behaviorSimulator = new HumanBehaviorSimulator(page, logger);
+      const cloudflareSolver = new CloudflareSolver(page, behaviorSimulator, logger);
+      
+      // Apply fingerprint
+      await applyFingerprint(page, fingerprint, logger);
+      
+      // Enable request interception
+      await page.setRequestInterception(true);
+      
+      // Advanced request interception
+      page.on('request', (request) => {
+        const resourceType = request.resourceType();
+        const url = request.url();
+        
+        // Block unnecessary resources
+        if (['image', 'stylesheet', 'font', 'texttrack', 'manifest'].includes(resourceType)) {
+          request.abort();
+          return;
+        }
+        
+        // Block tracking and analytics
+        if (url.includes('google-analytics') ||
+            url.includes('doubleclick') ||
+            url.includes('facebook') ||
+            url.includes('twitter') ||
+            url.includes('amazon-adsystem')) {
+          request.abort();
+          return;
+        }
+        
+        // Modify headers
+        const headers = {
+          ...request.headers(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': fingerprint.languages.join(','),
+          'Accept-Encoding': 'gzip, deflate, br',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        };
+        
+        // Remove automation headers
+        delete headers['x-devtools-emulate-network-conditions-client-id'];
+        delete headers['x-automation'];
+        
+        request.continue({ headers });
+      });
+      
+      // Log responses
+      page.on('response', (response) => {
+        const status = response.status();
+        const url = response.url();
+        
+        if (status >= 400) {
+          logger.warn('HTTP error', { url, status });
+        }
+      });
+      
+      // Handle console messages
+      page.on('console', (msg) => {
+        logger.debug('Console', { type: msg.type(), text: msg.text() });
+      });
+      
+      // Restore cookies for VidSrc
+      await cookieManager.restore(page, 'vidsrc.cc', logger);
+      
+      // Navigate to VidSrc with enhanced error handling
+      logger.info('Navigating to VidSrc URL');
+      
+      try {
+        await page.goto(url, {
+          waitUntil: 'domcontentloaded',
+          timeout: CONFIG.timing.pageLoadTimeout
+        });
+      } catch (navError) {
+        logger.warn('Navigation error, checking if page loaded anyway', { error: navError.message });
+      }
+      
+      // Wait a moment for page to stabilize
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Check for Cloudflare challenge (reduced timeout)
+      const hasChallenge = await cloudflareSolver.waitForChallenge(3000);
+      if (hasChallenge) {
+        const solved = await cloudflareSolver.solveChallenge();
+        if (!solved) {
+          throw new Error('Failed to solve Cloudflare challenge');
+        }
+      }
+      
+      // Wait for CloudNestra URL to appear and extract it immediately
+      logger.info('Waiting for CloudNestra URL...');
+      let cloudNestraUrl = null;
+      const startWait = Date.now();
+      
+      while (!cloudNestraUrl && (Date.now() - startWait < 5000)) {
+        const html = await page.content();
+        cloudNestraUrl = extractCloudNestraUrl(html, logger);
+        if (!cloudNestraUrl) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+      
+      if (!cloudNestraUrl) {
+        throw new Error('CloudNestra URL not found');
+      }
+      
+      // Navigate to CloudNestra
+      logger.info('Navigating to CloudNestra');
+      
+      try {
+        await page.goto(cloudNestraUrl, {
+          waitUntil: 'domcontentloaded',
+          timeout: CONFIG.timing.pageLoadTimeout
+        });
+      } catch (navError) {
+        logger.warn('CloudNestra navigation error', { error: navError.message });
+      }
+      
+      // Wait for page to stabilize
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Check for Cloudflare on CloudNestra (reduced timeout)
+      const cloudNestraChallenge = await cloudflareSolver.waitForChallenge(2000);
+      if (cloudNestraChallenge) {
+        await cloudflareSolver.solveChallenge();
+      }
+      
+      // Wait for ProRCP URL to appear and extract it immediately
+      logger.info('Waiting for ProRCP URL...');
+      let proRcpUrl = null;
+      const proRcpStartWait = Date.now();
+      
+      while (!proRcpUrl && (Date.now() - proRcpStartWait < 5000)) {
+        const html = await page.content();
+        proRcpUrl = extractProRcpUrl(html, logger);
+        
+        if (!proRcpUrl) {
+          // Check if player is directly available
+          const hasDirectPlayer = await page.evaluate(() => {
+            return document.querySelector('#player_parent') !== null ||
+                   document.querySelector('video') !== null;
+          });
+          
+          if (hasDirectPlayer) {
+            logger.info('Direct player found, extracting stream');
+            const streamUrl = await page.evaluate(() => {
+              const video = document.querySelector('video');
+              if (video && video.src) return video.src;
+              
+              const scripts = Array.from(document.scripts);
+              for (const script of scripts) {
+                const match = script.textContent.match(/file:\s*["']([^"']+)["']/);
+                if (match) return match[1];
+              }
+              
+              return null;
+            });
+            
+            if (streamUrl) {
+              if (browser) await browser.close();
+              const duration = logger.timing('Total extraction time', startTime);
+              return {
+                url: streamUrl,
+                type: 'direct',
+                source: 'cloudnestra',
+                metadata: {
+                  tmdbId,
+                  season,
+                  episode,
+                  duration,
+                  attempts: attempt,
+                  proxy: proxy?.server || 'none'
+                }
+              };
+            }
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+      
+      if (!proRcpUrl) {
+        throw new Error('ProRCP URL not found and no direct player available');
+      }
+      
+      // Navigate to ProRCP
+      logger.info('Navigating to ProRCP');
+      
+      try {
+        await page.goto(proRcpUrl, {
+          waitUntil: 'domcontentloaded',
+          timeout: CONFIG.timing.pageLoadTimeout
+        });
+      } catch (navError) {
+        logger.warn('ProRCP navigation error', { error: navError.message });
+      }
+      
+      // Wait for page to stabilize
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Check for Cloudflare on ProRCP
+      const proRcpChallenge = await cloudflareSolver.waitForChallenge(5000);
+      if (proRcpChallenge) {
+        await cloudflareSolver.solveChallenge();
+      }
+      
+      // Wait for Shadowlands URL to appear and extract it immediately
+      logger.info('Waiting for Shadowlands URL...');
+      let shadowlandsUrl = null;
+      const shadowlandsStartWait = Date.now();
+      
+      while (!shadowlandsUrl && (Date.now() - shadowlandsStartWait < 5000)) {
+        const html = await page.content();
+        shadowlandsUrl = await extractShadowlandsUrlFromProRCP(html, logger);
+        
+        if (!shadowlandsUrl) {
+          // Try to find iframes
+          try {
+            const iframes = await page.$$eval('iframe', frames =>
+              frames.map(f => f.src).filter(src => src && src.length > 0)
+            );
+            
+            for (const iframe of iframes) {
+              if (iframe && (iframe.includes('shadowlands') || iframe.includes('shadow') || iframe.includes('lands'))) {
+                logger.info('Found Shadowlands iframe:', iframe);
+                shadowlandsUrl = iframe;
+                break;
+              }
+            }
+          } catch (e) {
+            // No iframes yet
+          }
+          
+          if (!shadowlandsUrl) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+        }
+      }
+      
+      if (!shadowlandsUrl) {
+        throw new Error('Shadowlands URL not found in ProRCP page');
+      }
+      
+      logger.info('Found Shadowlands URL, returning it directly:', shadowlandsUrl);
+      
+      // Close browser as we're done
+      if (browser) {
+        await browser.close();
+      }
+      
+      const duration = logger.timing('Total extraction time', startTime);
+      
+      // Return the shadowlands URL directly
+      return {
+        url: shadowlandsUrl,
+        type: 'shadowlands',
+        source: 'prorcp',
+        metadata: {
+          tmdbId,
+          season,
+          episode,
+          duration,
+          attempts: attempt,
+          proxy: proxy?.server || 'none'
+        }
+      };
+      
+    } catch (error) {
+      lastError = error;
+      logger.error(`Attempt ${attempt} failed`, error);
+      
+      // Blacklist proxy if it failed
+      if (browserInfo?.proxy) {
+        browserInfo.proxyManager.blacklistProxy(browserInfo.proxy.server);
+      }
+      
+      if (browser) {
+        await browser.close();
+        browser = null;
+      }
+      
+      if (attempt < CONFIG.timing.retryAttempts) {
+        const delay = CONFIG.timing.retryDelay;
+        logger.info(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw new Error(`Failed after ${CONFIG.timing.retryAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
+}
+
+// API endpoint for bulletproof extraction
+app.get('/api/extract/bulletproof', async (req, res) => {
+  const requestId = generateRequestId();
+  const logger = createLogger(requestId);
+  const startTime = Date.now();
+  
+  try {
+    // Get parameters from query string
+    const { tmdbId, season, episode } = req.query;
+    
+    if (!tmdbId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameter: tmdbId',
+        requestId
+      });
+    }
+    
+    logger.info('Received extraction request', { tmdbId, season, episode });
+    
+    // Build VidSrc URL
+    let url;
+    if (season && episode) {
+      url = `https://vidsrc.xyz/embed/tv/${tmdbId}/${season}/${episode}`;
+    } else {
+      url = `https://vidsrc.xyz/embed/movie/${tmdbId}`;
+    }
+    
+    // Perform bulletproof extraction
+    const result = await bulletproofExtraction(url, tmdbId, season, episode, requestId);
+    
+    const totalDuration = logger.timing('Total request time', startTime);
+    
+    res.json({
+      success: true,
+      data: result,
+      requestId,
+      duration: totalDuration
+    });
+    
+  } catch (error) {
+    logger.error('Extraction failed', error);
+    const totalDuration = Date.now() - startTime;
+    
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      requestId,
+      duration: totalDuration
+    });
+  }
+});
+
+// Test endpoint
+app.get('/test', async (req, res) => {
+  const requestId = generateRequestId();
+  const logger = createLogger(requestId);
+  
+  try {
+    logger.info('Test endpoint called');
+    
+    // Test with a known working movie
+    const testTmdbId = '550'; // Fight Club
+    const url = `https://vidsrc.xyz/embed/movie/${testTmdbId}`;
+    
+    const result = await bulletproofExtraction(url, testTmdbId, null, null, requestId);
+    
+    res.json({
+      success: true,
+      message: 'Bulletproof extraction service is working',
+      test_result: result,
+      requestId
+    });
+    
+  } catch (error) {
+    logger.error('Test failed', error);
+    
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Bulletproof extraction service test failed',
+      requestId
+    });
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    service: 'Flyx Extract Stream Service',
-    version: '1.0.0'
-  });
-});
-
-// Root endpoint with API documentation
-app.get('/', (req, res) => {
-  res.json({
-    service: 'Flyx Extract Stream Service',
-    version: '1.0.0',
-    endpoints: {
-      '/health': 'Health check',
-      '/extract': 'Extract stream URLs (JSON response)',
-      '/extract-stream': 'Extract stream URLs with real-time progress (Server-Sent Events)',
-    },
-    usage: {
-      extract: {
-        method: 'GET',
-        parameters: {
-          url: 'Direct URL to extract from (optional)',
-          mediaType: 'movie or tv (required if no url)',
-          movieId: 'TMDB movie/show ID (required if no url)',
-          seasonId: 'Season number (required for TV)',
-          episodeId: 'Episode number (required for TV)',
-          server: 'vidsrc.xyz (default)'
-        },
-        examples: [
-          '/extract?mediaType=movie&movieId=123456&server=vidsrc.xyz',
-          '/extract?mediaType=tv&movieId=123456&seasonId=1&episodeId=1&server=vidsrc.xyz',
-          '/extract?url=https://vidsrc.xyz/embed/movie?tmdb=123456'
-        ]
-      }
+    status: 'ok',
+    service: 'vm-server-bulletproof',
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    config: {
+      proxies: CONFIG.proxies.length,
+      retryAttempts: CONFIG.timing.retryAttempts,
+      profiles: fs.existsSync(CONFIG.profilesDir),
+      cookies: fs.existsSync(CONFIG.cookiesDir)
     }
   });
-});
-
-// Main extract endpoint
-app.get('/extract', async (req, res) => {
-  const requestStart = Date.now();
-  const requestId = generateRequestId();
-  const logger = createLogger(requestId);
-
-  logger.info('Stream extraction request started');
-
-  let browser = null;
-
-  try {
-    // Parse and validate parameters
-    const validation = validateParameters(req.query, logger);
-
-    if (!validation.isValid) {
-      return res.status(400).json({
-        success: false,
-        error: validation.error,
-        requestId
-      });
-    }
-
-    const { url, mediaType, movieId, seasonId, episodeId, server } = validation.params;
-
-    // Launch browser
-    logger.info('Launching Puppeteer browser');
-    const browserConfig = await getBrowserConfig(logger);
-    browser = await puppeteer.launch(browserConfig);
-
-    // Create new page
-    const page = await browser.newPage();
-    const fingerprint = browserConfig.fingerprint;
-
-    // Set viewport
-    await page.setViewport({
-      width: fingerprint.screenWidth,
-      height: fingerprint.screenHeight,
-      deviceScaleFactor: 1,
-      hasTouch: fingerprint.maxTouchPoints > 0,
-      isLandscape: fingerprint.screenWidth > fingerprint.screenHeight
-    });
-
-    // Setup stream interception
-    const { streamUrls } = setupEnhancedStreamInterception(page, logger, url);
-
-    // Navigate to URL
-    logger.info('Navigating to URL', { url: url.substring(0, 100) });
-
-    try {
-      await page.goto(url, {
-        waitUntil: 'domcontentloaded',
-        timeout: 30000
-      });
-    } catch (navigationError) {
-      logger.error('Navigation failed', navigationError);
-      throw new Error(`Navigation failed: ${navigationError.message}`);
-    }
-
-    // Handle Cloudflare challenges
-    const cloudflareResult = await detectAndHandleCloudflareChallenge(page, logger);
-    if (cloudflareResult.challengeDetected && !cloudflareResult.resolved) {
-      throw new Error('Cloudflare challenge could not be resolved');
-    }
-
-    // Interact with page to trigger stream loading
-    await interactWithPage(page, logger, browser, requestStart);
-
-    // Wait for streams to be detected
-    let streamWaitTime = 0;
-    const maxStreamWait = 15000; // 15 seconds max
-
-    while (streamUrls.length === 0 && streamWaitTime < maxStreamWait) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      streamWaitTime += 1000;
-
-      if (streamWaitTime % 3000 === 0) {
-        logger.info(`Still waiting for streams... ${streamWaitTime}ms elapsed`);
-      }
-    }
-
-    // Process results
-    const totalTime = Date.now() - requestStart;
-
-    if (streamUrls.length > 0) {
-      // Sort streams by priority
-      streamUrls.sort((a, b) => a.priority - b.priority);
-
-      const bestStream = streamUrls[0];
-
-      logger.info('Stream extraction successful', {
-        streamCount: streamUrls.length,
-        bestStreamSource: bestStream.source,
-        totalTime,
-        requestId
-      });
-
-      res.json({
-        success: true,
-        streamUrl: bestStream.url,
-        streamInfo: {
-          source: bestStream.source,
-          quality: 'auto',
-          type: 'hls'
-        },
-        debug: {
-          totalStreams: streamUrls.length,
-          extractionTime: totalTime,
-          method: bestStream.extractionMethod,
-          requestId
-        }
-      });
-    } else {
-      logger.warn('No streams found', { totalTime, requestId });
-
-      res.json({
-        success: false,
-        error: 'No streams found',
-        debug: {
-          extractionTime: totalTime,
-          requestId
-        }
-      });
-    }
-
-  } catch (error) {
-    const totalTime = Date.now() - requestStart;
-    logger.error('Stream extraction failed', error, { totalTime, requestId });
-
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      debug: {
-        extractionTime: totalTime,
-        requestId
-      }
-    });
-  } finally {
-    // Cleanup
-    if (browser) {
-      try {
-        await browser.close();
-        logger.info('Browser closed successfully');
-      } catch (e) {
-        logger.warn('Error closing browser', { error: e.message });
-      }
-    }
-  }
-});
-
-// Server-Sent Events endpoint for real-time progress
-app.get('/extract-stream', async (req, res) => {
-  const requestStart = Date.now();
-  const requestId = generateRequestId();
-  const logger = createLogger(requestId);
-
-  // Set up Server-Sent Events
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control'
-  });
-
-  function sendProgress(phase, percentage, message, data = {}) {
-    const progressData = {
-      phase,
-      percentage,
-      message,
-      timestamp: new Date().toISOString(),
-      requestId,
-      ...data
-    };
-
-    res.write(`data: ${JSON.stringify(progressData)}\n\n`);
-    logger.info(`Progress: ${phase} (${percentage}%) - ${message}`);
-  }
-
-  let browser = null;
-
-  try {
-    sendProgress('initializing', 5, 'Starting stream extraction service');
-
-    // Parse and validate parameters
-    const validation = validateParameters(req.query, logger);
-    if (!validation.isValid) {
-      sendProgress('error', 0, validation.error);
-      res.write(`data: ${JSON.stringify({ success: false, error: validation.error, requestId })}\n\n`);
-      return res.end();
-    }
-
-    const { url, mediaType, movieId, seasonId, episodeId, server } = validation.params;
-
-    sendProgress('connecting', 10, 'Launching browser');
-    const browserConfig = await getBrowserConfig(logger);
-    browser = await puppeteer.launch(browserConfig);
-
-    sendProgress('connecting', 15, 'Creating new page');
-    const page = await browser.newPage();
-    const fingerprint = browserConfig.fingerprint;
-
-    sendProgress('navigating', 25, 'Setting up browser');
-    await page.setViewport({
-      width: fingerprint.screenWidth,
-      height: fingerprint.screenHeight,
-      deviceScaleFactor: 1,
-      hasTouch: fingerprint.maxTouchPoints > 0,
-      isLandscape: fingerprint.screenWidth > fingerprint.screenHeight
-    });
-
-    sendProgress('navigating', 35, 'Setting up stream interception');
-    const { streamUrls } = setupEnhancedStreamInterception(page, logger, url);
-
-    sendProgress('bypassing', 45, 'Navigating to target URL');
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-    sendProgress('bypassing', 50, 'Handling anti-bot measures');
-    const cloudflareResult = await detectAndHandleCloudflareChallenge(page, logger);
-    if (cloudflareResult.challengeDetected && !cloudflareResult.resolved) {
-      throw new Error('Cloudflare challenge could not be resolved');
-    }
-
-    sendProgress('extracting', 65, 'Triggering stream loading');
-    await interactWithPage(page, logger, browser, requestStart, sendProgress);
-
-    sendProgress('validating', 90, 'Waiting for stream detection');
-    let streamWaitTime = 0;
-    const maxStreamWait = 15000;
-
-    while (streamUrls.length === 0 && streamWaitTime < maxStreamWait) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      streamWaitTime += 1000;
-
-      if (streamWaitTime % 3000 === 0) {
-        sendProgress('validating', 90 + (streamWaitTime / maxStreamWait) * 5,
-          `Still detecting streams... ${streamWaitTime}ms elapsed`);
-      }
-    }
-
-    sendProgress('finalizing', 95, 'Processing results');
-
-    const totalTime = Date.now() - requestStart;
-
-    if (streamUrls.length > 0) {
-      streamUrls.sort((a, b) => a.priority - b.priority);
-      const bestStream = streamUrls[0];
-
-      sendProgress('complete', 100, 'Stream extraction successful');
-
-      const result = {
-        success: true,
-        streamUrl: bestStream.url,
-        streamInfo: {
-          source: bestStream.source,
-          quality: 'auto',
-          type: 'hls'
-        },
-        debug: {
-          totalStreams: streamUrls.length,
-          extractionTime: totalTime,
-          method: bestStream.extractionMethod,
-          requestId
-        }
-      };
-
-      res.write(`data: ${JSON.stringify(result)}\n\n`);
-    } else {
-      sendProgress('error', 100, 'No streams found');
-      res.write(`data: ${JSON.stringify({
-        success: false,
-        error: 'No streams found',
-        debug: { extractionTime: totalTime, requestId }
-      })}\n\n`);
-    }
-
-  } catch (error) {
-    const totalTime = Date.now() - requestStart;
-    logger.error('Stream extraction failed', error);
-
-    sendProgress('error', 100, `Extraction failed: ${error.message}`);
-    res.write(`data: ${JSON.stringify({
-      success: false,
-      error: error.message,
-      debug: { extractionTime: totalTime, requestId }
-    })}\n\n`);
-  } finally {
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (e) {
-        logger.warn('Error closing browser', { error: e.message });
-      }
-    }
-    res.end();
-  }
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Flyx Extract Stream Service running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🎬 Extract endpoint: http://localhost:${PORT}/extract`);
-  console.log(`📡 Streaming endpoint: http://localhost:${PORT}/extract-stream`);
+  console.log(`\n🚀 Bulletproof VM Server running on port ${PORT}`);
+  console.log('\n📋 Configuration:');
+  console.log(`   - Proxies configured: ${CONFIG.proxies.length}`);
+  console.log(`   - Retry attempts: ${CONFIG.timing.retryAttempts}`);
+  console.log(`   - Human delay range: ${CONFIG.timing.humanDelayMin}-${CONFIG.timing.humanDelayMax}ms`);
+  console.log(`   - Page load timeout: ${CONFIG.timing.pageLoadTimeout}ms`);
+  console.log(`   - Challenge timeout: ${CONFIG.timing.challengeTimeout}ms`);
+  console.log(`   - Browser profiles: ${CONFIG.profilesDir}`);
+  console.log(`   - Cookies storage: ${CONFIG.cookiesDir}`);
+  console.log('\n🔧 Available endpoints:');
+  console.log(`   GET /api/extract/bulletproof - Extract shadowlands URL`);
+  console.log(`   GET /test - Test the extraction service`);
+  console.log(`   GET /health - Check service health`);
+  console.log('\n🔗 Example GET request:');
+  console.log(`   GET /api/extract/bulletproof?tmdbId=550`);
+  console.log(`   GET /api/extract/bulletproof?tmdbId=1396&season=1&episode=1\n`);
 });
+
+export default app;

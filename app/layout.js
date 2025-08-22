@@ -1,5 +1,13 @@
 import './globals.css'
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#6366f1',
+  colorScheme: 'dark light',
+}
+
 export const metadata = {
   title: 'Flyx 2.0 - Stream Beyond',
   description: 'Discover and stream your favorite movies and TV shows with Flyx 2.0. Your ultimate entertainment destination.',
@@ -47,17 +55,6 @@ export const metadata = {
   },
   // Manifest
   manifest: '/manifest.json',
-  // Theme color for mobile browsers
-  themeColor: '#6366f1',
-  // Color scheme
-  colorScheme: 'dark light',
-  // Viewport
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-  },
-
 }
 
 export default function RootLayout({ children }) {

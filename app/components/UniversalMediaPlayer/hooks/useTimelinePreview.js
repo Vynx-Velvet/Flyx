@@ -40,9 +40,36 @@ export const useTimelinePreview = ({ duration, videoRef }) => {
       canvas.width = 160;
       canvas.height = 90;
 
-      // Store original state
-      const originalTime = video.currentTime;
-      const wasPlaying = !video.paused;
+      // Create a temporary video element for thumbnail generation to avoid affecting main playback
+      const thumbnailVideo = document.createElement('video');
+      thumbnailVideo.crossOrigin = video.crossOrigin;
+      thumbnailVideo.preload = 'metadata';
+      
+      // For HLS streams, we need to use the same source but in a separate element
+      if (video.src) {
+        thumbnailVideo.src = video.src;
+      } else if (video.currentSrc) {
+        thumbnailVideo.src = video.currentSrc;
+      }
+      
+      // IMPORTANT: Don't attach to DOM to prevent interference with main video
+      thumbnailVideo.style.display = 'none';
+      thumbnailVideo.muted = true; // Mute to prevent audio interference
+      
+      // Wait for the temporary video to load metadata
+      await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => reject(new Error('Timeout loading video for thumbnail')), 3000);
+        
+        thumbnailVideo.addEventListener('loadedmetadata', () => {
+          clearTimeout(timeoutId);
+          resolve();
+        }, { once: true });
+        
+        thumbnailVideo.addEventListener('error', (e) => {
+          clearTimeout(timeoutId);
+          reject(e);
+        }, { once: true });
+      });
 
       return new Promise((resolve) => {
         let timeoutId;
@@ -50,39 +77,32 @@ export const useTimelinePreview = ({ duration, videoRef }) => {
         const onSeeked = () => {
           try {
             // Draw the frame at the target time
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(thumbnailVideo, 0, 0, canvas.width, canvas.height);
             const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
             
             // Clean up
-            video.removeEventListener('seeked', onSeeked);
+            thumbnailVideo.removeEventListener('seeked', onSeeked);
             clearTimeout(timeoutId);
-            
-            // Restore original state
-            video.currentTime = originalTime;
-            if (wasPlaying) {
-              video.play().catch(() => {});
-            }
+            thumbnailVideo.remove();
             
             resolve(thumbnailUrl);
           } catch (error) {
             console.warn('❌ Error drawing thumbnail:', error);
+            thumbnailVideo.remove();
             resolve(null);
           }
         };
 
         // Set up timeout fallback
         timeoutId = setTimeout(() => {
-          video.removeEventListener('seeked', onSeeked);
-          video.currentTime = originalTime;
-          if (wasPlaying) {
-            video.play().catch(() => {});
-          }
+          thumbnailVideo.removeEventListener('seeked', onSeeked);
+          thumbnailVideo.remove();
           resolve(null);
         }, 1000);
 
         // Set up event listener and seek
-        video.addEventListener('seeked', onSeeked);
-        video.currentTime = targetTime;
+        thumbnailVideo.addEventListener('seeked', onSeeked, { once: true });
+        thumbnailVideo.currentTime = targetTime;
       });
     } catch (error) {
       console.warn('❌ Error generating thumbnail:', error);

@@ -1,0 +1,1506 @@
+/* ==========================================
+   FUTURISTIC MEDIA PLAYER - REVOLUTIONARY UI
+   ========================================== */
+
+/* ==========================================
+   MAIN PLAYER CONTAINER
+   ========================================== */
+
+.futuristicPlayer {
+  /* Futuristic Color Palette */
+  --neon-cyan: #00f5ff;
+  --neon-magenta: #ff006e;
+  --neon-purple: #8b5cf6;
+  --neon-green: #00ff88;
+  --neon-yellow: #ffff00;
+  --neon-orange: #ff8c00;
+  
+  /* Glass Morphism */
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+  --glass-blur: blur(12px);
+  
+  /* Dark Theme */
+  --dark-bg-primary: #0a0a0f;
+  --dark-bg-secondary: #141420;
+  --dark-bg-tertiary: #1e1e2e;
+  --dark-text-primary: #ffffff;
+  --dark-text-secondary: rgba(255, 255, 255, 0.8);
+  --dark-text-muted: rgba(255, 255, 255, 0.5);
+  
+  /* Light Theme */
+  --light-bg-primary: #f8fafc;
+  --light-bg-secondary: #f1f5f9;
+  --light-bg-tertiary: #e2e8f0;
+  --light-text-primary: #1e293b;
+  --light-text-secondary: #475569;
+  --light-text-muted: #94a3b8;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 50%, var(--neon-magenta) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--neon-green) 0%, var(--neon-cyan) 100%);
+  --gradient-ambient: radial-gradient(ellipse at center, rgba(0, 245, 255, 0.3) 0%, transparent 70%);
+  
+  /* Animations */
+  --animation-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --animation-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --animation-slow: 0.6s cubic-bezier(0.23, 1, 0.320, 1);
+  --animation-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  
+  /* Shadows */
+  --shadow-small: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.15);
+  --shadow-large: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --shadow-neon: 0 0 20px currentColor;
+  --shadow-neon-strong: 0 0 40px currentColor, 0 0 60px currentColor;
+
+  /* Component Styles */
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  background: var(--dark-bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+  overflow: hidden;
+  cursor: default;
+  transition: all var(--animation-slow);
+}
+
+/* Theme Variations */
+.futuristicPlayer.theme-dark {
+  --bg-primary: var(--dark-bg-primary);
+  --bg-secondary: var(--dark-bg-secondary);
+  --bg-tertiary: var(--dark-bg-tertiary);
+  --text-primary: var(--dark-text-primary);
+  --text-secondary: var(--dark-text-secondary);
+  --text-muted: var(--dark-text-muted);
+}
+
+.futuristicPlayer.theme-light {
+  --bg-primary: var(--light-bg-primary);
+  --bg-secondary: var(--light-bg-secondary);
+  --bg-tertiary: var(--light-bg-tertiary);
+  --text-primary: var(--light-text-primary);
+  --text-secondary: var(--light-text-secondary);
+  --text-muted: var(--light-text-muted);
+}
+
+.futuristicPlayer.immersiveMode {
+  cursor: default;
+  background: #000000;
+}
+
+.futuristicPlayer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(0, 245, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 0, 110, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 50% 10%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity var(--animation-slow);
+}
+
+.futuristicPlayer.immersiveMode::before {
+  opacity: 0.3;
+}
+
+/* Fullscreen Enhancements */
+.futuristicPlayer:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+}
+
+/* ==========================================
+   VIDEO ELEMENT - ENHANCED
+   ========================================== */
+
+.videoElement {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: transparent;
+  z-index: 2;
+  position: relative;
+  border-radius: 0;
+  transition: all var(--animation-slow);
+  filter: brightness(1) contrast(1.02) saturate(1.05);
+}
+
+.videoElement::-webkit-media-controls {
+  display: none !important;
+  -webkit-appearance: none;
+}
+
+.videoElement::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+
+/* ==========================================
+   AMBIENT LIGHTING SYSTEM
+   ========================================== */
+
+.ambientLighting {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+  transition: opacity var(--animation-slow);
+}
+
+.ambientGlow {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  top: -50%;
+  left: -50%;
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: ambientPulse 8s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes ambientPulse {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.6; }
+  25% { transform: scale(1.1) rotate(90deg); opacity: 0.8; }
+  50% { transform: scale(0.9) rotate(180deg); opacity: 0.4; }
+  75% { transform: scale(1.05) rotate(270deg); opacity: 0.7; }
+}
+
+.atmosphereParticles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.atmosphereParticle {
+  position: absolute;
+  width: var(--size, 2px);
+  height: var(--size, 2px);
+  background: var(--color, var(--neon-cyan));
+  border-radius: 50%;
+  animation: float var(--duration, 20s) linear infinite;
+  opacity: var(--opacity, 0.6);
+  box-shadow: 0 0 6px currentColor;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(100vh) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: var(--opacity, 0.6);
+  }
+  90% {
+    opacity: var(--opacity, 0.6);
+  }
+  100% {
+    transform: translateY(-10vh) translateX(var(--drift, 50px)) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* ==========================================
+   PARTICLE SYSTEM
+   ========================================== */
+
+.particleSystem {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.energyParticle {
+  position: absolute;
+  background: radial-gradient(circle, var(--color) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: energyFlow var(--duration, 15s) ease-in-out infinite;
+  filter: blur(var(--blur, 1px));
+}
+
+@keyframes energyFlow {
+  0% {
+    transform: translate(var(--start-x, 0), var(--start-y, 100vh)) scale(0);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(var(--start-x, 0), calc(var(--start-y, 100vh) - 10vh)) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(var(--mid-x, 50vw), var(--mid-y, 50vh)) scale(var(--mid-scale, 1.2));
+    opacity: var(--mid-opacity, 0.8);
+  }
+  90% {
+    transform: translate(var(--end-x, 100vw), var(--end-y, 0)) scale(0.5);
+    opacity: 0.2;
+  }
+  100% {
+    transform: translate(var(--end-x, 100vw), var(--end-y, -10vh)) scale(0);
+    opacity: 0;
+  }
+}
+
+/* ==========================================
+   INTELLIGENT SUBTITLES
+   ========================================== */
+
+.intelligentSubtitles {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+  transition: all var(--animation-normal);
+  max-width: 80%;
+  word-wrap: break-word;
+}
+
+.subtitleText {
+  display: inline-block;
+  padding: 8px 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  
+  color: var(--text-primary);
+  font-size: clamp(18px, 3vh, 32px);
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-align: center;
+  line-height: 1.4;
+  
+  text-shadow: 
+    0 0 10px rgba(0, 0, 0, 0.8),
+    0 2px 4px rgba(0, 0, 0, 0.6);
+  
+  animation: subtitleEnter var(--animation-normal) var(--animation-bounce);
+}
+
+.subtitleText.contentAware {
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid var(--neon-cyan);
+  box-shadow: 
+    var(--glass-shadow),
+    0 0 20px rgba(0, 245, 255, 0.3);
+}
+
+@keyframes subtitleEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ==========================================
+   FUTURISTIC CONTROLS
+   ========================================== */
+
+.controlsContainer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding: 2rem;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.7) 50%,
+    transparent 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+.timeline {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: var(--glass-bg);
+  border-radius: 3px;
+  margin-bottom: 2rem;
+  cursor: pointer;
+  transition: all var(--animation-normal);
+  overflow: visible;
+}
+
+.timeline:hover {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.timelineProgress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--gradient-primary);
+  border-radius: 3px;
+  transition: all var(--animation-fast);
+  box-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
+}
+
+.timeline:hover .timelineProgress {
+  box-shadow: 0 0 20px rgba(0, 245, 255, 0.8);
+}
+
+.timelineThumb {
+  position: absolute;
+  top: 50%;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  background: var(--neon-cyan);
+  border: 2px solid white;
+  border-radius: 50%;
+  transform: translateY(-50%) scale(0);
+  transition: all var(--animation-normal);
+  box-shadow: 
+    0 0 15px rgba(0, 245, 255, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.timeline:hover .timelineThumb {
+  transform: translateY(-50%) scale(1);
+}
+
+.controlsRow {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  justify-content: space-between;
+}
+
+.leftControls,
+.centerControls,
+.rightControls {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.centerControls {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ==========================================
+   GLASS MORPHISM BUTTONS
+   ========================================== */
+
+.glassButton {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  
+  color: var(--text-primary);
+  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  
+  transition: all var(--animation-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.glassButton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left var(--animation-slow);
+}
+
+.glassButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--neon-cyan);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 
+    var(--glass-shadow),
+    0 0 20px rgba(0, 245, 255, 0.4);
+}
+
+.glassButton:hover::before {
+  left: 100%;
+}
+
+.glassButton:active {
+  transform: translateY(-1px) scale(1.02);
+}
+
+.playButton {
+  min-width: 60px;
+  min-height: 60px;
+  border-radius: 50%;
+  font-size: 24px;
+  background: var(--gradient-primary);
+  border: none;
+  color: white;
+  box-shadow: 
+    var(--shadow-large),
+    0 0 30px rgba(0, 245, 255, 0.5);
+}
+
+.playButton:hover {
+  transform: translateY(-3px) scale(1.1);
+  box-shadow: 
+    var(--shadow-large),
+    0 0 40px rgba(0, 245, 255, 0.8);
+}
+
+/* ==========================================
+   VOLUME CONTROL - FUTURISTIC
+   ========================================== */
+
+.volumeContainer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.volumeSlider {
+  position: relative;
+  width: 120px;
+  height: 6px;
+  background: var(--glass-bg);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all var(--animation-normal);
+}
+
+.volumeSlider:hover {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.volumeFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--gradient-secondary);
+  border-radius: 3px;
+  transition: all var(--animation-fast);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+.volumeSlider:hover .volumeFill {
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
+}
+
+.volumeThumb {
+  position: absolute;
+  top: 50%;
+  right: -6px;
+  width: 12px;
+  height: 12px;
+  background: var(--neon-green);
+  border: 2px solid white;
+  border-radius: 50%;
+  transform: translateY(-50%) scale(0);
+  transition: all var(--animation-normal);
+  box-shadow: 
+    0 0 15px rgba(0, 255, 136, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.volumeSlider:hover .volumeThumb {
+  transform: translateY(-50%) scale(1);
+}
+
+/* ==========================================
+   ADVANCED SETTINGS PANEL
+   ========================================== */
+
+.settingsPanel {
+  position: fixed;
+  top: 50%;
+  right: 2rem;
+  transform: translateY(-50%);
+  width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 100;
+  
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: var(--shadow-large);
+  
+  padding: 2rem;
+}
+
+.settingsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.settingsTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--gradient-primary);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.settingSection {
+  margin-bottom: 2rem;
+}
+
+.settingLabel {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.settingControl {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  width: 100%;
+  transition: all var(--animation-normal);
+}
+
+.settingControl:focus {
+  outline: none;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 0 3px rgba(0, 245, 255, 0.2);
+}
+
+/* ==========================================
+   PERFORMANCE DASHBOARD
+   ========================================== */
+
+.performanceDashboard {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  width: 350px;
+  z-index: 100;
+  
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(30px);
+  box-shadow: var(--shadow-large);
+  
+  padding: 1.5rem;
+}
+
+.performanceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.performanceGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.performanceMetric {
+  text-align: center;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+}
+
+.metricValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  margin-bottom: 0.25rem;
+}
+
+.metricLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ==========================================
+   GESTURE OVERLAY
+   ========================================== */
+
+.gestureOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.gestureRipple {
+  position: absolute;
+  border: 2px solid var(--neon-cyan);
+  border-radius: 50%;
+  animation: gestureRipple 0.6s ease-out;
+  pointer-events: none;
+}
+
+@keyframes gestureRipple {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+  }
+  100% {
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+  }
+}
+
+.gestureIndicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 1rem 2rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--neon-cyan);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  color: var(--text-primary);
+  font-weight: 500;
+  animation: gestureIndicator 1s ease-out;
+  box-shadow: 0 0 30px rgba(0, 245, 255, 0.4);
+}
+
+@keyframes gestureIndicator {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* ==========================================
+   VOICE INTERFACE
+   ========================================== */
+
+.voiceInterface {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  
+  background: var(--glass-bg);
+  border: 1px solid var(--neon-cyan);
+  border-radius: 20px;
+  backdrop-filter: blur(30px);
+  box-shadow: 
+    var(--shadow-large),
+    0 0 40px rgba(0, 245, 255, 0.3);
+  
+  padding: 2rem;
+  text-align: center;
+  min-width: 300px;
+}
+
+.voiceWaveform {
+  width: 200px;
+  height: 60px;
+  margin: 1rem auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+}
+
+.voiceWaveBar {
+  width: 3px;
+  background: var(--gradient-primary);
+  border-radius: 1.5px;
+  animation: voiceWave 1.5s ease-in-out infinite;
+  animation-delay: calc(var(--index) * 0.1s);
+}
+
+@keyframes voiceWave {
+  0%, 100% { height: 10px; opacity: 0.3; }
+  50% { height: 40px; opacity: 1; }
+}
+
+/* ==========================================
+   SCENE DETECTION
+   ========================================== */
+
+.sceneDetector {
+  position: absolute;
+  bottom: 10rem;
+  left: 2rem;
+  right: 2rem;
+  z-index: 25;
+  
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 1rem 0;
+}
+
+.sceneMarker {
+  flex-shrink: 0;
+  width: 80px;
+  height: 45px;
+  border-radius: 8px;
+  border: 2px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: all var(--animation-normal);
+  overflow: hidden;
+  position: relative;
+}
+
+.sceneMarker:hover {
+  border-color: var(--neon-cyan);
+  transform: scale(1.1);
+  box-shadow: 0 0 20px rgba(0, 245, 255, 0.4);
+}
+
+.sceneMarker.active {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 30px rgba(0, 245, 255, 0.6);
+}
+
+.sceneTimestamp {
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
+  font-size: 0.7rem;
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.7);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* ==========================================
+   NEXT EPISODE PROMPT - ENHANCED
+   ========================================== */
+
+.nextEpisodePrompt {
+  position: fixed;
+  top: 50%;
+  right: 2rem;
+  transform: translateY(-50%);
+  z-index: 150;
+  width: 350px;
+  
+  background: var(--glass-bg);
+  border: 1px solid var(--neon-cyan);
+  border-radius: 20px;
+  backdrop-filter: blur(30px);
+  box-shadow: 
+    var(--shadow-large),
+    0 0 40px rgba(0, 245, 255, 0.3);
+  
+  overflow: hidden;
+}
+
+.promptHeader {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--glass-border);
+  background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(139, 92, 246, 0.1));
+}
+
+.promptTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  margin-bottom: 0.5rem;
+}
+
+.promptCountdown {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 20px currentColor;
+  animation: countdown 1s ease-in-out infinite;
+}
+
+@keyframes countdown {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.promptBody {
+  padding: 1.5rem;
+}
+
+.episodeInfo {
+  margin-bottom: 1.5rem;
+}
+
+.episodeNumber {
+  font-size: 0.9rem;
+  color: var(--neon-cyan);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.episodeTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.episodeDescription {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.promptActions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.playNextButton {
+  background: var(--gradient-primary);
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--animation-normal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 0 20px rgba(0, 245, 255, 0.4);
+}
+
+.playNextButton:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 0 30px rgba(0, 245, 255, 0.6);
+}
+
+.dismissButton {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 8px 16px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all var(--animation-normal);
+}
+
+.dismissButton:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+/* ==========================================
+   PICTURE-IN-PICTURE
+   ========================================== */
+
+.pictureInPicture {
+  position: fixed;
+  z-index: 300;
+  background: var(--glass-bg);
+  border: 2px solid var(--neon-cyan);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  box-shadow:
+    var(--shadow-large),
+    0 0 30px rgba(0, 245, 255, 0.4);
+  overflow: hidden;
+  cursor: move;
+  transition: all var(--animation-normal);
+}
+
+.pictureInPicture:hover {
+  border-color: var(--neon-magenta);
+  box-shadow:
+    var(--shadow-large),
+    0 0 40px rgba(255, 0, 110, 0.4);
+}
+
+.pipVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pipControls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+  padding: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  transform: translateY(100%);
+  transition: all var(--animation-normal);
+}
+
+.pictureInPicture:hover .pipControls {
+  transform: translateY(0);
+}
+
+.pipButton {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--animation-fast);
+}
+
+.pipButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--neon-cyan);
+}
+
+/* ==========================================
+   ADAPTIVE LOADING - FUTURISTIC
+   ========================================== */
+
+.adaptiveLoading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.loadingBackdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 25% 25%, rgba(0, 245, 255, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(255, 0, 110, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 50% 10%, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
+  animation: loadingBackdrop 10s ease-in-out infinite;
+}
+
+@keyframes loadingBackdrop {
+  0%, 100% {
+    filter: hue-rotate(0deg);
+    transform: scale(1);
+  }
+  50% {
+    filter: hue-rotate(180deg);
+    transform: scale(1.1);
+  }
+}
+
+.loadingContent {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  text-align: center;
+}
+
+.loadingOrb {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  animation: orbPulse 2s ease-in-out infinite;
+  box-shadow:
+    0 0 50px rgba(0, 245, 255, 0.6),
+    inset 0 0 50px rgba(255, 255, 255, 0.1);
+}
+
+@keyframes orbPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+.loadingRings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.loadingRing {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid transparent;
+  border-top: 2px solid var(--neon-cyan);
+  border-radius: 50%;
+  animation: ringRotate 3s linear infinite;
+}
+
+.loadingRing:nth-child(1) {
+  width: 220px;
+  height: 220px;
+  animation-delay: 0s;
+}
+
+.loadingRing:nth-child(2) {
+  width: 260px;
+  height: 260px;
+  animation-delay: -0.5s;
+  border-top-color: var(--neon-magenta);
+}
+
+.loadingRing:nth-child(3) {
+  width: 300px;
+  height: 300px;
+  animation-delay: -1s;
+  border-top-color: var(--neon-purple);
+}
+
+@keyframes ringRotate {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.loadingProgress {
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-shadow: 0 0 20px currentColor;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.loadingPhase {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-top: 1rem;
+}
+
+.loadingParticles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.loadingParticle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: var(--color);
+  border-radius: 50%;
+  animation: loadingFloat 6s ease-in-out infinite;
+  animation-delay: calc(var(--delay) * 1s);
+  box-shadow: 0 0 10px currentColor;
+}
+
+@keyframes loadingFloat {
+  0%, 100% {
+    transform: translate(0, 100vh) scale(0);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(0, 90vh) scale(1);
+    opacity: 1;
+  }
+  90% {
+    transform: translate(var(--drift), 10vh) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--drift), 0) scale(0);
+    opacity: 0;
+  }
+}
+
+/* ==========================================
+   ERROR STATES - FUTURISTIC
+   ========================================== */
+
+.errorOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  background:
+    radial-gradient(circle at center, rgba(255, 0, 110, 0.1) 0%, transparent 70%),
+    var(--bg-primary);
+}
+
+.errorContent {
+  text-align: center;
+  padding: 3rem;
+  background: var(--glass-bg);
+  border: 1px solid rgba(255, 0, 110, 0.3);
+  border-radius: 20px;
+  backdrop-filter: blur(30px);
+  box-shadow:
+    var(--shadow-large),
+    0 0 40px rgba(255, 0, 110, 0.2);
+  max-width: 500px;
+}
+
+.errorContent h3 {
+  font-size: 2rem;
+  color: var(--neon-magenta);
+  margin-bottom: 1rem;
+  text-shadow: 0 0 20px currentColor;
+}
+
+.errorContent p {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
+
+.errorActions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.retryButton {
+  background: var(--gradient-secondary);
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--animation-normal);
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+}
+
+.retryButton:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+}
+
+.backButton {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 12px 24px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--animation-normal);
+}
+
+.backButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+/* ==========================================
+   HIDDEN ELEMENTS
+   ========================================== */
+
+.hiddenCanvas {
+  display: none !important;
+  position: absolute;
+  top: -9999px;
+  left: -9999px;
+  pointer-events: none;
+}
+
+/* ==========================================
+   RESPONSIVE DESIGN
+   ========================================== */
+
+@media (max-width: 1024px) {
+  .futuristicPlayer {
+    cursor: auto;
+  }
+  
+  .controlsContainer {
+    padding: 1.5rem;
+  }
+  
+  .controlsRow {
+    gap: 1.5rem;
+  }
+  
+  .leftControls,
+  .centerControls,
+  .rightControls {
+    gap: 1rem;
+  }
+  
+  .settingsPanel {
+    width: 350px;
+    right: 1rem;
+  }
+  
+  .performanceDashboard {
+    width: 300px;
+    right: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .controlsContainer {
+    padding: 1rem;
+  }
+  
+  .controlsRow {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .leftControls,
+  .centerControls,
+  .rightControls {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  
+  .timeline {
+    margin-bottom: 1.5rem;
+  }
+  
+  .playButton {
+    min-width: 50px;
+    min-height: 50px;
+    font-size: 20px;
+  }
+  
+  .volumeSlider {
+    width: 80px;
+  }
+  
+  .settingsPanel,
+  .performanceDashboard {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+    transform: none;
+  }
+  
+  .nextEpisodePrompt {
+    position: fixed;
+    bottom: 8rem;
+    left: 1rem;
+    right: 1rem;
+    top: auto;
+    width: auto;
+    transform: none;
+  }
+  
+  .sceneDetector {
+    bottom: 12rem;
+    left: 1rem;
+    right: 1rem;
+  }
+  
+  .subtitleText {
+    font-size: clamp(16px, 4vw, 24px);
+    padding: 6px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .futuristicPlayer::before {
+    opacity: 0.5;
+  }
+  
+  .controlsContainer {
+    padding: 0.75rem;
+  }
+  
+  .timeline {
+    height: 4px;
+    margin-bottom: 1rem;
+  }
+  
+  .timeline:hover {
+    height: 6px;
+  }
+  
+  .glassButton {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  
+  .playButton {
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 18px;
+  }
+  
+  .volumeSlider {
+    width: 60px;
+    height: 4px;
+  }
+  
+  .loadingOrb {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .loadingProgress {
+    font-size: 2rem;
+  }
+  
+  .loadingPhase {
+    font-size: 1rem;
+  }
+  
+  .subtitleText {
+    font-size: clamp(14px, 5vw, 20px);
+    padding: 4px 8px;
+  }
+}
+
+/* ==========================================
+   ACCESSIBILITY
+   ========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .futuristicPlayer * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .ambientGlow,
+  .energyParticle,
+  .atmosphereParticle,
+  .loadingParticle {
+    display: none;
+  }
+}
+
+@media (prefers-contrast: high) {
+  .futuristicPlayer {
+    --glass-bg: rgba(255, 255, 255, 0.2);
+    --glass-border: rgba(255, 255, 255, 0.5);
+    --text-primary: #ffffff;
+    --text-secondary: #ffffff;
+    --neon-cyan: #ffffff;
+    --neon-magenta: #ffffff;
+    --neon-purple: #ffffff;
+  }
+  
+  .glassButton {
+    border: 2px solid #ffffff;
+    background: rgba(0, 0, 0, 0.8);
+  }
+  
+  .timeline {
+    background: rgba(255, 255, 255, 0.3);
+    border: 1px solid #ffffff;
+  }
+  
+  .timelineProgress {
+    background: #ffffff;
+  }
+}
+
+/* ==========================================
+   PRINT STYLES
+   ========================================== */
+
+@media print {
+  .futuristicPlayer {
+    display: none !important;
+  }
+}

@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 
 // VM extractor configuration
 const VM_EXTRACTOR_URL = process.env.VM_EXTRACTOR_URL || 'http://35.188.123.210:3001';
+// VidSrc.cc extractor configuration
+const VIDSRCCC_EXTRACTOR_URL = process.env.VIDSRCCC_EXTRACTION_URL || 'http://localhost:3002';
+// Bulletproof extractor configuration
+const BULLETPROOF_EXTRACTOR_URL = process.env.BULLETPROOF_EXTRACTOR_URL || 'http://localhost:3001';
 
 // Utility function for structured logging
 function createLogger(requestId) {
@@ -63,7 +67,74 @@ function buildVMUrl(searchParams, logger) {
   return vmUrl.toString();
 }
 
-// Main proxy function to handle requests to VM extractor
+// Build VidSrc.cc extractor URL with query parameters
+function buildVidSrcCcUrl(searchParams, logger) {
+  const vidsrcccUrl = new URL(`${VIDSRCCC_EXTRACTOR_URL}/extract-m3u8`);
+  
+  // Map parameters to VidSrc.cc extractor format
+  const movieId = searchParams.get('movieId');
+  const mediaType = searchParams.get('mediaType');
+  const seasonId = searchParams.get('seasonId');
+  const episodeId = searchParams.get('episodeId');
+  
+  if (movieId) vidsrcccUrl.searchParams.set('mediaId', movieId);
+  if (mediaType) vidsrcccUrl.searchParams.set('mediaType', mediaType);
+  if (seasonId) vidsrcccUrl.searchParams.set('season', seasonId);
+  if (episodeId) vidsrcccUrl.searchParams.set('episode', episodeId);
+
+  logger.info('Built VidSrc.cc extractor URL', {
+    vidsrcccBaseUrl: VIDSRCCC_EXTRACTOR_URL,
+    vidsrcccFullUrl: vidsrcccUrl.toString(),
+    forwardedParams: Object.fromEntries(vidsrcccUrl.searchParams)
+  });
+
+  return vidsrcccUrl.toString();
+}
+
+// Build Bulletproof extractor URL with query parameters
+function buildBulletproofUrl(searchParams, logger) {
+  const bulletproofUrl = new URL(`${BULLETPROOF_EXTRACTOR_URL}/api/extract/bulletproof`);
+  
+  // Map parameters to Bulletproof extractor format
+  const movieId = searchParams.get('movieId');
+  const mediaType = searchParams.get('mediaType');
+  const seasonId = searchParams.get('seasonId');
+  const episodeId = searchParams.get('episodeId');
+  
+  if (movieId) bulletproofUrl.searchParams.set('tmdbId', movieId);
+  if (mediaType === 'tv' && seasonId) bulletproofUrl.searchParams.set('season', seasonId);
+  if (mediaType === 'tv' && episodeId) bulletproofUrl.searchParams.set('episode', episodeId);
+
+  logger.info('Built Bulletproof extractor URL', {
+    bulletproofBaseUrl: BULLETPROOF_EXTRACTOR_URL,
+    bulletproofFullUrl: bulletproofUrl.toString(),
+    forwardedParams: Object.fromEntries(bulletproofUrl.searchParams)
+  });
+
+  return bulletproofUrl.toString();
+}
+
+// Determine which extractor to use based on parameters
+function getExtractorType(searchParams) {
+  const server = searchParams.get('server');
+  const mediaType = searchParams.get('mediaType');
+  
+  // Use Bulletproof extractor for vidsrc.xyz server
+  if (server === 'vidsrc.xyz') {
+    return 'bulletproof';
+  }
+  
+  // Use VidSrc.cc extractor for vidsrc.cc content
+  if ((server && server.includes('vidsrc')) ||
+      (mediaType && (mediaType === 'movie' || mediaType === 'tv'))) {
+    return 'vidsrccc';
+  }
+  
+  // Default to VM extractor
+  return 'vm';
+}
+
+// Main proxy function to handle requests to extractor
 export async function GET(request) {
   const requestStart = Date.now();
   const requestId = generateRequestId();
@@ -76,17 +147,29 @@ export async function GET(request) {
   });
 
   try {
-    // Parse parameters and build VM URL
+    // Parse parameters
     const { searchParams } = new URL(request.url);
-    const vmUrl = buildVMUrl(searchParams, logger);
+    const extractorType = getExtractorType(searchParams);
     
-    logger.info('Forwarding request to VM extractor', {
-      vmUrl: vmUrl.substring(0, 200) + (vmUrl.length > 200 ? '...' : ''),
-      vmBaseUrl: VM_EXTRACTOR_URL
+    let extractorUrl;
+    if (extractorType === 'bulletproof') {
+      extractorUrl = buildBulletproofUrl(searchParams, logger);
+      logger.info('Using Bulletproof extractor', { extractorUrl });
+    } else if (extractorType === 'vidsrccc') {
+      extractorUrl = buildVidSrcCcUrl(searchParams, logger);
+      logger.info('Using VidSrc.cc extractor', { extractorUrl });
+    } else {
+      extractorUrl = buildVMUrl(searchParams, logger);
+      logger.info('Using VM extractor', { extractorUrl });
+    }
+    
+    logger.info('Forwarding request to extractor', {
+      extractorUrl: extractorUrl.substring(0, 200) + (extractorUrl.length > 200 ? '...' : ''),
+      extractorType
     });
 
-    // Forward request to VM extractor
-    const vmResponse = await fetch(vmUrl, {
+    // Forward request to extractor
+    const extractorResponse = await fetch(extractorUrl, {
       method: 'GET',
       headers: {
         'User-Agent': request.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -94,64 +177,105 @@ export async function GET(request) {
         'Accept': 'application/json, text/plain, */*',
         'Cache-Control': 'no-cache'
       },
-      // Set a reasonable timeout for the VM request
+      // Set a reasonable timeout for the extractor request
       signal: AbortSignal.timeout(120000) // 2 minutes timeout
     });
 
-    const vmResponseTime = Date.now() - requestStart;
-    logger.timing('VM extractor response time', requestStart);
+    const extractorResponseTime = Date.now() - requestStart;
+    logger.timing('Extractor response time', requestStart);
 
-    // Check if VM responded successfully
-    if (!vmResponse.ok) {
-      logger.error('VM extractor returned error', null, {
-        status: vmResponse.status,
-        statusText: vmResponse.statusText,
-        vmUrl: vmUrl.substring(0, 100)
+    // Check if extractor responded successfully
+    if (!extractorResponse.ok) {
+      logger.error('Extractor returned error', null, {
+        status: extractorResponse.status,
+        statusText: extractorResponse.statusText,
+        extractorUrl: extractorUrl.substring(0, 100),
+        extractorType
       });
 
       return NextResponse.json(
         { 
           success: false, 
-          error: `VM extractor error: ${vmResponse.status} ${vmResponse.statusText}`,
+          error: `${extractorType.toUpperCase()} extractor error: ${extractorResponse.status} ${extractorResponse.statusText}`,
           requestId,
-          vmStatus: vmResponse.status,
-          vmResponseTime
+          extractorStatus: extractorResponse.status,
+          extractorResponseTime
         },
-        { status: vmResponse.status }
+        { status: extractorResponse.status }
       );
     }
 
-    // Parse VM response
-    const vmData = await vmResponse.json();
+    // Parse extractor response
+    const extractorData = await extractorResponse.json();
     
-    logger.info('VM extractor response received', {
-      success: vmData.success,
-      hasStreamUrl: !!vmData.streamUrl,
-      server: vmData.server,
-      totalFound: vmData.totalFound,
-      requestId: vmData.requestId,
-      vmResponseTime
+    logger.info('Extractor response received', {
+      success: extractorData.success,
+      hasStreamUrl: !!extractorData.m3u8Url || !!extractorData.streamUrl,
+      extractorType,
+      requestId: extractorData.requestId,
+      extractorResponseTime
     });
 
-    // Add proxy metadata to response
-    const proxyResponse = {
-      ...vmData,
-      proxy: {
+    // Format response based on extractor type
+    let formattedResponse;
+    if (extractorType === 'bulletproof') {
+      // Format Bulletproof response to match expected structure
+      formattedResponse = {
+        success: extractorData.success,
+        streamUrl: extractorData.data?.url || extractorData.url,
+        streamType: extractorData.data?.type || extractorData.type || 'shadowlands',
+        server: 'vidsrc.xyz',
+        extractionMethod: 'bulletproof_puppeteer',
+        requiresProxy: true, // Shadowlands URLs need proxy
+        totalFound: extractorData.data?.url ? 1 : 0,
+        m3u8Count: 0, // Shadowlands URL, not m3u8 yet
+        subtitles: [],
+        requestId: extractorData.requestId || requestId,
+        debug: {
+          extractorType: 'bulletproof',
+          extractorResponseTime,
+          source: extractorData.data?.source || 'prorcp',
+          metadata: extractorData.data?.metadata || {}
+        }
+      };
+    } else if (extractorType === 'vidsrccc') {
+      // Format VidSrc.cc response to match VM response structure
+      formattedResponse = {
+        success: extractorData.success,
+        streamUrl: extractorData.m3u8Url,
+        streamType: 'hls',
+        server: 'vidsrc.cc',
+        extractionMethod: 'puppeteer_scraping',
+        requiresProxy: false,
+        totalFound: extractorData.m3u8Url ? 1 : 0,
+        m3u8Count: extractorData.m3u8Url ? 1 : 0,
+        subtitles: [],
         requestId,
-        vmResponseTime,
-        timestamp: new Date().toISOString(),
-        vmUrl: VM_EXTRACTOR_URL
-      }
-    };
+        debug: {
+          extractorType: 'vidsrccc',
+          extractorResponseTime
+        }
+      };
+    } else {
+      // Use VM response as-is with added proxy metadata
+      formattedResponse = {
+        ...extractorData,
+        proxy: {
+          requestId,
+          extractorResponseTime,
+          timestamp: new Date().toISOString(),
+          extractorUrl: extractorType === 'vm' ? VM_EXTRACTOR_URL : VIDSRCCC_EXTRACTOR_URL
+        }
+      };
+    }
 
-    // Return the VM response data
-    return NextResponse.json(proxyResponse);
+    // Return the formatted response
+    return NextResponse.json(formattedResponse);
 
   } catch (error) {
     const totalDuration = Date.now() - requestStart;
     logger.error('Proxy request failed', error, {
-      requestDuration: totalDuration,
-      vmUrl: VM_EXTRACTOR_URL
+      requestDuration: totalDuration
     });
 
     // Determine error type for better error messages
@@ -159,13 +283,13 @@ export async function GET(request) {
     let statusCode = 500;
 
     if (error.name === 'AbortError') {
-      errorMessage = 'VM extractor timeout - request took too long';
+      errorMessage = 'Extractor timeout - request took too long';
       statusCode = 504;
     } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      errorMessage = 'Cannot connect to VM extractor';
+      errorMessage = 'Cannot connect to extractor';
       statusCode = 503;
     } else if (error.message.includes('ECONNREFUSED')) {
-      errorMessage = 'VM extractor is not available';
+      errorMessage = 'Extractor is not available';
       statusCode = 503;
     }
 
@@ -176,7 +300,6 @@ export async function GET(request) {
         requestId,
         debug: {
           requestDuration: totalDuration,
-          vmUrl: VM_EXTRACTOR_URL,
           errorType: error.name,
           errorMessage: error.message
         }
@@ -184,4 +307,4 @@ export async function GET(request) {
       { status: statusCode }
     );
   }
-} 
+}

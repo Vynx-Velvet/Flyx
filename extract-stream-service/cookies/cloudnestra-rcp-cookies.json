@@ -1,0 +1,16 @@
+[
+  {
+    "name": "session_persistence",
+    "value": "enabled",
+    "domain": "cloudnestra.com",
+    "path": "/",
+    "expires": 1755826399,
+    "size": 26,
+    "httpOnly": false,
+    "secure": true,
+    "session": false,
+    "sameParty": false,
+    "sourceScheme": "Secure",
+    "sourcePort": 443
+  }
+]

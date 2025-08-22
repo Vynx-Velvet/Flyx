@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Solo Leveling (2024) SS1 EP3</title>
+  <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer-when-downgrade">
+  <link rel="icon" href="https://vidsrc.cc/favicon.ico" />
+  <link rel="shortcut icon" href="https://vidsrc.cc/assets/images/favicon.png" type="image/x-icon" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+  <link href="/saas/css/embed.min.css?t=1726579983" rel="stylesheet" />
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-39DG1MG3NE"></script>
+  
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-39DG1MG3NE', {
+      page_path: window.location.pathname,
+      cookie_flags: 'max-age=7200;secure;samesite=none'
+    });
+  </script>
+  
+  <script>
+    var v = "U29sbyBMZXZlbGluZ18yMDI0XzE=";
+    var client = "NzYuMTQxLjIwNS4xNTg=";
+    var userId = "BzMQPAQdGDEFIwA-Bxp9MQcdLg";
+    var imdbId = "tt21209876";
+    var movieId = "127532";
+    var autoPlay = true;
+    var movieType = "tv";
+    var season = 1;
+    var episode = 3;
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script type="text/javascript" src="https://ssl.p.jwpcdn.com/player/v/8.27.1/jwplayer.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.6.2/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Deobfuscated Ad Script Documentation -->
+  <script>
+    /**
+     * Deobfuscated Documentation of Ad Script
+     * 
+     * This script is a heavily obfuscated advertising script that loads various ad formats
+     * including pop-ups, interstitials, banners, and video sliders.
+     * 
+     * Key Components:
+     * 1. Ad Library (Adcash/Adexchange)
+     * 2. Pop-under functionality
+     * 3. Interstitial ads
+     * 4. In-page push notifications
+     * 5. Video slider ads
+     * 6. Tracking mechanisms
+     * 7. Sandbox detection
+     * 8. Client hint collection
+     * 
+     * The script uses webpack to modularize its components and uses heavy obfuscation
+     * to prevent analysis and blocking by ad blockers.
+     */
+     
+    // Configuration data for ad delivery
+    window.adConfig = {
+      "adserverDomain": "wpnxiswpuyrfn.icu",
+      "cdnDomain": "kslfqcxumewry.store",
+      // Different ad format configurations
+      "adFormats": {
+        "popunder": {
+          "cdnPath": "/script/kl1Mnopq.js",
+          "endpoint": "/d3.php"
+        },
+        "inPagePush": {
+          "cdnPath": "/script/main_script_123.js"
+        },
+        "autoTag": {
+          "cdnPath": "/script/index_abc_99.js"
+        },
+        "interstitial": {
+          "cdnPath": "/script/intrn.js"
+        },
+        "userTracking": {
+          "cdnPath": "/script/ut.js"
+        }
+      }
+    };
+
+    /**
+     * Ad Library Class
+     * 
+     * This is the main class that manages all ad functionality.
+     */
+    class AdLibrary {
+      constructor() {
+        this.isLoaded = {
+          pop: false,
+          autoTag: false,
+          inPagePush: false,
+          interstitial: false,
+          videoSlider: false
+        };
+        
+        this.zoneIds = new Set();
+        this.loadedZoneIds = new Set();
+        
+        this.adServerDomain = "adexchangeclear.com";
+        this.cdnDomain = null;
+        this.adblockSettings = null;
+        
+        this.isPreviewMode = false;
+        this.isShowingAd = false;
+        
+        // Event handling for user interactions
+        this.eventHandlers = {
+          capture: {
+            mousedown: [],
+            click: [],
+            touchstart: []
+          },
+          bubble: {
+            mousedown: [],
+            scroll: [],
+            click: [],
+            touchstart: []
+          }
+        };
+      }
+      
+      /**
+       * Initialize the ad library
+       */
+      init() {
+        this.setupEventListeners();
+        this.getClientHints();
+        this.loadConfiguration();
+        this.prefetchDomains();
+      }
+      
+      /**
+       * Set up event listeners for user interactions
+       */
+      setupEventListeners() {
+        // Add event listeners for various user interactions
+        window.addEventListener("mousedown", this.handleEvent.bind(this, "mousedown"), true);
+        window.addEventListener("mousedown", this.handleEvent.bind(this, "mousedown"), false);
+        window.addEventListener("click", this.handleEvent.bind(this, "click"), true);
+        window.addEventListener("click", this.handleEvent.bind(this, "click"), false);
+        window.addEventListener("scroll", this.handleEvent.bind(this, "scroll"));
+        window.addEventListener("touchstart", this.handleEvent.bind(this, "touchstart"), true);
+        window.addEventListener("touchstart", this.handleEvent.bind(this, "touchstart"), false);
+        
+        document.addEventListener("mousedown", this.handleEvent.bind(this, "mousedown"));
+        document.addEventListener("click", this.handleEvent.bind(this, "click"));
+        document.addEventListener("touchstart", this.handleEvent.bind(this, "touchstart"));
+      }
+      
+      /**
+       * Handle user events
+       */
+      handleEvent(eventType, event, useCapture = false) {
+        const handlers = useCapture ? 
+          this.eventHandlers.capture[eventType] : 
+          this.eventHandlers.bubble[eventType];
+          
+        handlers.forEach(handler => {
+          if (handler.callback) {
+            handler.callback(event);
+          }
+        });
+      }
+      
+      /**
+       * Get browser client hints for targeting
+       */
+      async getClientHints() {
+        // Implementation would collect browser information
+        // for better ad targeting
+        return {};
+      }
+      
+      /**
+       * Load configuration from script attributes
+       */
+      loadConfiguration() {
+        // Get configuration from script element or window object
+        this.cdnDomain = this.getCdnDomain();
+        this.adblockSettings = this.getAdblockSettings();
+      }
+      
+      /**
+       * Get CDN domain
+       */
+      getCdnDomain() {
+        // Extract CDN domain from script source or configuration
+        return "kslfqcxumewry.store";
+      }
+      
+      /**
+       * Get adblock settings
+       */
+      getAdblockSettings() {
+        // Extract adblock settings from window object
+        return window.adConfig || {};
+      }
+      
+      /**
+       * Prefetch domains for performance
+       */
+      prefetchDomains() {
+        // Prefetch domains to reduce latency
+        const domains = [
+          this.cdnDomain,
+          this.adServerDomain
+        ];
+        
+        // Add domains from adblock settings
+        if (this.adblockSettings && this.adblockSettings.adserverDomain) {
+          domains.push(this.adblockSettings.adserverDomain);
+        }
+        
+        // Create DNS prefetch links
+        domains.forEach(domain => {
+          if (domain) {
+            const link = document.createElement("link");
+            link.rel = "dns-prefetch";
+            link.href = `//${domain}`;
+            document.head.appendChild(link);
+          }
+        });
+      }
+      
+      /**
+       * Run a pop-under ad
+       */
+      runPop(config) {
+        // Validate configuration
+        if (!config.zoneId) {
+          throw new Error("Zone ID is required for pop-under ads");
+        }
+        
+        // Check if already loaded
+        if (this.loadedZoneIds.has(config.zoneId)) {
+          console.warn(`Zone ID ${config.zoneId} already loaded`);
+          return;
+        }
+        
+        // Mark as loaded
+        this.loadedZoneIds.add(config.zoneId);
+        
+        // Load pop-under script if not already loaded
+        if (!this.isLoaded.pop) {
+          this.loadScript(`${window.location.protocol}//${this.cdnDomain}/script/suv5.js`, () => {
+            this.isLoaded.pop = true;
+            // Initialize pop-under with config
+            new PopUnder(config);
+          });
+        } else {
+          // Initialize pop-under with config
+          new PopUnder(config);
+        }
+      }
+      
+      /**
+       * Run an in-page push ad
+       */
+      runInPagePush(config) {
+        // Validate configuration
+        if (!config.zoneId) {
+          throw new Error("Zone ID is required for in-page push ads");
+        }
+        
+        // Check if already loaded
+        if (this.isLoaded.inPagePush) {
+          console.warn("In-page push already loaded");
+          return;
+        }
+        
+        this.isLoaded.inPagePush = true;
+        
+        // Load in-page push script
+        this.loadScript(`${window.location.protocol}//${this.ccdnDomain}/script/inpagepush.js`, () => {
+          // Initialize in-page push with config
+          new InPagePush(config);
+        });
+      }
+      
+      /**
+       * Run a banner ad
+       */
+      runBanner(config) {
+        // Validate configuration
+        if (!config.zoneId) {
+          throw new Error("Zone ID is required for banner ads");
+        }
+        
+        // Load banner script
+        this.loadScript(`${window.location.protocol}//${this.cdnDomain}/script/banner.js`, () => {
+          // Initialize banner with config
+          new Banner(config);
+        });
+      }
+      
+      /**
+       * Run an interstitial ad
+       */
+      runInterstitial(config) {
+        // Validate configuration
+        if (!config.zoneId) {
+          throw new Error("Zone ID is required for interstitial ads");
+        }
+        
+        // Check if already loaded
+        if (this.isLoaded.interstitial) {
+          console.warn("Interstitial already loaded");
+          return;
+        }
+        
+        this.isLoaded.interstitial = true;
+        
+        // Load interstitial script
+        this.loadScript(`${window.location.protocol}//${this.cdnDomain}/script/interstitial.js`, () => {
+          // Initialize interstitial with config
+          new Interstitial(config);
+        });
+      }
+      
+      /**
+       * Run a video slider ad
+       */
+      runVideoSlider(config) {
+        // Validate configuration
+        if (!config.zoneId) {
+          throw new Error("Zone ID is required for video slider ads");
+        }
+        
+        // Check if already loaded
+        if (this.isLoaded.videoSlider) {
+          console.warn("Video slider already loaded");
+          return;
+        }
+        
+        this.isLoaded.videoSlider = true;
+        
+        // Load video slider script
+        const scriptUrl = Math.round(Math.random()) ? 
+          `${window.location.protocol}//${this.cdnDomain}/script/videoSliderAlt.js` :
+          `${window.location.protocol}//${this.cdnDomain}/script/videoSlider.js`;
+          
+        this.loadScript(scriptUrl, () => {
+          // Initialize video slider with config
+          new VideoSlider(config);
+        });
+      }
+      
+      /**
+       * Load a script dynamically
+       */
+      loadScript(url, callback) {
+        const script = document.createElement("script");
+        script.type = "text/javascript";
+        script.src = url;
+        script.onload = callback;
+        script.onerror = () => {
+          console.error(`Failed loading ${url}`);
+        };
+        document.head.appendChild(script);
+      }
+      
+      /**
+       * Subscribe to events
+       */
+      subscribe(eventType, handler, useCapture = false) {
+        if (useCapture) {
+          this.eventHandlers.capture[eventType].push(handler);
+        } else {
+          this.eventHandlers.bubble[eventType].push(handler);
+        }
+      }
+      
+      /**
+       * Unsubscribe from events
+       */
+      unsubscribe(eventType, zoneId, useCapture = false) {
+        const handlers = useCapture ? 
+          this.eventHandlers.capture[eventType] : 
+          this.eventHandlers.bubble[eventType];
+          
+        for (let i = 0; i < handlers.length; i++) {
+          if (handlers[i].zoneId === zoneId) {
+            handlers.splice(i, 1);
+            break;
+          }
+        }
+      }
+    }
+    
+    /**
+     * PopUnder Ad Class
+     */
+    class PopUnder {
+      constructor(config) {
+        this.config = config;
+        this.adUrl = null;
+        this.isLocked = false;
+        this.localStorage = new LocalStorageHelper(`suv5_${config.zoneId}_state`);
+        this.initialize();
+      }
+      
+      initialize() {
+        // Check for previous state
+        const state = this.localStorage.getState();
+        if (state && state.renderAfterTimestamp > Date.now()) {
+          // Schedule ad render
+          const delay = state.renderAfterTimestamp - Date.now();
+          setTimeout(() => {
+            this.renderAd();
+          }, delay);
+        } else {
+          // Render immediately
+          this.renderAd();
+        }
+      }
+      
+      async renderAd() {
+        // Get ad URL from server
+        const adUrl = await this.getAdUrl();
+        if (adUrl) {
+          this.adUrl = adUrl;
+          this.showAd();
+        }
+      }
+      
+      async getAdUrl() {
+        // Implementation would fetch ad URL from server
+        // This is a simplified version
+        return "https://example.com/ad";
+      }
+      
+      showAd() {
+        // Implementation would show the pop-under ad
+        // This is a simplified version
+        console.log("Showing pop-under ad");
+      }
+    }
+    
+    /**
+     * Interstitial Ad Class
+     */
+    class Interstitial {
+      constructor(config) {
+        this.config = config;
+        this.initialize();
+      }
+      
+      initialize() {
+        // Implementation would initialize the interstitial ad
+        console.log("Initializing interstitial ad");
+      }
+    }
+    
+    /**
+     * InPagePush Ad Class
+     */
+    class InPagePush {
+      constructor(config) {
+        this.config = config;
+        this.initialize();
+      }
+      
+      initialize() {
+        // Implementation would initialize the in-page push ad
+        console.log("Initializing in-page push ad");
+      }
+    }
+    
+    /**
+     * Banner Ad Class
+     */
+    class Banner {
+      constructor(config) {
+        this.config = config;
+        this.initialize();
+      }
+      
+      initialize() {
+        // Implementation would initialize the banner ad
+        console.log("Initializing banner ad");
+      }
+    }
+    
+    /**
+     * VideoSlider Ad Class
+     */
+    class VideoSlider {
+      constructor(config) {
+        this.config = config;
+        this.initialize();
+      }
+      
+      initialize() {
+        // Implementation would initialize the video slider ad
+        console.log("Initializing video slider ad");
+      }
+    }
+    
+    /**
+     * Local Storage Helper
+     */
+    class LocalStorageHelper {
+      constructor(key) {
+        this.key = key;
+      }
+      
+      getState() {
+        try {
+          const state = localStorage.getItem(this.key);
+          return state ? JSON.parse(state) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+      
+      setState(state) {
+        try {
+          localStorage.setItem(this.key, JSON.stringify(state));
+        } catch (e) {
+          console.error("Failed to set state in localStorage", e);
+        }
+      }
+    }
+    
+    /**
+     * Initialize the ad library when the document is ready
+     */
+    document.addEventListener("DOMContentLoaded", () => {
+      // Create global ad library instance
+      window.adLibrary = new AdLibrary();
+      window.adLibrary.init();
+      
+      // Run initial pop-under ad
+      window.adLibrary.runPop({
+        zoneId: '10247390',
+      });
+    });
+  </script>
+</head>
+<body>
+<div id="wrapper" data-id="127532">
+  <header style="z-index: 1">
+    <div class="controls">
+      <button id="episode-btn" class="main-btn" style="display: none;">
+        <svg>
+          <use xlink:href="#icon-ep"></use>
+        </svg>
+      </button>
+      <div id="servers" class="servers dropdown" style="opacity: 0;visibility: hidden;">
+        <button id="server-btn" class="main-btn" data-toggle="dropdown" aria-expanded="false" data-placeholder="false">
+          <svg>
+            <use xlink:href="#icon-sv"></use>
+          </svg>
+        </button>
+        <div class="dropdown-menu servers">
+          <a class="dropdown-item" href="javascript:;"></a>
+        </div>
+      </div>
+    </div>
+    <div class="title">Solo Leveling (2024) SS1 EP3</div>
+  </header>
+  <main>
+    <div id="b-loading" class="b-loading"><div></div><div></div></div>
+  </main>
+  
+  <aside id="ep-panel" class="panel from-left" style="z-index: 3">
+    <div class="seasons dropdown">
+      <a class="btn dropdown-toggle season-current" href="#"  data-toggle="dropdown">Season 1</a>
+      <div id="seasons" class="dropdown-menu season-items">
+        <a class="dropdown-item" href="javascript:;" data-number="1">Season 1</a>
+      </div>
+    </div>
+    <div id="close-ep-btn" class="close">
+      <svg>
+        <use xlink:href="#icon-x"></use>
+      </svg>
+    </div>
+    <ul class="episodes" style="display: none" data-season="1">
+      <li>
+        <a href="javascript:;" data-id="4987144" data-number="3">EP 3: It's Like a Game</a>
+      </li>
+    </ul>
+  </aside>
+</div>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'971d91869aff21a9',t:'MTc1NTY0NzU4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+<script type="text/javascript" src="/saas/js/embed.min.js?t=1751201789"></script>
+<script type="text/javascript">
+  // Run the initial pop-under ad
+  if (window.adLibrary) {
+    window.adLibrary.runPop({
+      zoneId: '10247390',
+    });
+  }
+</script>
+<svg class="d-none">
+  <symbol id="icon-ep" fill="#fff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 346.55 346.55">
+    <path d="M279,44.5H67.5c-21.3,0-38.6,17.3-38.6,38.6v180.2c0,21.3,17.3,38.6,38.6,38.6H279c21.3,0,38.6-17.3,38.6-38.6V83.2C317.7,61.8,300.4,44.5,279,44.5z M99.4,249.1l-24.4,14c-3.5,2-7.8-0.5-7.8-4.5v-28.1c0-4,4.3-6.5,7.8-4.5l24.4,14C102.9,242,102.9,247,99.4,249.1zM99.4,177.8l-24.4,14c-3.5,2-7.8-0.5-7.8-4.5v-28.1c0-4,4.3-6.5,7.8-4.5l24.4,14C102.9,170.8,102.9,175.8,99.4,177.8z M99.4,106.5l-24.4,14c-3.5,2-7.8-0.5-7.8-4.5V88c0-4,4.3-6.5,7.8-4.5l24.4,14C102.9,99.5,102.9,104.5,99.4,106.5zM279.3,244.6c0,6.7-5.5,12.2-12.2,12.2H142.3c-6.7,0-12.2-5.5-12.2-12.2v0c0-6.7,5.5-12.2,12.2-12.2h124.8C273.8,232.4,279.3,237.9,279.3,244.6L279.3,244.6z M267.1,185.5H142.3c-6.7,0-12.2-5.5-12.2-12.2c0-6.7,5.5-12.2,12.2-12.2h124.8c6.7,0,12.2,5.5,12.2,12.2C279.3,180.1,273.8,185.5,267.1,185.5z M267.1,114.3H142.3c-6.7,0-12.2-5.5-12.2-12.2c0-6.7,5.5-12.2,12.2-12.2h124.8c6.7,0,12.2,5.5,12.2,12.2C279.3,108.8,273.8,114.3,267.1,114.3z"/>
+  </symbol>
+  <symbol id="icon-sv" fill="#fff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 346.55 346.55">
+    <path d="M344.86,188.03c-6.66-36.22-37.98-65.37-74.77-69.04-8.37-.83-16.89-.12-25.37-.12-11.46-47.79-57.81-81.19-109.8-73.96-23.14,3.22-42.88,13.45-58.74,30.65-21.39,23.19-29.38,50.8-25.79,81.99-1.67,.58-3.11,1.1-4.56,1.6C18.84,168.47,.35,194.23,.15,222.77c-.26,37.77,30.04,68.55,67.97,68.63,63.91,.14,127.83,.09,191.74-.05,6.13-.01,12.39-.66,18.37-2.01,46.6-10.47,75.29-54.24,66.63-101.32Zm-83.8,78.62c-7.28,.09-14.56,.1-21.84,.08-7.28-.02-14.56-.05-21.84-.05-11.21,0-22.42,.1-33.63,.05-3.74-.01-7.47-.04-11.21-.1-18.88-.27-34.36-14.75-36.27-33.56-1.84-18.07,10.31-35.16,28.2-39.55,6.38-1.57,12.73-1.42,19.08,.43,9.18,2.67,14.57-.16,17.71-9.12,9.39-26.81,35.31-43.94,63.21-41.76,28.1,2.2,51.02,22.87,56.26,50.76,6.97,37.06-21.89,72.35-59.67,72.82Z"/>
+  </symbol>
+  <symbol id="icon-x" fill="#fff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 346.55 346.55">
+    <path d="M204.97,173.27l96.02-96.02c8.72-8.72,8.72-22.98,0-31.7h0c-8.72-8.72-22.98-8.72-31.7,0l-96.02,96.02L77.25,45.55c-8.72-8.72-22.98-8.72-31.7,0h0c-8.72,8.72-8.72,22.98,0,31.7l96.02,96.02-96.02,96.02c-8.72,8.72-8.72,22.98,0,31.7h0c8.72,8.72,22.98,8.72,31.7,0l96.02-96.02,96.02,96.02c8.72,8.72,22.98,8.72,31.7,0,8.72-8.72,8.72-22.98,0-31.7l-96.02-96.02Z"/>
+  </symbol>
+</svg>
+</html>

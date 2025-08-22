@@ -18,23 +18,24 @@ function createLogger(requestId) {
 // Rate limiting configuration
 const RATE_LIMIT_CONFIG = {
   windowMs: 60 * 1000, // 1 minute window
-  maxRequests: 100, // Max 100 requests per minute per IP
-  blockDuration: 5 * 60 * 1000 // Block for 5 minutes if exceeded
+  maxRequests: 1000, // Increased to 1000 requests per minute per IP
+  blockDuration: 5 * 60 * 1000, // Block for 5 minutes if exceeded
+  lightningboltMaxRequests: 2000 // Special higher limit for lightningbolt URLs
 };
 
-// Retry configuration
+// STABLE Retry configuration - patient and non-aggressive
 const RETRY_CONFIG = {
-  maxRetries: 3,
-  baseDelay: 1000, // 1 second base delay
-  maxDelay: 10000, // 10 seconds max delay
-  backoffFactor: 2
+  maxRetries: 1,         // Only 1 retry to avoid interruptions
+  baseDelay: 3000,       // 3 seconds base delay
+  maxDelay: 5000,        // 5 seconds max delay
+  backoffFactor: 1       // No exponential backoff
 };
 
-// Connection pool configuration
+// STABLE Connection configuration - longer timeouts for stability
 const CONNECTION_POOL_CONFIG = {
-  maxConnections: 50,
-  keepAliveTimeout: 30000, // 30 seconds
-  timeout: 30000 // 30 seconds request timeout
+  maxConnections: 100,
+  keepAliveTimeout: 60000,  // 60 seconds keepalive
+  timeout: 60000            // 60 seconds request timeout for patience
 };
 
 // Generate unique request ID (simplified)
@@ -43,9 +44,14 @@ function generateRequestId() {
 }
 
 // Enhanced rate limiting
-function checkRateLimit(clientIp, logger) {
+function checkRateLimit(clientIp, logger, isLightningbolt = false) {
   const now = Date.now();
   const clientKey = `rate_${clientIp}`;
+  
+  // Determine the appropriate rate limit based on URL type
+  const maxRequests = isLightningbolt ?
+    RATE_LIMIT_CONFIG.lightningboltMaxRequests :
+    RATE_LIMIT_CONFIG.maxRequests;
   
   if (!rateLimitStore.has(clientKey)) {
     rateLimitStore.set(clientKey, {
@@ -54,7 +60,7 @@ function checkRateLimit(clientIp, logger) {
       blocked: false,
       blockUntil: 0
     });
-    return { allowed: true, remaining: RATE_LIMIT_CONFIG.maxRequests - 1 };
+    return { allowed: true, remaining: maxRequests - 1 };
   }
   
   const clientData = rateLimitStore.get(clientKey);
@@ -66,10 +72,10 @@ function checkRateLimit(clientIp, logger) {
       blockedUntil: new Date(clientData.blockUntil).toISOString(),
       remainingBlockTime: clientData.blockUntil - now
     });
-    return { 
-      allowed: false, 
-      blocked: true, 
-      retryAfter: Math.ceil((clientData.blockUntil - now) / 1000) 
+    return {
+      allowed: false,
+      blocked: true,
+      retryAfter: Math.ceil((clientData.blockUntil - now) / 1000)
     };
   }
   
@@ -79,31 +85,32 @@ function checkRateLimit(clientIp, logger) {
     clientData.windowStart = now;
     clientData.blocked = false;
     clientData.blockUntil = 0;
-    return { allowed: true, remaining: RATE_LIMIT_CONFIG.maxRequests - 1 };
+    return { allowed: true, remaining: maxRequests - 1 };
   }
   
   // Check if limit exceeded
-  if (clientData.requests >= RATE_LIMIT_CONFIG.maxRequests) {
+  if (clientData.requests >= maxRequests) {
     clientData.blocked = true;
     clientData.blockUntil = now + RATE_LIMIT_CONFIG.blockDuration;
     logger.warn('Rate limit exceeded', {
       clientIp,
       requests: clientData.requests,
       windowStart: new Date(clientData.windowStart).toISOString(),
-      blockedUntil: new Date(clientData.blockUntil).toISOString()
+      blockedUntil: new Date(clientData.blockUntil).toISOString(),
+      isLightningbolt
     });
-    return { 
-      allowed: false, 
-      blocked: true, 
-      retryAfter: Math.ceil(RATE_LIMIT_CONFIG.blockDuration / 1000) 
+    return {
+      allowed: false,
+      blocked: true,
+      retryAfter: Math.ceil(RATE_LIMIT_CONFIG.blockDuration / 1000)
     };
   }
   
   // Increment request count
   clientData.requests++;
-  return { 
-    allowed: true, 
-    remaining: RATE_LIMIT_CONFIG.maxRequests - clientData.requests 
+  return {
+    allowed: true,
+    remaining: maxRequests - clientData.requests
   };
 }
 
@@ -133,140 +140,99 @@ function validateRequest(request, logger) {
   return { isValid: true };
 }
 
-// Enhanced retry logic with header fallback strategies
+// SIMPLIFIED fetch with minimal retries for stability
 async function fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex = 0, retryCount = 0) {
-  const strategies = getHeaderStrategies(url, userAgent, logger, source);
-  const maxStrategies = strategies.length;
+  // Use simplified headers - no complex strategies
+  const headers = getSimplifiedHeaders(url, userAgent, source);
   
-  // If we've exhausted all strategies, throw the last error
-  if (strategyIndex >= maxStrategies) {
-    throw new Error(`All ${maxStrategies} header strategies failed for URL: ${url.substring(0, 100)}`);
-  }
-  
-  const currentStrategy = strategies[strategyIndex];
   const options = {
     ...baseOptions,
     headers: {
-      ...currentStrategy.headers,
+      ...headers,
       // Preserve range header if present
       ...(baseOptions.headers?.Range && { 'Range': baseOptions.headers.Range })
     }
   };
   
   try {
-    logger.debug('Fetch attempt with header strategy', { 
-      url: url.substring(0, 100), 
-      strategyName: currentStrategy.name,
-      strategyIndex: strategyIndex + 1,
-      totalStrategies: maxStrategies,
-      retryCount: retryCount + 1,
-      maxRetries: RETRY_CONFIG.maxRetries 
+    logger.debug('Fetch attempt', {
+      url: url.substring(0, 100),
+      retryCount: retryCount
     });
     
     const response = await fetch(url, options);
     
     // If response is successful, return it
     if (response.ok) {
-      logger.info('Fetch successful with header strategy', {
-        strategyName: currentStrategy.name,
-        strategyIndex: strategyIndex + 1,
+      logger.info('Fetch successful', {
         status: response.status,
         contentType: response.headers.get('content-type')
       });
       return response;
     }
     
-    // Handle different types of failures
-    const isHeaderRelated = response.status === 403 || // Forbidden
-                           response.status === 401 || // Unauthorized  
-                           response.status === 405 || // Method Not Allowed
-                           response.status === 406;   // Not Acceptable
+    // Only retry server errors once
+    const isRetryableError = response.status >= 500;
     
-    const isRetryableError = response.status >= 500 || 
-                            response.status === 408 || // Request Timeout
-                            response.status === 429 || // Too Many Requests
-                            response.status === 502 || // Bad Gateway
-                            response.status === 503 || // Service Unavailable
-                            response.status === 504;   // Gateway Timeout
-    
-    if (isHeaderRelated) {
-      // Try next header strategy immediately
-      logger.warn('Header-related error, trying next strategy', {
+    if (isRetryableError && retryCount < RETRY_CONFIG.maxRetries) {
+      const delay = RETRY_CONFIG.baseDelay;
+      
+      logger.warn('Server error, single retry attempt', {
         status: response.status,
-        statusText: response.statusText,
-        currentStrategy: currentStrategy.name,
-        nextStrategy: strategies[strategyIndex + 1]?.name || 'none'
-      });
-      
-      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex + 1, 0);
-      
-    } else if (isRetryableError && retryCount < RETRY_CONFIG.maxRetries) {
-      // Retry with same headers after delay
-      const delay = Math.min(
-        RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffFactor, retryCount),
-        RETRY_CONFIG.maxDelay
-      );
-      
-      logger.warn('Retryable error, waiting before retry', {
-        status: response.status,
-        statusText: response.statusText,
-        strategyName: currentStrategy.name,
-        retryCount: retryCount + 1,
-        delay,
-        nextAttempt: retryCount + 2
+        delay
       });
       
       await new Promise(resolve => setTimeout(resolve, delay));
-      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex, retryCount + 1);
-      
-    } else {
-      // Try next header strategy for other errors
-      logger.warn('Non-retryable error, trying next header strategy', {
-        status: response.status,
-        statusText: response.statusText,
-        currentStrategy: currentStrategy.name,
-        nextStrategy: strategies[strategyIndex + 1]?.name || 'none'
-      });
-      
-      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex + 1, 0);
+      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, 0, retryCount + 1);
     }
+    
+    // Don't retry, just return the response
+    return response;
     
   } catch (error) {
-    const isNetworkError = error.name === 'TypeError' || // Network error
-                          error.name === 'AbortError' || // Timeout
-                          error.code === 'ECONNRESET' ||
-                          error.code === 'ENOTFOUND' ||
-                          error.code === 'ECONNREFUSED';
-    
-    if (isNetworkError && retryCount < RETRY_CONFIG.maxRetries) {
-      // Retry with same headers after delay
-      const delay = Math.min(
-        RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffFactor, retryCount),
-        RETRY_CONFIG.maxDelay
-      );
+    // Single retry for network errors
+    if (retryCount < RETRY_CONFIG.maxRetries) {
+      const delay = RETRY_CONFIG.baseDelay;
       
-      logger.warn('Network error, retrying with same strategy', {
+      logger.warn('Network error, single retry attempt', {
         error: error.message,
-        strategyName: currentStrategy.name,
-        retryCount: retryCount + 1,
-        delay,
-        nextAttempt: retryCount + 2
+        delay
       });
       
       await new Promise(resolve => setTimeout(resolve, delay));
-      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex, retryCount + 1);
-      
-    } else {
-      // Try next header strategy
-      logger.warn('Network error, trying next header strategy', {
-        error: error.message,
-        currentStrategy: currentStrategy.name,
-        nextStrategy: strategies[strategyIndex + 1]?.name || 'none'
-      });
-      
-      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex + 1, 0);
+      return fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, 0, retryCount + 1);
     }
+    
+    // Re-throw the error if retries exhausted
+    throw error;
   }
+}
+
+// SIMPLIFIED headers - only what's absolutely necessary
+function getSimplifiedHeaders(url, userAgent, source) {
+  const baseUserAgent = userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+  
+  // Minimal headers for stability
+  const headers = {
+    'User-Agent': baseUserAgent,
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Connection': 'keep-alive'
+  };
+  
+  // Only add referer/origin if absolutely necessary
+  if (url.includes('shadowlandschronicles')) {
+    headers['Referer'] = 'https://cloudnestra.com/';
+    headers['Origin'] = 'https://cloudnestra.com';
+  } else if (url.includes('embed.su')) {
+    headers['Referer'] = 'https://embed.su/';
+    headers['Origin'] = 'https://embed.su';
+  } else if (url.includes('lightningbolt')) {
+    headers['Referer'] = 'https://vidsrc.cc/';
+    headers['Origin'] = 'https://vidsrc.cc';
+  }
+  
+  return headers;
 }
 
 // Legacy function for backward compatibility
@@ -315,189 +281,7 @@ function validateStreamUrl(url, logger) {
   }
 }
 
-// Header fallback strategies for different sources
-function getHeaderStrategies(originalUrl, userAgent, logger, source) {
-  const isSubtitle = originalUrl.includes('.vtt') || originalUrl.includes('.srt');
-  const isVidsrc = source === 'vidsrc';
-  const isShadowlands = originalUrl.includes('shadowlandschronicles');
-  const isCloudnestra = originalUrl.includes('cloudnestra.com');
-  const isEmbed = source === 'embed.su' || originalUrl.includes('embed.su');
-  const isStarpulse = originalUrl.includes('starpulsecreative.xyz');
-  
-  const baseUserAgent = userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-  
-  // Define different header strategies to try in order
-  const strategies = [];
-  
-  if (isVidsrc || isCloudnestra || isStarpulse) {
-    // Strategy 1: Minimal headers (most likely to work for vidsrc.xyz)
-    strategies.push({
-      name: 'minimal',
-      headers: {
-        'User-Agent': baseUserAgent,
-        'Accept': isSubtitle ? 'text/vtt, text/plain, */*' : '*/*'
-      }
-    });
-    
-    // Strategy 2: Basic headers with connection keep-alive
-    strategies.push({
-      name: 'basic',
-      headers: {
-        'User-Agent': baseUserAgent,
-        'Accept': isSubtitle ? 'text/vtt, text/plain, */*' : '*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Connection': 'keep-alive'
-      }
-    });
-    
-    // Strategy 3: No headers at all (sometimes works when servers are picky)
-    strategies.push({
-      name: 'none',
-      headers: {}
-    });
-    
-    // Strategy 4: Only User-Agent (fallback)
-    strategies.push({
-      name: 'user-agent-only',
-      headers: {
-        'User-Agent': baseUserAgent
-      }
-    });
-    
-  } else if (isShadowlands) {
-    // Strategy 1: Full shadowlandschronicles headers
-    strategies.push({
-      name: 'shadowlands-full',
-      headers: {
-        'User-Agent': baseUserAgent,
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Referer': 'https://cloudnestra.com/',
-        'Origin': 'https://cloudnestra.com',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'cross-site',
-        'Connection': 'keep-alive',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
-    });
-    
-    // Strategy 2: Minimal shadowlands headers
-    strategies.push({
-      name: 'shadowlands-minimal',
-      headers: {
-        'User-Agent': baseUserAgent,
-        'Accept': '*/*',
-        'Referer': 'https://cloudnestra.com/',
-        'Origin': 'https://cloudnestra.com'
-      }
-    });
-    
-    // Strategy 3: No referer/origin (sometimes works)
-    strategies.push({
-      name: 'shadowlands-no-referer',
-      headers: {
-        'User-Agent': baseUserAgent,
-        'Accept': '*/*'
-      }
-    });
-    
-  } else {
-    // Default strategies for embed.su and others
-    // Strategy 1: Full embed headers
-    strategies.push({
-      name: 'embed-full',
-      headers: {
-        'User-Agent': baseUserAgent,
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Referer': 'https://embed.su/',
-        'Origin': 'https://embed.su',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'cross-site',
-        'Connection': 'keep-alive',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
-    });
-    
-    // Strategy 2: Basic headers
-    strategies.push({
-      name: 'basic',
-      headers: {
-        'User-Agent': baseUserAgent,
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Connection': 'keep-alive'
-      }
-    });
-    
-    // Strategy 3: Minimal headers
-    strategies.push({
-      name: 'minimal',
-      headers: {
-        'User-Agent': baseUserAgent,
-        'Accept': '*/*'
-      }
-    });
-  }
-  
-  // Add content-type specific Accept headers
-  strategies.forEach(strategy => {
-    if (strategy.headers.Accept && strategy.headers.Accept === '*/*') {
-      if (originalUrl.includes('.m3u8')) {
-        strategy.headers.Accept = 'application/vnd.apple.mpegurl, application/x-mpegURL, */*';
-      } else if (originalUrl.includes('.ts')) {
-        strategy.headers.Accept = 'video/MP2T, */*';
-      } else if (originalUrl.includes('.mp4')) {
-        strategy.headers.Accept = 'video/mp4, */*';
-      } else if (originalUrl.includes('.vtt') || originalUrl.includes('.srt')) {
-        strategy.headers.Accept = 'text/vtt, text/plain, */*';
-      }
-    }
-  });
-  
-  logger.debug('Header strategies prepared', {
-    totalStrategies: strategies.length,
-    strategyNames: strategies.map(s => s.name),
-    isVidsrc,
-    isShadowlands,
-    isEmbed,
-    isStarpulse
-  });
-  
-  return strategies;
-}
-
-// Enhanced source-specific header management with fallback
-function getStreamHeaders(originalUrl, userAgent, logger, source, strategyIndex = 0) {
-  const strategies = getHeaderStrategies(originalUrl, userAgent, logger, source);
-  
-  if (strategyIndex >= strategies.length) {
-    // Fallback to minimal headers if all strategies exhausted
-    logger.warn('All header strategies exhausted, using minimal fallback');
-    return {
-      'User-Agent': userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    };
-  }
-  
-  const selectedStrategy = strategies[strategyIndex];
-  
-  logger.debug('Using header strategy', {
-    strategyName: selectedStrategy.name,
-    strategyIndex: strategyIndex + 1,
-    totalStrategies: strategies.length,
-    headerCount: Object.keys(selectedStrategy.headers).length,
-    hasReferer: !!selectedStrategy.headers.Referer,
-    hasOrigin: !!selectedStrategy.headers.Origin
-  });
-  
-  return selectedStrategy.headers;
-}
+// REMOVED complex header strategies - simplified headers are now used directly in fetchWithHeaderFallback
 
 // Handle different response types
 function getResponseHeaders(originalResponse, logger, skipContentLength = false) {
@@ -649,16 +433,21 @@ export async function GET(request) {
     }, { status: 400 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const streamUrl = searchParams.get('url');
+  const source = searchParams.get('source'); // 'vidsrc', 'embed.su', etc.
+
   // Rate limiting check (Requirement 5.3)
-  const rateLimitResult = checkRateLimit(clientIp, logger);
+  const isLightningboltUrl = (streamUrl?.includes('lightningbolt') || streamUrl?.includes('lightningbolts.ru')) || false;
+  const rateLimitResult = checkRateLimit(clientIp, logger, isLightningboltUrl);
   if (!rateLimitResult.allowed) {
-    logger.warn('Rate limit exceeded', { clientIp, blocked: rateLimitResult.blocked });
+    logger.warn('Rate limit exceeded', { clientIp, blocked: rateLimitResult.blocked, isLightningboltUrl });
     return NextResponse.json({
       success: false,
       error: 'Rate limit exceeded',
       retryAfter: rateLimitResult.retryAfter,
       requestId
-    }, { 
+    }, {
       status: 429,
       headers: {
         'Retry-After': rateLimitResult.retryAfter?.toString() || '60',
@@ -667,10 +456,6 @@ export async function GET(request) {
       }
     });
   }
-
-  const { searchParams } = new URL(request.url);
-  const streamUrl = searchParams.get('url');
-  const source = searchParams.get('source'); // 'vidsrc', 'embed.su', etc.
 
   logger.info('Stream proxy parameters', {
     url: streamUrl?.substring(0, 100) + (streamUrl?.length > 100 ? '...' : ''),
@@ -745,9 +530,17 @@ export async function GET(request) {
 
     // Check if this is an M3U8 playlist that needs URL rewriting
     const contentType = response.headers.get('content-type') || '';
-    const isM3U8 = streamUrl.includes('.m3u8') || 
-                   contentType.includes('application/vnd.apple.mpegurl') || 
+    const isM3U8 = streamUrl.includes('.m3u8') ||
+                   contentType.includes('application/vnd.apple.mpegurl') ||
                    contentType.includes('application/x-mpegURL');
+    
+    // Check if this is a TS segment (including lightningbolt.site with wrong content type)
+    const isTSSegment = streamUrl.includes('.ts') ||
+                       streamUrl.includes('lightningbolt') ||
+                       streamUrl.includes('lightningbolts') || // Also check for plural form
+                       contentType.includes('video/mp2t') ||
+                       contentType.includes('application/octet-stream') ||
+                       (contentType.includes('image') && streamUrl.includes('.ts'));
     
     // Check if this is a subtitle file
     const isSubtitle = streamUrl.includes('.vtt') || streamUrl.includes('.srt') ||
@@ -857,6 +650,44 @@ export async function GET(request) {
           headers: responseHeaders
         });
       }
+    } else if (isTSSegment) {
+      // Handle TS segments (including lightningbolt.site with wrong content type)
+      logger.info('Processing TS segment', {
+        originalUrl: streamUrl.substring(0, 100),
+        contentType,
+        hasWrongContentType: contentType.includes('image') && streamUrl.includes('.ts')
+      });
+
+      // Prepare response headers with correct content type for TS segments
+      const responseHeaders = getResponseHeaders(response, logger);
+      
+      // Fix content type for TS segments with wrong content type
+      if (contentType.includes('image')) {
+        responseHeaders.set('content-type', 'video/mp2t');
+        logger.info('Fixed content type from image to video/mp2t for TS segment');
+      } else if (!contentType || contentType.includes('application/octet-stream')) {
+        responseHeaders.set('content-type', 'video/mp2t');
+        logger.info('Set content type to video/mp2t for TS segment');
+      } else if (!contentType || contentType === 'text/plain') {
+        responseHeaders.set('content-type', 'video/mp2t');
+        logger.info('Set content type to video/mp2t for TS segment (was text/plain)');
+      }
+
+      // Add rate limiting headers
+      responseHeaders.set('X-RateLimit-Remaining', rateLimitResult.remaining?.toString() || '0');
+      responseHeaders.set('X-RateLimit-Reset', new Date(Date.now() + RATE_LIMIT_CONFIG.windowMs).toISOString());
+
+      logger.info('TS segment processed successfully', {
+        status: response.status,
+        contentType: responseHeaders.get('content-type'),
+        rateLimitRemaining: rateLimitResult.remaining
+      });
+
+      // Stream the response directly for TS segments
+      return new NextResponse(response.body, {
+        status: response.status,
+        headers: responseHeaders
+      });
     } else {
       // Prepare response headers for non-M3U8 content
       const responseHeaders = getResponseHeaders(response, logger);
@@ -934,7 +765,10 @@ export async function OPTIONS(request) {
   });
 
   // Apply rate limiting to OPTIONS requests as well
-  const rateLimitResult = checkRateLimit(clientIp, logger);
+  const { searchParams: optionsParams } = new URL(request.url);
+  const optionsStreamUrl = optionsParams.get('url');
+  const isOptionsLightningboltUrl = (optionsStreamUrl?.includes('lightningbolt') || optionsStreamUrl?.includes('lightningbolts.ru')) || false;
+  const rateLimitResult = checkRateLimit(clientIp, logger, isOptionsLightningboltUrl);
   if (!rateLimitResult.allowed) {
     return new NextResponse(null, {
       status: 429,
@@ -974,7 +808,12 @@ export async function HEAD(request) {
     return new NextResponse(null, { status: 400 });
   }
 
-  const rateLimitResult = checkRateLimit(clientIp, logger);
+  const { searchParams } = new URL(request.url);
+  const streamUrl = searchParams.get('url');
+  const source = searchParams.get('source');
+
+  const isHeadLightningboltUrl = (streamUrl?.includes('lightningbolt') || streamUrl?.includes('lightningbolts.ru')) || false;
+  const rateLimitResult = checkRateLimit(clientIp, logger, isHeadLightningboltUrl);
   if (!rateLimitResult.allowed) {
     return new NextResponse(null, {
       status: 429,
@@ -985,10 +824,6 @@ export async function HEAD(request) {
       }
     });
   }
-
-  const { searchParams } = new URL(request.url);
-  const streamUrl = searchParams.get('url');
-  const source = searchParams.get('source');
 
   const validation = validateStreamUrl(streamUrl, logger);
   if (!validation.isValid) {
@@ -1029,6 +864,23 @@ export async function HEAD(request) {
       }
     }
     
+    // Set appropriate content-type for TS segments
+    const isTSSegment = streamUrl.includes('.ts') ||
+                       streamUrl.includes('lightningbolt') ||
+                       streamUrl.includes('lightningbolts') || // Also check for plural form
+                       (response.headers.get('content-type') || '').includes('image') && streamUrl.includes('.ts');
+    if (isTSSegment) {
+      // Fix content type for TS segments with wrong content type
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('image')) {
+        responseHeaders.set('content-type', 'video/mp2t');
+      } else if (!contentType || contentType.includes('application/octet-stream') || contentType === 'text/plain') {
+        responseHeaders.set('content-type', 'video/mp2t');
+      } else {
+        responseHeaders.set('content-type', 'video/mp2t');
+      }
+    }
+    
     return new NextResponse(null, {
       status: response.status,
       headers: responseHeaders
@@ -1038,4 +890,4 @@ export async function HEAD(request) {
     logger.error('HEAD request failed', error);
     return new NextResponse(null, { status: 500 });
   }
-} 
+}

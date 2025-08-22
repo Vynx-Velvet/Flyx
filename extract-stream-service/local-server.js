@@ -1,8 +1,8 @@
-const express = require('express');
-const cors = require('cors');
-const puppeteer = require('puppeteer');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import cors from 'cors';
+import puppeteer from 'puppeteer';
+import path from 'path';
+import fs from 'fs';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -89,9 +89,9 @@ function validateParameters(query, logger) {
   if (!url && mediaType && movieId) {
     if (server.toLowerCase() === 'vidsrc.xyz' || server.toLowerCase() === 'vidsrc') {
       if (mediaType === 'movie') {
-        finalUrl = `https://vidsrc.xyz/embed/movie?tmdb=${movieId}`;
+        finalUrl = `https://vidsrc.xyz/embed/movie/${movieId}/`;
       } else if (mediaType === 'tv' && seasonId && episodeId) {
-        finalUrl = `https://vidsrc.xyz/embed/tv?tmdb=${movieId}&season=${seasonId}&episode=${episodeId}`;
+        finalUrl = `https://vidsrc.xyz/embed/tv/${movieId}/${seasonId}/${episodeId}/`;
       } else if (mediaType === 'tv') {
         return { 
           isValid: false, 
@@ -481,6 +481,101 @@ app.get('/extract', async (req, res) => {
   }
 });
 
+// Server-Sent Events endpoint for real-time progress (required by frontend)
+app.get('/extract-stream', async (req, res) => {
+  const requestId = generateRequestId();
+  const logger = createLogger(requestId);
+  
+  logger.info('SSE extraction request received', { query: req.query });
+
+  // Set up Server-Sent Events headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
+
+  function sendProgress(phase, percentage, message, data = {}) {
+    const progressData = {
+      phase,
+      percentage,
+      progress: percentage, // Frontend expects 'progress' field
+      message,
+      timestamp: new Date().toISOString(),
+      requestId,
+      ...data
+    };
+    
+    res.write(`data: ${JSON.stringify(progressData)}\n\n`);
+    logger.info(`Progress: ${phase} (${percentage}%) - ${message}`);
+  }
+
+  try {
+    sendProgress('initializing', 5, 'Starting stream extraction service');
+
+    // Validate parameters
+    const validation = validateParameters(req.query, logger);
+    if (!validation.isValid) {
+      sendProgress('error', 0, validation.error);
+      res.write(`data: ${JSON.stringify({ success: false, error: validation.error, requestId })}\n\n`);
+      return res.end();
+    }
+
+    const { url } = validation.params;
+
+    sendProgress('connecting', 15, 'Initializing extraction');
+    sendProgress('navigating', 35, 'Fetching video page');
+    sendProgress('bypassing', 50, 'Processing video sources');
+    sendProgress('extracting', 75, 'Extracting stream URL');
+
+    // Extract stream
+    const result = await extractStream(url, logger);
+
+    if (result.success) {
+      sendProgress('complete', 100, 'Stream extraction successful');
+      
+      const finalResult = {
+        success: true,
+        streamUrl: result.streamUrl,
+        streamInfo: {
+          source: result.server || 'vidsrc.xyz',
+          quality: 'auto',
+          type: 'hls',
+          requiresProxy: result.requiresProxy || false
+        },
+        debug: {
+          extractionMethod: result.extractionMethod,
+          extractionTime: result.debug?.extractionTime,
+          requestId
+        }
+      };
+
+      res.write(`data: ${JSON.stringify(finalResult)}\n\n`);
+    } else {
+      sendProgress('error', 100, `Extraction failed: ${result.error}`);
+      res.write(`data: ${JSON.stringify({ 
+        success: false, 
+        error: result.error,
+        debug: { extractionMethod: result.extractionMethod, requestId }
+      })}\n\n`);
+    }
+
+  } catch (error) {
+    logger.error('SSE extraction failed', error);
+    
+    sendProgress('error', 100, `Extraction failed: ${error.message}`);
+    res.write(`data: ${JSON.stringify({ 
+      success: false, 
+      error: error.message,
+      debug: { requestId }
+    })}\n\n`);
+  } finally {
+    res.end();
+  }
+});
+
 // Test endpoint for quick debugging
 app.get('/test', async (req, res) => {
   const requestId = generateRequestId();
@@ -514,10 +609,12 @@ app.listen(PORT, () => {
   console.log(`🚀 Flyx Extract Stream Service (Local Debug) running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 Extract endpoint: http://localhost:${PORT}/extract`);
+  console.log(`📡 SSE endpoint: http://localhost:${PORT}/extract-stream`);
   console.log(`🧪 Test endpoint: http://localhost:${PORT}/test`);
-  console.log(`🐛 Debug mode: ${process.env.NODE_ENV === 'development' ? 'ON' : 'OFF'}`);
+  console.log(`� DeQbug mode: ${process.env.NODE_ENV === 'development' ? 'ON' : 'OFF'}`);
   console.log(`\n💡 Quick test commands:`);
   console.log(`   curl http://localhost:${PORT}/health`);
   console.log(`   curl http://localhost:${PORT}/test`);
   console.log(`   curl "http://localhost:${PORT}/extract?mediaType=movie&movieId=550"`);
+  console.log(`   curl "http://localhost:${PORT}/extract-stream?mediaType=movie&movieId=550"`);
 });

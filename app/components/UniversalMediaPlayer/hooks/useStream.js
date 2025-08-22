@@ -114,14 +114,20 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
 
             // Process stream URL to handle CORS issues
             const isVidsrc = extractData.server === 'vidsrc.xyz' || extractData.server === 'vidsrc';
-            const needsProxy = extractData.requiresProxy || 
-                              extractData.streamUrl.includes('shadowlandschronicles.com') || 
+            const isShadowlands = extractData.streamType === 'shadowlands' ||
+                                 extractData.streamUrl.includes('shadowlands');
+            const needsProxy = extractData.requiresProxy ||
+                              extractData.streamUrl.includes('shadowlandschronicles.com') ||
                               extractData.streamUrl.includes('cloudnestra.com') ||
                               !isVidsrc;
 
             let finalStreamUrl;
-            if (needsProxy) {
-              const sourceParam = extractData.debug?.selectedStream?.source || 
+            if (isShadowlands) {
+              // Use special shadowlands proxy that extracts m3u8 from shadowlands page
+              finalStreamUrl = `/api/shadowlands-proxy?url=${encodeURIComponent(extractData.streamUrl)}`;
+              console.log('🌑 Using shadowlands proxy for stream extraction');
+            } else if (needsProxy) {
+              const sourceParam = extractData.debug?.selectedStream?.source ||
                                  (isVidsrc ? 'vidsrc' : 'embed.su');
               finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=${sourceParam}`;
               console.log(`🔄 Using proxy for ${extractData.server} URL (source: ${sourceParam})`);
@@ -133,7 +139,7 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
             // Success - clean up and set results
             cleanup();
             setStreamUrl(finalStreamUrl);
-            setStreamType(extractData.streamType || 'hls');
+            setStreamType(isShadowlands ? 'hls' : (extractData.streamType || 'hls'));
             setLoading(false);
             setRetryAttempt(0);
             console.log(`✅ Stream extraction succeeded on attempt ${attemptNumber}/${maxRetries}`);
