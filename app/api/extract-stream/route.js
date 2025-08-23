@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 
 // VM extractor configuration
-const VM_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || 'http://35.188.123.210:3001';
+const VM_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || 'http://35.188.123.210:3001';
 // VidSrc.cc extractor configuration
 const VIDSRCCC_EXTRACTOR_URL = process.env.VIDSRCCC_EXTRACTION_URL || 'http://localhost:3002';
 // Bulletproof extractor configuration
-const BULLETPROOF_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || 'http://localhost:3001';
+const BULLETPROOF_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || 'http://35.188.123.210:3001';
 
 // Utility function for structured logging
 function createLogger(requestId) {
@@ -152,10 +152,22 @@ export async function GET(request) {
     const extractorType = getExtractorType(searchParams);
     
     let extractorUrl;
-
-      extractorUrl = buildBulletproofUrl(searchParams, logger);
-      logger.info('Using Bulletproof extractor', { extractorUrl });
-
+    
+    // Use the correct extractor based on the determined type
+    switch (extractorType) {
+      case 'bulletproof':
+        extractorUrl = buildBulletproofUrl(searchParams, logger);
+        logger.info('Using Bulletproof extractor', { extractorUrl });
+        break;
+      case 'vidsrccc':
+        extractorUrl = buildVidSrcCcUrl(searchParams, logger);
+        logger.info('Using VidSrc.cc extractor', { extractorUrl });
+        break;
+      default: // 'vm'
+        extractorUrl = buildVMUrl(searchParams, logger);
+        logger.info('Using VM extractor', { extractorUrl });
+        break;
+    }
     
     logger.info('Forwarding request to extractor', {
       extractorUrl: extractorUrl.substring(0, 200) + (extractorUrl.length > 200 ? '...' : ''),
@@ -258,7 +270,7 @@ export async function GET(request) {
           requestId,
           extractorResponseTime,
           timestamp: new Date().toISOString(),
-          extractorUrl: extractorType === 'vm' ? VM_EXTRACTOR_URL : VIDSRCCC_EXTRACTOR_URL
+          extractorUrl: VM_EXTRACTOR_URL 
         }
       };
     }

@@ -81,7 +81,11 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
         }),
       });
 
-      const progressUrl = `/api/extract-stream-progress?${params.toString()}`;
+      // Use VM_EXTRACTION_URL for bulletproof route if available, otherwise fallback to local API
+      const baseUrl = process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || '/api/extract-stream-progress';
+      const progressUrl = `${baseUrl}?${params.toString()}`;
+      
+      console.log('🔫 Using extraction endpoint:', progressUrl);
       const eventSource = new EventSource(progressUrl);
       extractionRef.current.eventSource = eventSource;
 

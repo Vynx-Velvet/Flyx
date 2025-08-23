@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // Bulletproof extractor configuration
-const BULLETPROOF_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || 'http://localhost:3001';
+const BULLETPROOF_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || 'http://35.188.123.210:3001';
 
 // Utility function for structured logging
 function createLogger(requestId) {
@@ -71,11 +71,18 @@ export async function GET(request) {
   const requestId = generateRequestId();
   const logger = createLogger(requestId);
 
-  logger.info('SSE proxy request started', {
+  logger.info('🚀 SSE PROXY REQUEST STARTED', {
     timestamp: new Date().toISOString(),
     userAgent: request.headers.get('user-agent'),
-    referer: request.headers.get('referer')
+    referer: request.headers.get('referer'),
+    requestUrl: request.url,
+    vmExtractionUrl: process.env.VM_EXTRACTION_URL || 'NOT_SET',
+    nextPublicVmUrl: process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || 'NOT_SET',
+    bulletproofUrl: BULLETPROOF_EXTRACTOR_URL
   });
+  
+  // Force console output to appear in Vercel logs
+  console.log(`🔥 [${requestId}] EXTRACTION REQUEST STARTING - VM_URL: ${BULLETPROOF_EXTRACTOR_URL}`);
 
   try {
     // Parse parameters
