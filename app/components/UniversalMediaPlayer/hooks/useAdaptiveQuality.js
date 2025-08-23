@@ -159,15 +159,21 @@ const useAdaptiveQuality = ({
     if (!enableAdaptation) return;
 
     const monitorNetwork = async () => {
-      const metrics = { ...networkMetrics };
+      const newMetrics = {
+        bandwidth: 0,
+        latency: 0,
+        stability: 1.0,
+        trend: 'stable',
+        effectiveType: 'unknown'
+      };
 
       // Use Navigation Timing API for bandwidth estimation
       try {
         const connection = navigator.connection;
         if (connection) {
-          metrics.bandwidth = connection.downlink * 1000000; // Convert to bps
-          metrics.effectiveType = connection.effectiveType;
-          metrics.latency = connection.rtt;
+          newMetrics.bandwidth = connection.downlink * 1000000; // Convert to bps
+          newMetrics.effectiveType = connection.effectiveType;
+          newMetrics.latency = connection.rtt;
         }
 
         // Additional bandwidth measurement via Resource Timing API
@@ -180,7 +186,7 @@ const useAdaptiveQuality = ({
           
           if (totalTime > 0) {
             const estimatedBandwidth = (totalSize * 8) / (totalTime / 1000); // bits per second
-            metrics.bandwidth = Math.max(metrics.bandwidth, estimatedBandwidth);
+            newMetrics.bandwidth = Math.max(newMetrics.bandwidth, estimatedBandwidth);
           }
         }
 
@@ -189,7 +195,7 @@ const useAdaptiveQuality = ({
         if (bandwidthHistory.length > 1) {
           const variance = calculateVariance(bandwidthHistory);
           const mean = bandwidthHistory.reduce((a, b) => a + b, 0) / bandwidthHistory.length;
-          metrics.stability = Math.max(0, 1 - (variance / (mean * mean)));
+          newMetrics.stability = Math.max(0, 1 - (variance / (mean * mean)));
         }
 
         // Determine trend
@@ -200,21 +206,21 @@ const useAdaptiveQuality = ({
           const earlierAvg = earlier.reduce((a, b) => a + b, 0) / earlier.length;
           
           if (recentAvg > earlierAvg * 1.2) {
-            metrics.trend = 'improving';
+            newMetrics.trend = 'improving';
           } else if (recentAvg < earlierAvg * 0.8) {
-            metrics.trend = 'degrading';
+            newMetrics.trend = 'degrading';
           } else {
-            metrics.trend = 'stable';
+            newMetrics.trend = 'stable';
           }
         }
 
         // Store in history
         metricsHistoryRef.current.bandwidth = [
           ...metricsHistoryRef.current.bandwidth.slice(-19),
-          metrics.bandwidth
+          newMetrics.bandwidth
         ];
 
-        setNetworkMetrics(metrics);
+        setNetworkMetrics(newMetrics);
       } catch (error) {
         console.warn('Network monitoring failed:', error);
       }
@@ -228,7 +234,7 @@ const useAdaptiveQuality = ({
         clearInterval(monitoringRef.current.bandwidth);
       }
     };
-  }, [enableAdaptation, networkMetrics]);
+  }, [enableAdaptation]);
 
   // Buffer health monitoring
   useEffect(() => {
@@ -546,14 +552,14 @@ const useAdaptiveQuality = ({
     runAdaptation();
 
     // Set up periodic adaptation
-    monitoringRef.current.adaptation = setInterval(runAdaptation, 3000);
+    monitoringRef.current.adaptation = setInterval(runAdaptation, 10000); // Reduce frequency
 
     return () => {
       if (monitoringRef.current.adaptation) {
         clearInterval(monitoringRef.current.adaptation);
       }
     };
-  }, [enableAdaptation, currentQuality, selectOptimalQuality, changeQuality, adaptationLocked]);
+  }, [enableAdaptation, currentQuality, adaptationLocked]);
 
   // Handle video element attachment
   const attachToVideo = useCallback((videoElement) => {

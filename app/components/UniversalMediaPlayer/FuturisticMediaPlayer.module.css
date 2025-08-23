@@ -137,6 +137,7 @@
   border-radius: 0;
   transition: all var(--animation-slow);
   filter: brightness(1) contrast(1.02) saturate(1.05);
+  display: block;
 }
 
 .videoElement::-webkit-media-controls {

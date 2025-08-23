@@ -235,7 +235,9 @@ const useAdvancedAnalytics = ({
   useEffect(() => {
     if (!isTracking) return;
 
-    flushTimerRef.current = setInterval(flushEvents, flushInterval);
+    flushTimerRef.current = setInterval(() => {
+      flushEvents();
+    }, flushInterval);
 
     // Flush on page unload
     const handleUnload = () => {
@@ -251,7 +253,7 @@ const useAdvancedAnalytics = ({
       window.removeEventListener('beforeunload', handleUnload);
       flushEvents(); // Final flush
     };
-  }, [isTracking, flushInterval, flushEvents]);
+  }, [isTracking, flushInterval]);
 
   // Process events for real-time insights
   const processEventForInsights = useCallback((event) => {
@@ -591,7 +593,7 @@ const useAdvancedAnalytics = ({
     setInsights(prev => ({
       ...prev,
       userSegment,
-      retentionRisk: prev.engagementScore < 0.3 ? 'high' : 
+      retentionRisk: prev.engagementScore < 0.3 ? 'high' :
                     prev.engagementScore < 0.6 ? 'medium' : 'low'
     }));
 
@@ -603,7 +605,7 @@ const useAdvancedAnalytics = ({
         predictedActions: insights.predictedActions
       });
     }
-  }, [classifyUserSegment, insights.engagementScore, insights.predictedActions, onInsightGenerated]);
+  }, [userBehavior, sessionData]);
 
   // Public API
   return {

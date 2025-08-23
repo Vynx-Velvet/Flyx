@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 
 // VM extractor configuration
-const VM_EXTRACTOR_URL = process.env.VM_EXTRACTOR_URL || 'http://35.188.123.210:3001';
+const VM_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || 'http://35.188.123.210:3001';
 // VidSrc.cc extractor configuration
 const VIDSRCCC_EXTRACTOR_URL = process.env.VIDSRCCC_EXTRACTION_URL || 'http://localhost:3002';
 // Bulletproof extractor configuration
-const BULLETPROOF_EXTRACTOR_URL = process.env.BULLETPROOF_EXTRACTOR_URL || 'http://localhost:3001';
+const BULLETPROOF_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || 'http://localhost:3001';
 
 // Utility function for structured logging
 function createLogger(requestId) {
@@ -220,7 +220,7 @@ export async function GET(request) {
         streamType: extractorData.data?.type || extractorData.type || 'shadowlands',
         server: 'vidsrc.xyz',
         extractionMethod: 'bulletproof_puppeteer',
-        requiresProxy: true, // Shadowlands URLs need proxy
+        requiresProxy: false, // Shadowlands URLs don't need proxy
         totalFound: extractorData.data?.url ? 1 : 0,
         m3u8Count: 0, // Shadowlands URL, not m3u8 yet
         subtitles: [],

@@ -111,7 +111,7 @@ const FuturisticMediaPlayer = ({
   const setQuality = () => {};
   const currentQuality = 'auto';
   const adaptiveSettings = {};
-  const performanceMetrics = {};
+  const playerPerformanceMetrics = {};
   const bufferHealth = 100;
   const networkMetrics = {};
 
@@ -120,16 +120,144 @@ const FuturisticMediaPlayer = ({
     if (videoRef.current && streamUrl) {
       console.log('🎬 Setting video source:', streamUrl);
       console.log('📹 Stream type:', streamType);
+      console.log('📺 Video element:', videoRef.current);
+      console.log('🔗 Current video src before:', videoRef.current.src);
+      console.log('📊 Video readyState before:', videoRef.current.readyState);
       
-      // For m3u8/HLS streams, we'll use the native video element for now
-      // In production, you'd want to use HLS.js for better compatibility
-      videoRef.current.src = streamUrl;
-      
-      // If the browser doesn't support HLS natively (non-Safari), log a warning
-      if (streamType === 'hls' && !videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-        console.warn('⚠️ Browser may not support HLS natively. Consider using HLS.js for better compatibility.');
+      // For HLS streams, try to use native HLS support first
+      if (streamType === 'hls') {
+        console.log(' Loading HLS stream');
+        
+        // Check if browser supports native HLS
+        if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+          console.log(' Using native HLS support');
+          videoRef.current.src = streamUrl;
+        } else {
+          // For non-Safari browsers, try to use HLS.js with better error handling
+          const loadHLS = async () => {
+            try {
+              // Import HLS.js with a more reliable approach
+              let HLS;
+              
+              // Try different import methods
+              try {
+                const hlsModule = await import('hls.js/dist/hls.min.js');
+                HLS = hlsModule.default;
+              } catch (e) {
+                console.warn('Failed to import hls.min.js, trying main export:', e);
+                const hlsModule = await import('hls.js');
+                HLS = hlsModule.default;
+              }
+              
+              if (!HLS) {
+                throw new Error('HLS.js not available');
+              }
+              
+              console.log(' HLS.js module loaded successfully');
+              
+              // Check if HLS is supported
+              if (HLS.isSupported && HLS.isSupported()) {
+                console.log(' HLS.js is supported, initializing...');
+                
+                // Clean up any existing HLS instance
+                if (videoRef.current && videoRef.current.hls) {
+                  videoRef.current.hls.destroy();
+                  videoRef.current.hls = null;
+                }
+                
+                // Create HLS instance with optimized settings
+                const hls = new HLS({
+                  debug: false,
+                  enableWorker: true,
+                  lowLatencyMode: false,
+                  backBufferLength: 90,
+                  maxBufferLength: 30,
+                  maxMaxBufferLength: 600,
+                  startLevel: -1, // Auto quality
+                  capLevelToPlayerSize: true
+                });
+                
+                // Store reference for cleanup
+                videoRef.current.hls = hls;
+                
+                console.log(' Loading HLS stream:', streamUrl);
+                hls.loadSource(streamUrl);
+                hls.attachMedia(videoRef.current);
+                
+                // Handle HLS events
+                hls.on(HLS.Events.MANIFEST_PARSED, () => {
+                  console.log(' HLS manifest parsed successfully');
+                });
+                
+                hls.on(HLS.Events.ERROR, (event, data) => {
+                  console.error(' HLS error:', { event, data });
+                  if (data.fatal) {
+                    console.error(' Fatal HLS error, falling back to direct URL');
+                    hls.destroy();
+                    videoRef.current.hls = null;
+                    videoRef.current.src = streamUrl;
+                  }
+                });
+                
+              } else {
+                console.warn(' HLS.js not supported on this browser');
+                videoRef.current.src = streamUrl;
+              }
+              
+            } catch (error) {
+              console.warn(' HLS.js failed to load, using direct URL:', error.message);
+              videoRef.current.src = streamUrl;
+            }
+          };
+          
+          // Only load HLS.js on client side
+          if (typeof window !== 'undefined') {
+            loadHLS();
+          } else {
+            videoRef.current.src = streamUrl;
+          }
+        }
+      } else {
+        // Non-HLS streams
+        console.log('🎯 Loading non-HLS stream directly');
+        videoRef.current.src = streamUrl;
       }
+      
+      // Add debugging after setting src
+      console.log('✅ Video src set to:', videoRef.current.src);
+      console.log('📊 Video readyState after:', videoRef.current.readyState);
+      
+      // Force video to load and add event listeners for debugging
+      const handleLoadStart = () => console.log('🎬 Video loadstart event');
+      const handleLoadedData = () => console.log('✅ Video loadeddata - ready to display');
+      const handleCanPlay = () => console.log('▶️ Video canplay - can start playing');
+      const handleVideoError = (e) => {
+        console.error('❌ Video error:', e);
+        console.error('❌ Video error details:', videoRef.current.error);
+      };
+      
+      videoRef.current.addEventListener('loadstart', handleLoadStart);
+      videoRef.current.addEventListener('loadeddata', handleLoadedData);
+      videoRef.current.addEventListener('canplay', handleCanPlay);
+      videoRef.current.addEventListener('error', handleVideoError);
+      
+      // Force load
+      videoRef.current.load();
+    } else {
+      console.log('❌ Missing requirements:', {
+        hasVideoRef: !!videoRef.current,
+        hasStreamUrl: !!streamUrl,
+        streamUrl
+      });
     }
+    
+    // Clean up HLS instance on unmount
+    return () => {
+      if (videoRef.current && videoRef.current.hls) {
+        videoRef.current.hls.destroy();
+        videoRef.current.hls = null;
+      }
+    };
   }, [streamUrl, streamType]);
 
   // Intelligent subtitle system
@@ -151,17 +279,11 @@ const FuturisticMediaPlayer = ({
     enableContentAwareness: enableAdvancedFeatures
   });
 
-  // Ambient effects system
-  const {
-    ambientColors,
-    lightingEffects,
-    particleConfig,
-    atmosphereMode
-  } = useAmbientEffects({
-    videoRef,
-    enabled: ambientLighting && enableAdvancedFeatures,
-    intensity: playerState.ambientIntensity || 0.7
-  });
+  // Simplified ambient effects - DISABLED
+  const ambientColors = [];
+  const lightingEffects = {};
+  const particleConfig = {};
+  const atmosphereMode = 'default';
 
   // Gesture control system
   const {
@@ -185,52 +307,20 @@ const FuturisticMediaPlayer = ({
     onCommand: (command) => handleVoiceCommand(command)
   }) || {};
 
-  // Adaptive quality system
-  const {
-    recommendedQuality,
-    qualityHistory,
-    performanceProfile
-  } = useAdaptiveQuality({
-    videoRef,
-    qualities,
-    sceneData,
-    networkMetrics,
-    enabled: adaptiveQuality && enableAdvancedFeatures
-  });
+  // Simplified quality system - DISABLED
+  const recommendedQuality = 'auto';
+  const qualityHistory = [];
+  const performanceProfile = {};
 
-  // Advanced analytics with comprehensive tracking
-  const {
-    trackEvent,
-    sessionId,
-    sessionData,
-    userBehavior,
-    performanceMetrics: analyticsPerformanceMetrics,
-    contentAnalytics,
-    insights,
-    assignUserToTest,
-    trackConversion,
-    getTestVariant,
-    startTracking,
-    stopTracking,
-    generateReport,
-    isTracking
-  } = useAdvancedAnalytics({
-    isEnabled: enableAdvancedFeatures,
-    privacyMode: true,
-    anonymizeData: true,
-    batchSize: 50,
-    flushInterval: 30000,
-    enablePredictive: true,
-    abTestingEnabled: collaborativeMode,
-    onInsightGenerated: (insight) => {
-      // Handle generated insights
-      if (insight.userSegment === 'power_user') {
-        // Enable advanced features for power users
-        playerActions.enableAdvancedFeatures(true);
-      }
-    },
-    debugMode: false
-  });
+  // Simplified analytics - DISABLED to prevent infinite loops
+  const trackEvent = () => {};
+  const sessionId = 'disabled';
+  const sessionData = { duration: 0, interactions: 0 };
+  const userBehavior = {};
+  const analyticsPerformanceMetrics = {};
+  const contentAnalytics = {};
+  const insights = {};
+  const isTracking = false;
 
   // Episode navigation for TV shows
   const {
@@ -671,7 +761,8 @@ const FuturisticMediaPlayer = ({
         )}
       </AnimatePresence>
 
-      {/* Particle System */}
+      {/* Particle System - DISABLED to prevent infinite loops */}
+      {/*
       <AnimatePresence>
         {enableAdvancedFeatures && (
           <ParticleSystem
@@ -681,6 +772,7 @@ const FuturisticMediaPlayer = ({
           />
         )}
       </AnimatePresence>
+      */}
 
       {/* Main Video Element */}
       <video
@@ -691,6 +783,23 @@ const FuturisticMediaPlayer = ({
         preload="metadata"
         crossOrigin="anonymous"
         data-testid="futuristic-video-player"
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          backgroundColor: 'rgba(255, 0, 0, 0.1)', // Red tint for debugging
+          border: '2px solid lime', // Bright green border for debugging
+          zIndex: 10
+        }}
+        onLoadStart={() => console.log('🎬 Video onLoadStart event')}
+        onLoadedData={() => console.log('✅ Video onLoadedData event')}
+        onLoadedMetadata={() => console.log('📋 Video onLoadedMetadata event')}
+        onCanPlay={() => console.log('▶️ Video onCanPlay event')}
+        onCanPlayThrough={() => console.log('🎯 Video onCanPlayThrough event')}
+        onProgress={() => console.log('⏳ Video onProgress event')}
+        onTimeUpdate={() => console.log('⏱️ Video onTimeUpdate event')}
+        onPlay={() => console.log('▶️ Video onPlay event')}
+        onError={(e) => console.error('❌ Video onError event:', e)}
       />
 
       {/* Hidden canvas for advanced features */}
@@ -760,7 +869,7 @@ const FuturisticMediaPlayer = ({
         {performanceVisible && enableAdvancedFeatures && (
           <PerformanceDashboard
             analytics={contentAnalytics}
-            performanceStats={performanceMetrics}
+            performanceStats={analyticsPerformanceMetrics}
             userBehavior={userBehavior}
             insights={insights}
             bufferHealth={bufferHealth}
@@ -768,9 +877,7 @@ const FuturisticMediaPlayer = ({
             sessionData={sessionData}
             onClose={() => setPerformanceVisible(false)}
             onGenerateReport={() => {
-              const report = generateReport('7d');
-              console.log('Analytics Report:', report);
-              trackEvent('report_generated', { timeRange: '7d' });
+              console.log('Analytics disabled in simplified mode');
             }}
           />
         )}

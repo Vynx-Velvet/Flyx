@@ -212,20 +212,22 @@ const useAmbientEffects = ({
     
     let frameCount = 0;
     let lastTime = performance.now();
+    let currentFrameRate = 60;
     
     const measureFrameRate = () => {
       frameCount++;
       const currentTime = performance.now();
       
       if (currentTime - lastTime >= 1000) {
-        setFrameRate(frameCount);
+        currentFrameRate = frameCount;
+        setFrameRate(currentFrameRate);
         frameCount = 0;
         lastTime = currentTime;
         
         // Adjust performance based on frame rate
-        if (frameRate < 30 && performanceLevel !== 'low') {
+        if (currentFrameRate < 30 && performanceLevel !== 'low') {
           setPerformanceLevel('low');
-        } else if (frameRate > 50 && performanceLevel === 'low') {
+        } else if (currentFrameRate > 50 && performanceLevel === 'low') {
           setPerformanceLevel('medium');
         }
       }
@@ -238,7 +240,7 @@ const useAmbientEffects = ({
         clearInterval(performanceMonitorRef.current);
       }
     };
-  }, [deviceCapabilities.supportsPerformanceObserver, frameRate, performanceLevel]);
+  }, [deviceCapabilities.supportsPerformanceObserver]);
 
   // Audio analysis setup
   useEffect(() => {
@@ -543,20 +545,20 @@ const useAmbientEffects = ({
       }
       
       // Apply performance scaling
-      const scaleFactor = performanceLevel === 'low' ? 0.5 : 
+      const scaleFactor = performanceLevel === 'low' ? 0.5 :
                          performanceLevel === 'medium' ? 0.8 : 1.0;
       
-      setEffectsIntensity(prev => prev * scaleFactor);
+      setEffectsIntensity(prev => Math.min(2, prev * scaleFactor));
     };
     
-    effectsTimerRef.current = setInterval(updateEffects, 100);
+    effectsTimerRef.current = setInterval(updateEffects, 1000);
     
     return () => {
       if (effectsTimerRef.current) {
         clearInterval(effectsTimerRef.current);
       }
     };
-  }, [isActive, audioLevel, audioReactivity, performanceLevel, syncEffectsWithAudio]);
+  }, [isActive, audioReactivity]);
 
   // Public API
   return {

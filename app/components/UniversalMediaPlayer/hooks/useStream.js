@@ -115,17 +115,18 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
             // Process stream URL to handle CORS issues
             const isVidsrc = extractData.server === 'vidsrc.xyz' || extractData.server === 'vidsrc';
             const isShadowlands = extractData.streamType === 'shadowlands' ||
-                                 extractData.streamUrl.includes('shadowlands');
+                                 extractData.streamUrl.includes('shadowlands') ||
+                                 extractData.streamUrl.includes('shadowlandschronicles.com') ||
+                                 extractData.streamUrl.includes('tmstr');
             const needsProxy = extractData.requiresProxy ||
-                              extractData.streamUrl.includes('shadowlandschronicles.com') ||
-                              extractData.streamUrl.includes('cloudnestra.com') ||
+                              (!isShadowlands && (extractData.streamUrl.includes('cloudnestra.com'))) ||
                               !isVidsrc;
 
             let finalStreamUrl;
             if (isShadowlands) {
-              // Use special shadowlands proxy that extracts m3u8 from shadowlands page
-              finalStreamUrl = `/api/shadowlands-proxy?url=${encodeURIComponent(extractData.streamUrl)}`;
-              console.log('🌑 Using shadowlands proxy for stream extraction');
+              // NEVER use proxy for shadowlands m3u8 URLs - use direct access
+              finalStreamUrl = extractData.streamUrl;
+              console.log('🌑 Using direct access for shadowlands m3u8 URL (no proxy)');
             } else if (needsProxy) {
               const sourceParam = extractData.debug?.selectedStream?.source ||
                                  (isVidsrc ? 'vidsrc' : 'embed.su');
