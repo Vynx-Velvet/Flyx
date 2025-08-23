@@ -232,7 +232,7 @@ export async function GET(request) {
         streamType: extractorData.data?.type || extractorData.type || 'shadowlands',
         server: 'vidsrc.xyz',
         extractionMethod: 'bulletproof_puppeteer',
-        requiresProxy: false, // Shadowlands URLs don't need proxy
+        requiresProxy: true, // Shadowlands URLs don't need proxy
         totalFound: extractorData.data?.url ? 1 : 0,
         m3u8Count: 0, // Shadowlands URL, not m3u8 yet
         subtitles: [],
