@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
-// Unified VM extractor configuration - Handles all extraction types
-const VM_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || 'http://localhost:3001';
+// Bulletproof extractor configuration
+const BULLETPROOF_EXTRACTOR_URL = process.env.BULLETPROOF_EXTRACTOR_URL || 'http://localhost:3001';
 
 // Utility function for structured logging
 function createLogger(requestId) {
@@ -35,9 +35,9 @@ function generateRequestId() {
   return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Build unified VM extractor URL with query parameters
-function buildVMUrl(searchParams, logger) {
-  const vmUrl = new URL(`${VM_EXTRACTOR_URL}/api/extract/bulletproof`);
+// Build bulletproof extractor URL with query parameters
+function buildBulletproofUrl(searchParams, logger) {
+  const bulletproofUrl = new URL(`${BULLETPROOF_EXTRACTOR_URL}/api/extract/bulletproof`);
   
   // Map parameters to Bulletproof extractor format
   const movieId = searchParams.get('movieId');
@@ -46,19 +46,19 @@ function buildVMUrl(searchParams, logger) {
   const episodeId = searchParams.get('episodeId');
   const server = searchParams.get('server');
   
-  if (movieId) vmUrl.searchParams.set('tmdbId', movieId);
-  if (mediaType) vmUrl.searchParams.set('mediaType', mediaType);
-  if (mediaType === 'tv' && seasonId) vmUrl.searchParams.set('season', seasonId);
-  if (mediaType === 'tv' && episodeId) vmUrl.searchParams.set('episode', episodeId);
-  if (server) vmUrl.searchParams.set('server', server);
+  if (movieId) bulletproofUrl.searchParams.set('tmdbId', movieId);
+  if (mediaType) bulletproofUrl.searchParams.set('mediaType', mediaType);
+  if (mediaType === 'tv' && seasonId) bulletproofUrl.searchParams.set('season', seasonId);
+  if (mediaType === 'tv' && episodeId) bulletproofUrl.searchParams.set('episode', episodeId);
+  if (server) bulletproofUrl.searchParams.set('server', server);
 
-  logger.info('Built unified VM extractor SSE URL', {
-    vmBaseUrl: VM_EXTRACTOR_URL,
-    vmFullUrl: vmUrl.toString(),
-    forwardedParams: Object.fromEntries(vmUrl.searchParams)
+  logger.info('Built bulletproof extractor SSE URL', {
+    bulletproofBaseUrl: BULLETPROOF_EXTRACTOR_URL,
+    bulletproofFullUrl: bulletproofUrl.toString(),
+    forwardedParams: Object.fromEntries(bulletproofUrl.searchParams)
   });
 
-  return vmUrl.toString();
+  return bulletproofUrl.toString();
 }
 
 // Create SSE progress events
@@ -81,8 +81,8 @@ export async function GET(request) {
     // Parse parameters
     const { searchParams } = new URL(request.url);
     
-    // Use unified VM extractor for all requests
-    return await proxyUnifiedVMExtractor(request, searchParams, logger, requestId);
+    // Use bulletproof extractor for all requests
+    return await proxyBulletproofExtractor(request, searchParams, logger, requestId);
   } catch (error) {
     logger.error('SSE proxy initialization failed', error);
 
@@ -102,13 +102,13 @@ export async function GET(request) {
   }
 }
 
-// Proxy to unified VM extractor
-async function proxyUnifiedVMExtractor(request, searchParams, logger, requestId) {
-  const vmUrl = buildVMUrl(searchParams, logger);
+// Proxy to bulletproof extractor
+async function proxyBulletproofExtractor(request, searchParams, logger, requestId) {
+  const bulletproofUrl = buildBulletproofUrl(searchParams, logger);
 
-  logger.info('Forwarding request to unified VM extractor', {
-    vmUrl: vmUrl.substring(0, 200) + (vmUrl.length > 200 ? '...' : ''),
-    vmBaseUrl: VM_EXTRACTOR_URL
+  logger.info('Forwarding request to bulletproof extractor', {
+    bulletproofUrl: bulletproofUrl.substring(0, 200) + (bulletproofUrl.length > 200 ? '...' : ''),
+    bulletproofBaseUrl: BULLETPROOF_EXTRACTOR_URL
   });
 
   // Create a readable stream for Server-Sent Events
@@ -119,7 +119,7 @@ async function proxyUnifiedVMExtractor(request, searchParams, logger, requestId)
         controller.enqueue(createProgressEvent('initializing', 0, 'Starting extraction...'));
         
         // Make request to bulletproof extractor (regular HTTP, not SSE)
-        const vmResponse = await fetch(vmUrl, {
+        const bulletproofResponse = await fetch(bulletproofUrl, {
           method: 'GET',
           headers: {
             'User-Agent': request.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -133,17 +133,17 @@ async function proxyUnifiedVMExtractor(request, searchParams, logger, requestId)
         // Send progress update
         controller.enqueue(createProgressEvent('processing', 50, 'Processing response...'));
 
-        if (!vmResponse.ok) {
-          logger.error('Unified VM extractor returned error', null, {
-            status: vmResponse.status,
-            statusText: vmResponse.statusText,
-            vmUrl: vmUrl.substring(0, 100)
+        if (!bulletproofResponse.ok) {
+          logger.error('Bulletproof extractor returned error', null, {
+            status: bulletproofResponse.status,
+            statusText: bulletproofResponse.statusText,
+            bulletproofUrl: bulletproofUrl.substring(0, 100)
           });
 
           // Send error event to client
           const errorData = {
             error: true,
-            message: `VM extractor error: ${vmResponse.status} ${vmResponse.statusText}`,
+            message: `Bulletproof extractor error: ${bulletproofResponse.status} ${bulletproofResponse.statusText}`,
             phase: 'error',
             progress: 0,
             requestId
@@ -154,7 +154,7 @@ async function proxyUnifiedVMExtractor(request, searchParams, logger, requestId)
         }
 
         // Parse extractor response
-        const extractorData = await vmResponse.json();
+        const extractorData = await bulletproofResponse.json();
         
         logger.info('Extractor response received', {
           success: extractorData.success,
@@ -189,7 +189,7 @@ async function proxyUnifiedVMExtractor(request, searchParams, logger, requestId)
         controller.close();
 
       } catch (error) {
-        logger.error('Unified VM extractor proxy error', error);
+        logger.error('Bulletproof extractor proxy error', error);
 
         // Send error event to client
         const errorData = {
