@@ -128,9 +128,9 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
 
             let finalStreamUrl;
             if (isShadowlands) {
-              // NEVER use proxy for shadowlands m3u8 URLs - use direct access
-              finalStreamUrl = extractData.streamUrl;
-              console.log('🌑 Using direct access for shadowlands m3u8 URL (no proxy)');
+              // Shadowlands URLs MUST be proxied with vidsrc.xyz referrer
+              finalStreamUrl = `/api/shadowlands-proxy?url=${encodeURIComponent(extractData.streamUrl)}`;
+              console.log('🌑 Using shadowlands proxy with vidsrc.xyz referrer for shadowlands URL');
             } else if (needsProxy) {
               const sourceParam = extractData.debug?.selectedStream?.source ||
                                  (isVidsrc ? 'vidsrc' : 'embed.su');
