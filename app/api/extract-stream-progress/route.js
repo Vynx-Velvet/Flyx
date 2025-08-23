@@ -106,7 +106,7 @@ export async function GET(request) {
 async function proxyUnifiedVMExtractor(request, searchParams, logger, requestId) {
   const vmUrl = buildVMUrl(searchParams, logger);
 
-  logger.info('Forwarding SSE request to unified VM extractor', {
+  logger.info('Forwarding request to unified VM extractor', {
     vmUrl: vmUrl.substring(0, 200) + (vmUrl.length > 200 ? '...' : ''),
     vmBaseUrl: VM_EXTRACTOR_URL
   });
@@ -115,17 +115,23 @@ async function proxyUnifiedVMExtractor(request, searchParams, logger, requestId)
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Forward request to VM extractor's SSE streaming endpoint
+        // Send initializing progress event
+        controller.enqueue(createProgressEvent('initializing', 0, 'Starting extraction...'));
+        
+        // Make request to bulletproof extractor (regular HTTP, not SSE)
         const vmResponse = await fetch(vmUrl, {
           method: 'GET',
           headers: {
             'User-Agent': request.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Accept': 'text/event-stream',
+            'Accept': 'application/json',
             'Cache-Control': 'no-cache'
           },
           // Set a reasonable timeout for the VM request
-          signal: AbortSignal.timeout(180000) // 3 minutes timeout for streaming
+          signal: AbortSignal.timeout(180000) // 3 minutes timeout
         });
+
+        // Send progress update
+        controller.enqueue(createProgressEvent('processing', 50, 'Processing response...'));
 
         if (!vmResponse.ok) {
           logger.error('Unified VM extractor returned error', null, {
@@ -135,65 +141,58 @@ async function proxyUnifiedVMExtractor(request, searchParams, logger, requestId)
           });
 
           // Send error event to client
-          const errorData = JSON.stringify({
+          const errorData = {
             error: true,
             message: `VM extractor error: ${vmResponse.status} ${vmResponse.statusText}`,
             phase: 'error',
             progress: 0,
             requestId
-          });
-          controller.enqueue(`data: ${errorData}\n\n`);
+          };
+          controller.enqueue(`data: ${JSON.stringify(errorData)}\n\n`);
           controller.close();
           return;
         }
 
-        // Stream the response from VM extractor to client
-        const reader = vmResponse.body.getReader();
-        const decoder = new TextDecoder();
+        // Parse extractor response
+        const extractorData = await vmResponse.json();
+        
+        logger.info('Extractor response received', {
+          success: extractorData.success,
+          hasUrl: !!extractorData.data?.url,
+          requestId: extractorData.requestId
+        });
 
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-
-            if (done) {
-              logger.info('Unified VM extractor stream completed');
-              break;
-            }
-
-            // Decode and forward the chunk
-            const chunk = decoder.decode(value, { stream: true });
-
-            // Log progress updates for debugging
-            if (chunk.includes('data:')) {
-              try {
-                const dataMatch = chunk.match(/data: (.+)/);
-                if (dataMatch) {
-                  const progressData = JSON.parse(dataMatch[1]);
-                  logger.debug('Progress update', {
-                    phase: progressData.phase,
-                    progress: progressData.progress || progressData.percentage,
-                    message: progressData.message
-                  });
-                }
-              } catch (e) {
-                // Ignore JSON parse errors for progress logging
-              }
-            }
-
-            // Forward the chunk to the client
-            controller.enqueue(chunk);
+        // Format Bulletproof response to match frontend expectations
+        const formattedResponse = {
+          success: extractorData.success,
+          streamUrl: extractorData.data?.url,
+          streamType: extractorData.data?.type || 'shadowlands',
+          server: 'vidsrc.xyz',
+          extractionMethod: 'bulletproof_puppeteer',
+          requiresProxy: true, // Shadowlands URLs need proxy
+          totalFound: extractorData.data?.url ? 1 : 0,
+          m3u8Count: 0, // Shadowlands URL, not m3u8 yet
+          subtitles: [],
+          requestId: extractorData.requestId || requestId,
+          debug: {
+            extractorType: 'bulletproof',
+            source: extractorData.data?.source || 'prorcp',
+            metadata: extractorData.data?.metadata || {}
           }
-        } finally {
-          reader.releaseLock();
-        }
+        };
 
+        // Send completion event with formatted response
+        controller.enqueue(createProgressEvent('complete', 100, 'Extraction complete', {
+          result: formattedResponse
+        }));
+        
         controller.close();
 
       } catch (error) {
-        logger.error('Unified VM extractor SSE proxy stream error', error);
+        logger.error('Unified VM extractor proxy error', error);
 
         // Send error event to client
-        const errorData = JSON.stringify({
+        const errorData = {
           error: true,
           message: error.name === 'AbortError' ? 'Request timeout' : 'Stream extraction failed',
           phase: 'error',
@@ -203,8 +202,8 @@ async function proxyUnifiedVMExtractor(request, searchParams, logger, requestId)
             errorType: error.name,
             errorMessage: error.message
           }
-        });
-        controller.enqueue(`data: ${errorData}\n\n`);
+        };
+        controller.enqueue(`data: ${JSON.stringify(errorData)}\n\n`);
         controller.close();
       }
     }
