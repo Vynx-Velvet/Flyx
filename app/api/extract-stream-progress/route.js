@@ -38,16 +38,19 @@ function generateRequestId() {
 // Build unified VM extractor URL with query parameters
 function buildVMUrl(searchParams, logger) {
   const vmUrl = new URL(`${VM_EXTRACTOR_URL}/api/extract/bulletproof`);
-
-  // Forward all query parameters to the unified VM extractor
-  const paramsToForward = ['url', 'mediaType', 'tmdbId', 'seasonId', 'episodeId', 'server', 'method'];
-
-  paramsToForward.forEach(param => {
-    const value = searchParams.get(param);
-    if (value) {
-      vmUrl.searchParams.set(param, value);
-    }
-  });
+  
+  // Map parameters to Bulletproof extractor format
+  const movieId = searchParams.get('movieId');
+  const mediaType = searchParams.get('mediaType');
+  const seasonId = searchParams.get('seasonId');
+  const episodeId = searchParams.get('episodeId');
+  const server = searchParams.get('server');
+  
+  if (movieId) vmUrl.searchParams.set('tmdbId', movieId);
+  if (mediaType) vmUrl.searchParams.set('mediaType', mediaType);
+  if (mediaType === 'tv' && seasonId) vmUrl.searchParams.set('season', seasonId);
+  if (mediaType === 'tv' && episodeId) vmUrl.searchParams.set('episode', episodeId);
+  if (server) vmUrl.searchParams.set('server', server);
 
   logger.info('Built unified VM extractor SSE URL', {
     vmBaseUrl: VM_EXTRACTOR_URL,
