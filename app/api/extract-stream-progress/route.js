@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 // Bulletproof extractor configuration
-const BULLETPROOF_EXTRACTOR_URL = process.env.BULLETPROOF_EXTRACTOR_URL || 'http://localhost:3001';
+const BULLETPROOF_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || 'http://localhost:3001';
 
 // Utility function for structured logging
 function createLogger(requestId) {
