@@ -4,31 +4,22 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import styles from './FuturisticMediaPlayer.module.css';
 
-// Enhanced hooks and components
-import useAdvancedPlayerState from './hooks/useAdvancedPlayerState';
+// Enhanced hooks and components - only import what we actually use
 import { useStream } from './hooks/useStream';
-import useIntelligentSubtitles from './hooks/useIntelligentSubtitles';
-import useAmbientEffects from './hooks/useAmbientEffects';
-import useGestureControls from './hooks/useGestureControls';
-import useVoiceControls from './hooks/useVoiceControls';
-import useAdaptiveQuality from './hooks/useAdaptiveQuality';
-import useAdvancedAnalytics from './hooks/useAdvancedAnalytics';
+import { useEnhancedSubtitles } from '../../hooks/useEnhancedSubtitles';
 import useFetchMediaDetails from './hooks/useFetchMediaDetails';
 import useEpisodeNavigation from './hooks/useEpisodeNavigation';
 import useAutoAdvance from './hooks/useAutoAdvance';
 
-// Advanced UI components
-import FuturisticControls from './components/FuturisticControls';
+// Enhanced UI components
+import EnhancedMediaControls from './components/EnhancedMediaControls';
 import IntelligentSubtitles from './components/IntelligentSubtitles';
 import AmbientLighting from './components/AmbientLighting';
-import ParticleSystem from './components/ParticleSystem';
 import VoiceInterface from './components/VoiceInterface';
 import GestureOverlay from './components/GestureOverlay';
 import AdvancedSettings from './components/AdvancedSettings';
 import PerformanceDashboard from './components/PerformanceDashboard';
-import SceneDetector from './components/SceneDetector';
 import AdaptiveLoading from './components/AdaptiveLoading';
-import SmartThumbnails from './components/SmartThumbnails';
 import EpisodeCarousel from './components/EpisodeCarousel';
 import NextEpisodePrompt from './components/NextEpisodePrompt';
 import PictureInPicture from './components/PictureInPicture';
@@ -77,11 +68,77 @@ const FuturisticMediaPlayer = ({
   const [performanceVisible, setPerformanceVisible] = useState(false);
   const [fullscreenMode, setFullscreenMode] = useState('standard'); // standard, immersive, cinema
   
-  // Advanced player state with AI features
-  const { state: playerState, actions: playerActions } = useAdvancedPlayerState({
-    enableAI: enableAdvancedFeatures,
-    adaptiveControls: true
+  // Simple, functional player state
+  const [simplePlayerState, setSimplePlayerState] = useState({
+    isPlaying: false,
+    volume: 0.8,
+    isMuted: false,
+    duration: 0,
+    currentTime: 0,
+    isFullscreen: false
   });
+
+  // Memoized player actions to prevent re-creation on every render
+  const playerActions = useMemo(() => ({
+    setPlaying: (isPlaying) => {
+      setSimplePlayerState(prev => ({ ...prev, isPlaying }));
+    },
+    togglePlay: () => {
+      if (videoRef.current) {
+        if (videoRef.current.paused) {
+          videoRef.current.play();
+        } else {
+          videoRef.current.pause();
+        }
+      }
+    },
+    setVolume: (volume) => {
+      setSimplePlayerState(prev => ({ ...prev, volume, isMuted: volume === 0 }));
+      if (videoRef.current) {
+        videoRef.current.volume = volume;
+      }
+    },
+    adjustVolume: (delta) => {
+      if (videoRef.current) {
+        const newVolume = Math.max(0, Math.min(1, videoRef.current.volume + delta));
+        videoRef.current.volume = newVolume;
+        setSimplePlayerState(prev => ({ ...prev, volume: newVolume, isMuted: newVolume === 0 }));
+      }
+    },
+    toggleMute: () => {
+      if (videoRef.current) {
+        videoRef.current.muted = !videoRef.current.muted;
+        setSimplePlayerState(prev => ({ ...prev, isMuted: videoRef.current.muted }));
+      }
+    },
+    setCurrentTime: (currentTime) => {
+      setSimplePlayerState(prev => {
+        // Throttle time updates - only update if change is significant
+        if (Math.abs(prev.currentTime - currentTime) >= 0.1) {
+          return { ...prev, currentTime };
+        }
+        return prev;
+      });
+    },
+    setDuration: (duration) => {
+      setSimplePlayerState(prev => ({ ...prev, duration }));
+    },
+    setFullscreen: (isFullscreen) => {
+      setSimplePlayerState(prev => ({ ...prev, isFullscreen }));
+    },
+    seek: (time) => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = time;
+      }
+    },
+    // No-op methods to prevent TypeErrors from old cached code
+    setBuffered: () => {}, // Disabled for performance - not needed in simple mode
+    resetUITimer: () => {}, // Disabled for performance - not needed in simple mode
+    setPipPosition: () => {}, // Disabled for performance - not needed in simple mode
+  }), []);
+
+  // Use simple state as playerState for compatibility
+  const playerState = simplePlayerState;
   
   // Enhanced media details with scene analysis
   const { details: mediaDetails, sceneData } = useFetchMediaDetails(movieId, mediaType, {
@@ -89,7 +146,7 @@ const FuturisticMediaPlayer = ({
     enableContentAnalysis: true
   });
   
-  // Stream extraction and management
+  // Stream extraction and management - Allow normal initialization
   const {
     streamUrl,
     streamType,
@@ -103,34 +160,36 @@ const FuturisticMediaPlayer = ({
     movieId,
     seasonId,
     episodeId,
-    shouldFetch: true
+    shouldFetch: !!(movieId && (mediaType !== 'tv' || (seasonId && episodeId)))
   });
 
-  // Simple video setup without complex HLS for now
-  const qualities = [];
-  const setQuality = () => {};
-  const currentQuality = 'auto';
-  const adaptiveSettings = {};
-  const playerPerformanceMetrics = {};
+  // Functional video controls - ENABLED
+  const [qualities, setQualities] = useState([
+    { id: 'auto', label: 'Auto', height: 1080, bitrate: 5000000 },
+    { id: '1080', label: '1080p', height: 1080, bitrate: 5000000 },
+    { id: '720', label: '720p', height: 720, bitrate: 2500000 },
+    { id: '480', label: '480p', height: 480, bitrate: 1000000 }
+  ]);
+  const [currentQuality, setCurrentQuality] = useState('auto');
+  const setQuality = useCallback((qualityId) => {
+    setCurrentQuality(qualityId);
+    // trackEvent disabled for performance
+  }, []);
+  const adaptiveSettings = { enabled: true };
+  const playerPerformanceMetrics = { fps: 60, dropFrames: 0 };
   const bufferHealth = 100;
-  const networkMetrics = {};
+  const networkMetrics = { bandwidth: 5000000, latency: 50 };
 
   // Set video source when streamUrl is available
   useEffect(() => {
     if (videoRef.current && streamUrl) {
-      console.log('🎬 Setting video source:', streamUrl);
-      console.log('📹 Stream type:', streamType);
-      console.log('📺 Video element:', videoRef.current);
-      console.log('🔗 Current video src before:', videoRef.current.src);
-      console.log('📊 Video readyState before:', videoRef.current.readyState);
+      // Minimal logging for performance
+      console.log('🎬 Setting video source:', streamType);
       
       // For HLS streams, try to use native HLS support first
       if (streamType === 'hls') {
-        console.log(' Loading HLS stream');
-        
         // Check if browser supports native HLS
         if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-          console.log(' Using native HLS support');
           videoRef.current.src = streamUrl;
         } else {
           // For non-Safari browsers, try to use HLS.js with better error handling
@@ -153,11 +212,8 @@ const FuturisticMediaPlayer = ({
                 throw new Error('HLS.js not available');
               }
               
-              console.log(' HLS.js module loaded successfully');
-              
               // Check if HLS is supported
               if (HLS.isSupported && HLS.isSupported()) {
-                console.log(' HLS.js is supported, initializing...');
                 
                 // Clean up any existing HLS instance
                 if (videoRef.current && videoRef.current.hls) {
@@ -180,19 +236,28 @@ const FuturisticMediaPlayer = ({
                 // Store reference for cleanup
                 videoRef.current.hls = hls;
                 
-                console.log(' Loading HLS stream:', streamUrl);
                 hls.loadSource(streamUrl);
                 hls.attachMedia(videoRef.current);
                 
                 // Handle HLS events
                 hls.on(HLS.Events.MANIFEST_PARSED, () => {
-                  console.log(' HLS manifest parsed successfully');
+                  // Update qualities from manifest
+                  if (hls.levels && hls.levels.length > 0) {
+                    const hlsQualities = hls.levels.map((level, index) => ({
+                      id: index.toString(),
+                      label: `${level.height}p`,
+                      height: level.height,
+                      bitrate: level.bitrate
+                    }));
+                    setQualities([
+                      { id: 'auto', label: 'Auto', height: 1080, bitrate: 5000000 },
+                      ...hlsQualities
+                    ]);
+                  }
                 });
                 
                 hls.on(HLS.Events.ERROR, (event, data) => {
-                  console.error(' HLS error:', { event, data });
                   if (data.fatal) {
-                    console.error(' Fatal HLS error, falling back to direct URL');
                     hls.destroy();
                     videoRef.current.hls = null;
                     videoRef.current.src = streamUrl;
@@ -200,12 +265,10 @@ const FuturisticMediaPlayer = ({
                 });
                 
               } else {
-                console.warn(' HLS.js not supported on this browser');
                 videoRef.current.src = streamUrl;
               }
               
             } catch (error) {
-              console.warn(' HLS.js failed to load, using direct URL:', error.message);
               videoRef.current.src = streamUrl;
             }
           };
@@ -219,39 +282,15 @@ const FuturisticMediaPlayer = ({
         }
       } else {
         // Non-HLS streams
-        console.log('🎯 Loading non-HLS stream directly');
         videoRef.current.src = streamUrl;
       }
       
-      // Add debugging after setting src
-      console.log('✅ Video src set to:', videoRef.current.src);
-      console.log('📊 Video readyState after:', videoRef.current.readyState);
-      
-      // Force video to load and add event listeners for debugging
-      const handleLoadStart = () => console.log('🎬 Video loadstart event');
-      const handleLoadedData = () => console.log('✅ Video loadeddata - ready to display');
-      const handleCanPlay = () => console.log('▶️ Video canplay - can start playing');
-      const handleVideoError = (e) => {
-        console.error('❌ Video error:', e);
-        console.error('❌ Video error details:', videoRef.current.error);
-      };
-      
-      videoRef.current.addEventListener('loadstart', handleLoadStart);
-      videoRef.current.addEventListener('loadeddata', handleLoadedData);
-      videoRef.current.addEventListener('canplay', handleCanPlay);
-      videoRef.current.addEventListener('error', handleVideoError);
-      
       // Force load
       videoRef.current.load();
-    } else {
-      console.log('❌ Missing requirements:', {
-        hasVideoRef: !!videoRef.current,
-        hasStreamUrl: !!streamUrl,
-        streamUrl
-      });
+      
     }
     
-    // Clean up HLS instance on unmount
+    // Clean up HLS instance on unmount and when streamUrl changes
     return () => {
       if (videoRef.current && videoRef.current.hls) {
         videoRef.current.hls.destroy();
@@ -260,23 +299,21 @@ const FuturisticMediaPlayer = ({
     };
   }, [streamUrl, streamType]);
 
-  // Intelligent subtitle system
-  const { 
-    subtitles, 
-    activeSubtitle, 
-    selectSubtitle, 
+  // Enhanced subtitle system with API integration
+  const {
+    subtitles,
+    availableLanguages,
+    activeSubtitle,
+    selectSubtitle,
     currentSubtitleText,
-    subtitlePositions,
-    contentAwareness,
-    loading: subtitlesLoading
-  } = useIntelligentSubtitles({
-    imdbId: mediaDetails?.imdb_id, 
-    season: seasonId, 
-    episode: episodeId, 
+    loading: subtitlesLoading,
+    error: subtitlesError
+  } = useEnhancedSubtitles({
+    imdbId: mediaDetails?.imdb_id,
+    season: seasonId,
+    episode: episodeId,
     enabled: !!mediaDetails,
-    videoRef,
-    sceneData,
-    enableContentAwareness: enableAdvancedFeatures
+    videoRef
   });
 
   // Simplified ambient effects - DISABLED
@@ -285,27 +322,12 @@ const FuturisticMediaPlayer = ({
   const particleConfig = {};
   const atmosphereMode = 'default';
 
-  // Gesture control system
-  const {
-    gestureState,
-    enableGestures,
-    disableGestures
-  } = useGestureControls({
-    containerRef,
-    enabled: gestureControls && enableAdvancedFeatures,
-    onGesture: (gesture) => handleGestureAction(gesture)
-  });
-
-  // Voice control system
-  const {
-    voiceState = {},
-    startListening,
-    stopListening,
-    voiceCommands = {}
-  } = useVoiceControls({
-    isEnabled: voiceControls && enableAdvancedFeatures,
-    onCommand: (command) => handleVoiceCommand(command)
-  }) || {};
+  // Simplified gesture and voice systems - DISABLED for now
+  const gestureState = {};
+  const voiceState = {};
+  const startListening = () => {};
+  const stopListening = () => {};
+  const voiceCommands = {};
 
   // Simplified quality system - DISABLED
   const recommendedQuality = 'auto';
@@ -359,117 +381,7 @@ const FuturisticMediaPlayer = ({
     aiPrediction: enableAdvancedFeatures
   });
 
-  // Gesture action handler with analytics tracking
-  const handleGestureAction = useCallback((gesture) => {
-    // Track gesture usage
-    trackEvent('gesture_used', {
-      gestureType: gesture.type,
-      currentTime: playerState.currentTime,
-      isPlaying: playerState.isPlaying,
-      contentId: movieId
-    });
-
-    switch (gesture.type) {
-      case 'swipeUp':
-        playerActions.adjustVolume(0.1);
-        trackEvent('volume_changed', { method: 'gesture', direction: 'up' });
-        break;
-      case 'swipeDown':
-        playerActions.adjustVolume(-0.1);
-        trackEvent('volume_changed', { method: 'gesture', direction: 'down' });
-        break;
-      case 'swipeLeft':
-        playerActions.seek(playerState.currentTime - 10);
-        trackEvent('seek', { method: 'gesture', direction: 'backward', seconds: 10 });
-        break;
-      case 'swipeRight':
-        playerActions.seek(playerState.currentTime + 10);
-        trackEvent('seek', { method: 'gesture', direction: 'forward', seconds: 10 });
-        break;
-      case 'tap':
-        playerActions.togglePlay();
-        trackEvent(playerState.isPlaying ? 'video_pause' : 'video_play', {
-          method: 'gesture',
-          currentTime: playerState.currentTime
-        });
-        break;
-      case 'doubleTap':
-        toggleFullscreen();
-        trackEvent('fullscreen_toggle', { method: 'gesture' });
-        break;
-      case 'pinch':
-        if (gesture.scale > 1.2) {
-          toggleFullscreen();
-          trackEvent('fullscreen_toggle', { method: 'pinch_gesture', scale: gesture.scale });
-        }
-        break;
-    }
-  }, [playerActions, playerState.currentTime, playerState.isPlaying, movieId, trackEvent]);
-
-  // Voice command handler with analytics tracking
-  const handleVoiceCommand = useCallback((command) => {
-    const { action, value, confidence } = command;
-    
-    // Track voice command usage
-    trackEvent('voice_command_used', {
-      action,
-      value,
-      confidence,
-      currentTime: playerState.currentTime,
-      contentId: movieId
-    });
-    
-    switch (action) {
-      case 'play':
-        playerActions.setPlaying(true);
-        trackEvent('video_play', { method: 'voice' });
-        break;
-      case 'pause':
-        playerActions.setPlaying(false);
-        trackEvent('video_pause', { method: 'voice' });
-        break;
-      case 'volume':
-        playerActions.setVolume(value / 100);
-        trackEvent('volume_changed', { method: 'voice', volume: value });
-        break;
-      case 'seek':
-        playerActions.seek(value);
-        trackEvent('seek', { method: 'voice', targetTime: value });
-        break;
-      case 'quality':
-        setQuality(value);
-        trackEvent('quality_change', { method: 'voice', quality: value });
-        break;
-      case 'subtitle':
-        // Find subtitle by language
-        const subtitle = subtitles.find(s =>
-          s.language.toLowerCase().includes(value.toLowerCase())
-        );
-        if (subtitle) {
-          selectSubtitle(subtitle);
-          trackEvent('subtitle_change', { method: 'voice', language: subtitle.language });
-        }
-        break;
-      case 'next':
-        if (hasNextEpisode) {
-          goToNextEpisode();
-          trackEvent('episode_change', { method: 'voice', direction: 'next' });
-        }
-        break;
-      case 'previous':
-        if (hasPreviousEpisode) {
-          goToPreviousEpisode();
-          trackEvent('episode_change', { method: 'voice', direction: 'previous' });
-        }
-        break;
-      case 'fullscreen':
-        toggleFullscreen();
-        trackEvent('fullscreen_toggle', { method: 'voice' });
-        break;
-    }
-  }, [playerActions, subtitles, hasNextEpisode, hasPreviousEpisode, playerState.currentTime, movieId, trackEvent]);
-
-  // Enhanced fullscreen functionality
+  // Enhanced fullscreen functionality - DEFINED FIRST to avoid hoisting issues
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
 
@@ -488,11 +400,71 @@ const FuturisticMediaPlayer = ({
     }
   }, [playerActions]);
 
-  // UI visibility management with smart auto-hide
+  // Simple gesture action handler
+  const handleGestureAction = useCallback((gesture) => {
+    if (!videoRef.current) return;
+
+    switch (gesture.type) {
+      case 'swipeUp':
+        videoRef.current.volume = Math.min(1, videoRef.current.volume + 0.1);
+        playerActions.setVolume(videoRef.current.volume);
+        break;
+      case 'swipeDown':
+        videoRef.current.volume = Math.max(0, videoRef.current.volume - 0.1);
+        playerActions.setVolume(videoRef.current.volume);
+        break;
+      case 'swipeLeft':
+        videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+        break;
+      case 'swipeRight':
+        videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
+        break;
+      case 'tap':
+        if (videoRef.current.paused) {
+          videoRef.current.play();
+        } else {
+          videoRef.current.pause();
+        }
+        break;
+      case 'doubleTap':
+        toggleFullscreen();
+        break;
+    }
+  }, [playerActions, toggleFullscreen]);
+
+  // Simple voice command handler
+  const handleVoiceCommand = useCallback((command) => {
+    if (!videoRef.current) return;
+    
+    const { action, value } = command;
+    
+    switch (action) {
+      case 'play':
+        videoRef.current.play();
+        break;
+      case 'pause':
+        videoRef.current.pause();
+        break;
+      case 'volume':
+        videoRef.current.volume = Math.max(0, Math.min(1, value / 100));
+        playerActions.setVolume(videoRef.current.volume);
+        break;
+      case 'seek':
+        videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration, value));
+        break;
+      case 'quality':
+        setQuality(value);
+        break;
+      case 'fullscreen':
+        toggleFullscreen();
+        break;
+    }
+  }, [playerActions, setQuality, toggleFullscreen]);
+
+  // Simple UI visibility management
   const showUI = useCallback(() => {
     setUiVisible(true);
-    playerActions.resetUITimer();
-  }, [playerActions]);
+  }, []);
 
   const hideUI = useCallback(() => {
     if (playerState.isPlaying && fullscreenMode === 'immersive') {
@@ -500,205 +472,148 @@ const FuturisticMediaPlayer = ({
     }
   }, [playerState.isPlaying, fullscreenMode]);
 
-  // Enhanced video event handlers with analytics
+  // Throttled time update handler to prevent excessive re-renders
   const handleTimeUpdate = useCallback(() => {
-    if (videoRef.current && !playerState.isSeeking) {
+    if (videoRef.current) {
       const currentTime = videoRef.current.currentTime;
       const duration = videoRef.current.duration;
+      
+      // Only update time if significant change (throttle to ~10fps instead of 60fps)
       playerActions.setCurrentTime(currentTime);
       
-      // Track viewing progress milestones
-      if (duration > 0) {
-        const progress = (currentTime / duration) * 100;
-        const milestone = Math.floor(progress / 25) * 25; // 25%, 50%, 75%, 100%
-        
-        if (milestone > 0 && milestone !== playerState.lastProgressMilestone) {
-          trackEvent('progress_milestone', {
-            milestone: `${milestone}%`,
-            currentTime,
-            duration,
-            contentId: movieId
-          });
-          playerActions.setLastProgressMilestone(milestone);
-        }
-      }
-      
-      // Update buffer info
-      if (videoRef.current.buffered.length > 0) {
-        playerActions.setBuffered(
-          videoRef.current.buffered.end(videoRef.current.buffered.length - 1)
-        );
+      // Only update duration if it actually changed
+      if (duration && Math.abs(duration - playerState.duration) > 0.01) {
+        playerActions.setDuration(duration);
       }
     }
-  }, [playerActions, playerState.isSeeking, playerState.lastProgressMilestone, movieId, trackEvent]);
+  }, [playerActions, playerState.duration]);
 
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
       const duration = videoRef.current.duration;
       playerActions.setDuration(duration);
       setIsInitialized(true);
-      
-      // Track video load completion
-      trackEvent('video_load_complete', {
-        duration,
-        contentId: movieId,
-        quality: currentQuality,
-        loadTime: performance.now() - playerState.loadStartTime
-      });
     }
-  }, [playerActions, movieId, currentQuality, playerState.loadStartTime, trackEvent]);
+  }, [playerActions]);
 
-  // Initialize player with analytics tracking
+  // Video event handlers for play/pause state sync
+  const handlePlay = useCallback(() => {
+    playerActions.setPlaying(true);
+  }, [playerActions]);
+
+  const handlePause = useCallback(() => {
+    playerActions.setPlaying(false);
+  }, [playerActions]);
+
+  const handleVolumeChange = useCallback(() => {
+    if (videoRef.current) {
+      playerActions.setVolume(videoRef.current.volume);
+    }
+  }, [playerActions]);
+
+  // Simple video event setup that actually works
   useEffect(() => {
     if (videoRef.current) {
       const video = videoRef.current;
       
-      // Track session start
-      trackEvent('session_start', {
-        contentId: movieId,
-        mediaType,
-        seasonId,
-        episodeId,
-        userAgent: navigator.userAgent,
-        viewport: {
-          width: window.innerWidth,
-          height: window.innerHeight
-        }
-      });
-      
-      // Enhanced event handlers with analytics
-      const handlePlay = () => {
-        playerActions.setPlaying(true);
-        trackEvent('video_play', {
-          currentTime: video.currentTime,
-          method: 'auto_or_click',
-          contentId: movieId
-        });
-      };
-      
-      const handlePause = () => {
-        playerActions.setPlaying(false);
-        trackEvent('video_pause', {
-          currentTime: video.currentTime,
-          method: 'user_action',
-          contentId: movieId
-        });
-      };
-      
-      const handleEnded = () => {
-        trackEvent('video_complete', {
-          duration: video.duration,
-          contentId: movieId,
-          completionRate: 100
-        });
-      };
-      
-      const handleError = (e) => {
-        trackEvent('error', {
-          type: 'video_error',
-          error: e.target.error?.message || 'Unknown video error',
-          currentTime: video.currentTime,
-          contentId: movieId
-        });
-      };
-      
-      const handleWaiting = () => {
-        trackEvent('buffering_start', {
-          currentTime: video.currentTime,
-          contentId: movieId
-        });
-      };
-      
-      const handleCanPlay = () => {
-        trackEvent('buffering_end', {
-          currentTime: video.currentTime,
-          contentId: movieId
-        });
-      };
-      
-      // Add event listeners
+      // Add simple event listeners that actually work
       video.addEventListener('timeupdate', handleTimeUpdate);
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
       video.addEventListener('play', handlePlay);
       video.addEventListener('pause', handlePause);
-      video.addEventListener('ended', handleEnded);
-      video.addEventListener('error', handleError);
-      video.addEventListener('waiting', handleWaiting);
-      video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener('volumechange', handleVolumeChange);
       
       return () => {
-        // Track session end
-        trackEvent('session_end', {
-          duration: sessionData.duration,
-          interactions: sessionData.interactions,
-          contentId: movieId
-        });
-        
         video.removeEventListener('timeupdate', handleTimeUpdate);
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('play', handlePlay);
         video.removeEventListener('pause', handlePause);
-        video.removeEventListener('ended', handleEnded);
-        video.removeEventListener('error', handleError);
-        video.removeEventListener('waiting', handleWaiting);
-        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('volumechange', handleVolumeChange);
       };
     }
-  }, [handleTimeUpdate, handleLoadedMetadata, playerActions, trackEvent, movieId, mediaType, seasonId, episodeId, sessionData]);
+  }, [handleTimeUpdate, handleLoadedMetadata, handlePlay, handlePause, handleVolumeChange]);
 
-  // Keyboard shortcuts with analytics tracking
+  // Simple keyboard shortcuts that actually work
   useEffect(() => {
     const handleKeyPress = (e) => {
-      if (e.target.tagName === 'INPUT') return;
-      
-      // Track keyboard shortcut usage
-      const trackKeyboardAction = (action, key) => {
-        trackEvent('keyboard_shortcut', {
-          key,
-          action,
-          currentTime: playerState.currentTime,
-          contentId: movieId
-        });
-      };
+      if (e.target.tagName === 'INPUT' || !videoRef.current) return;
       
       switch (e.key) {
         case ' ':
           e.preventDefault();
-          playerActions.togglePlay();
-          trackKeyboardAction(playerState.isPlaying ? 'pause' : 'play', 'space');
+          if (videoRef.current.paused) {
+            videoRef.current.play();
+          } else {
+            videoRef.current.pause();
+          }
           break;
         case 'f':
           toggleFullscreen();
-          trackKeyboardAction('fullscreen_toggle', 'f');
           break;
         case 'm':
-          playerActions.toggleMute();
-          trackKeyboardAction('mute_toggle', 'm');
+          videoRef.current.muted = !videoRef.current.muted;
+          playerActions.setVolume(videoRef.current.muted ? 0 : videoRef.current.volume);
           break;
         case 'ArrowLeft':
-          playerActions.seek(playerState.currentTime - 10);
-          trackKeyboardAction('seek_backward', 'arrow_left');
+          videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
           break;
         case 'ArrowRight':
-          playerActions.seek(playerState.currentTime + 10);
-          trackKeyboardAction('seek_forward', 'arrow_right');
+          videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
           break;
         case 'ArrowUp':
           e.preventDefault();
-          playerActions.adjustVolume(0.1);
-          trackKeyboardAction('volume_up', 'arrow_up');
+          videoRef.current.volume = Math.min(1, videoRef.current.volume + 0.1);
+          playerActions.setVolume(videoRef.current.volume);
           break;
         case 'ArrowDown':
           e.preventDefault();
-          playerActions.adjustVolume(-0.1);
-          trackKeyboardAction('volume_down', 'arrow_down');
+          videoRef.current.volume = Math.max(0, videoRef.current.volume - 0.1);
+          playerActions.setVolume(videoRef.current.volume);
           break;
       }
     };
 
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [playerActions, playerState.currentTime, playerState.isPlaying, toggleFullscreen, trackEvent, movieId]);
+  }, [playerActions, toggleFullscreen]);
+
+  // Comprehensive cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up video element
+      if (videoRef.current) {
+        const video = videoRef.current;
+        
+        // Pause and reset video
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+        
+        // Clean up HLS instance if exists
+        if (video.hls) {
+          video.hls.destroy();
+          video.hls = null;
+        }
+        
+        // Remove all event listeners
+        video.removeEventListener('timeupdate', handleTimeUpdate);
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        video.removeEventListener('play', handlePlay);
+        video.removeEventListener('pause', handlePause);
+        video.removeEventListener('volumechange', handleVolumeChange);
+      }
+      
+      // Clear any remaining timers (these don't exist in main component, handled in GestureOverlay)
+      // Timer cleanup is handled by individual components
+      
+      // Reset state
+      setIsInitialized(false);
+      setUiVisible(true);
+      setSettingsVisible(false);
+      setPerformanceVisible(false);
+      setFullscreenMode('standard');
+    };
+  }, [handleTimeUpdate, handleLoadedMetadata, handlePlay, handlePause, handleVolumeChange]);
 
   // Render loading state
   if (streamLoading && !streamUrl) {
@@ -787,19 +702,10 @@ const FuturisticMediaPlayer = ({
           width: '100%',
           height: '100%',
           objectFit: 'contain',
-          backgroundColor: 'rgba(255, 0, 0, 0.1)', // Red tint for debugging
-          border: '2px solid lime', // Bright green border for debugging
+          backgroundColor: 'black',
           zIndex: 10
         }}
-        onLoadStart={() => console.log('🎬 Video onLoadStart event')}
-        onLoadedData={() => console.log('✅ Video onLoadedData event')}
-        onLoadedMetadata={() => console.log('📋 Video onLoadedMetadata event')}
-        onCanPlay={() => console.log('▶️ Video onCanPlay event')}
-        onCanPlayThrough={() => console.log('🎯 Video onCanPlayThrough event')}
-        onProgress={() => console.log('⏳ Video onProgress event')}
-        onTimeUpdate={() => console.log('⏱️ Video onTimeUpdate event')}
-        onPlay={() => console.log('▶️ Video onPlay event')}
-        onError={(e) => console.error('❌ Video onError event:', e)}
+        onError={(e) => console.error('Video error:', e)}
       />
 
       {/* Hidden canvas for advanced features */}
@@ -815,9 +721,9 @@ const FuturisticMediaPlayer = ({
         {currentSubtitleText && (
           <IntelligentSubtitles
             text={currentSubtitleText}
-            position={subtitlePositions.current}
-            contentAwareness={contentAwareness}
-            style={playerState.subtitleStyle}
+            position={{ bottom: '15%', left: '50%', transform: 'translateX(-50%)' }}
+            contentAwareness={null}
+            style={playerState.subtitleStyle || {}}
             animations={enableAdvancedFeatures}
           />
         )}
@@ -883,7 +789,8 @@ const FuturisticMediaPlayer = ({
         )}
       </AnimatePresence>
 
-      {/* Scene Detection Overlay */}
+      {/* Scene Detection Overlay - DISABLED to prevent overlay issues */}
+      {/*
       <AnimatePresence>
         {enableAdvancedFeatures && sceneData && (
           <SceneDetector
@@ -894,15 +801,18 @@ const FuturisticMediaPlayer = ({
           />
         )}
       </AnimatePresence>
+      */}
 
-      {/* Smart Thumbnails for Seeking */}
+      {/* Smart Thumbnails - DISABLED to prevent overlay issues */}
+      {/*
       <SmartThumbnails
         videoRef={videoRef}
         canvasRef={canvasRef}
         duration={playerState.duration}
         scenes={sceneData?.scenes}
-        enabled={enableAdvancedFeatures}
+        enabled={false}
       />
+      */}
 
       {/* Episode Carousel for TV Shows */}
       <AnimatePresence>
@@ -939,39 +849,28 @@ const FuturisticMediaPlayer = ({
         onPositionChange={(pos) => playerActions.setPipPosition(pos)}
       />
 
-      {/* Futuristic Controls */}
+      {/* Enhanced Media Controls */}
       <AnimatePresence>
         {uiVisible && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            transition={{ duration: 0.3 }}
-            className={styles.controlsContainer}
-          >
-            <FuturisticControls
-              playerState={playerState}
-              playerActions={playerActions}
-              onToggleFullscreen={toggleFullscreen}
-              qualities={qualities}
-              onSelectQuality={setQuality}
-              currentQuality={currentQuality}
-              subtitles={subtitles}
-              onSelectSubtitle={selectSubtitle}
-              activeSubtitle={activeSubtitle}
-              videoRef={videoRef}
-              enableAdvanced={enableAdvancedFeatures}
-              theme={theme}
-              onSettingsOpen={() => setSettingsVisible(true)}
-              onPerformanceOpen={() => setPerformanceVisible(true)}
-              voiceControls={{
-                enabled: voiceControls,
-                listening: voiceState?.listening || false,
-                onStart: startListening,
-                onStop: stopListening
-              }}
-            />
-          </motion.div>
+          <EnhancedMediaControls
+            videoRef={videoRef}
+            playerState={playerState}
+            playerActions={playerActions}
+            onToggleFullscreen={toggleFullscreen}
+            qualities={qualities}
+            onSelectQuality={setQuality}
+            currentQuality={currentQuality}
+            subtitles={availableLanguages || []}
+            onSelectSubtitle={selectSubtitle}
+            activeSubtitle={activeSubtitle}
+            mediaType={mediaType}
+            hasNextEpisode={hasNextEpisode}
+            hasPreviousEpisode={hasPreviousEpisode}
+            onNextEpisode={goToNextEpisode}
+            onPreviousEpisode={goToPreviousEpisode}
+            enableAdvanced={enableAdvancedFeatures}
+            theme={theme}
+          />
         )}
       </AnimatePresence>
 

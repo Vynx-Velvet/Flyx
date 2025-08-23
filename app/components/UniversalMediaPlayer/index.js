@@ -21,6 +21,8 @@ export { FuturisticMediaPlayer };
 
 // UI Components
 export { default as FuturisticControls } from './components/FuturisticControls';
+export { default as EnhancedMediaControls } from './components/EnhancedMediaControls';
+export { default as SimpleMediaControls } from './components/SimpleMediaControls';
 export { default as IntelligentSubtitles } from './components/IntelligentSubtitles';
 export { default as AmbientLighting } from './components/AmbientLighting';
 export { default as ParticleSystem } from './components/ParticleSystem';

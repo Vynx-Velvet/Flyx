@@ -4,14 +4,33 @@ import { NextResponse } from 'next/server';
 const rateLimitStore = new Map();
 const connectionPool = new Map();
 
-// Silent logger for stream-proxy (no console output)
+// Active logger for stream-proxy debugging
 function createLogger(requestId) {
   return {
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-    debug: () => {},
-    timing: (label, startTime) => Date.now() - startTime
+    info: (message, data = {}) => {
+      console.log(`[${requestId}] INFO: ${message}`, JSON.stringify(data, null, 2));
+    },
+    warn: (message, data = {}) => {
+      console.warn(`[${requestId}] WARN: ${message}`, JSON.stringify(data, null, 2));
+    },
+    error: (message, error = null, data = {}) => {
+      console.error(`[${requestId}] ERROR: ${message}`, {
+        error: error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : null,
+        ...data
+      });
+    },
+    debug: (message, data = {}) => {
+      console.log(`[${requestId}] DEBUG: ${message}`, JSON.stringify(data, null, 2));
+    },
+    timing: (label, startTime) => {
+      const duration = Date.now() - startTime;
+      console.log(`[${requestId}] TIMING: ${label} took ${duration}ms`);
+      return duration;
+    }
   };
 }
 
@@ -220,10 +239,10 @@ function getSimplifiedHeaders(url, userAgent, source) {
     'Connection': 'keep-alive'
   };
   
-  // Only add referer/origin if absolutely necessary
-  if (url.includes('shadowlandschronicles')) {
-    headers['Referer'] = 'https://cloudnestra.com/';
-    headers['Origin'] = 'https://cloudnestra.com';
+  // Handle shadowlands source or shadowlands URLs with vidsrc.xyz headers
+  if (source === 'shadowlands' || url.includes('shadowlandschronicles') || url.includes('shadowlands') || url.includes('tmstr')) {
+    headers['Referer'] = 'https://vidsrc.xyz/';
+    headers['Origin'] = 'https://vidsrc.xyz';
   } else if (url.includes('embed.su')) {
     headers['Referer'] = 'https://embed.su/';
     headers['Origin'] = 'https://embed.su';

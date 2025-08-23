@@ -640,8 +640,8 @@ const GestureOverlay = ({
         </motion.svg>
       )}
       
-      {/* Gesture zones visualization (debug mode) */}
-      {process.env.NODE_ENV === 'development' && (
+      {/* Gesture zones visualization (debug mode) - DISABLED to prevent text overlay */}
+      {false && process.env.NODE_ENV === 'development' && (
         <div className={styles.gestureZones}>
           {Object.entries(zones).map(([zoneName, zone]) => (
             <div

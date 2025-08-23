@@ -427,7 +427,7 @@ const FuturisticControls = ({
                   exit={{ opacity: 0, y: 10 }}
                   className={styles.dropdownMenu}
                 >
-                  {qualities.map((quality) => (
+                  {(qualities || []).map((quality) => (
                     <motion.button
                       key={quality.id}
                       whileHover={{ x: 5 }}
@@ -475,7 +475,7 @@ const FuturisticControls = ({
                   >
                     No Subtitles
                   </motion.button>
-                  {subtitles.map((subtitle, index) => (
+                  {(subtitles || []).map((subtitle, index) => (
                     <motion.button
                       key={subtitle.id || index}
                       whileHover={{ x: 5 }}

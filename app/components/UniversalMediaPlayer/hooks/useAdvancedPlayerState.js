@@ -21,6 +21,8 @@ const initialState = {
   isSeeking: false,
   isFullscreen: false,
   error: null,
+  loadStartTime: performance.now(),
+  lastProgressMilestone: 0,
 
   // Advanced UI state
   uiTheme: 'dark',
@@ -300,6 +302,18 @@ const reducer = (state, action) => {
         lastInteraction: Date.now()
       };
 
+    case 'SET_LAST_PROGRESS_MILESTONE':
+      return {
+        ...state,
+        lastProgressMilestone: action.payload
+      };
+
+    case 'SET_LOAD_START_TIME':
+      return {
+        ...state,
+        loadStartTime: action.payload
+      };
+
     default:
       return state;
   }
@@ -424,6 +438,14 @@ const useAdvancedPlayerState = (options = {}) => {
 
   const updateUserPreference = useCallback((key, value) => {
     dispatch({ type: 'UPDATE_USER_PREFERENCE', key, value });
+  }, []);
+
+  const setLastProgressMilestone = useCallback((milestone) => {
+    dispatch({ type: 'SET_LAST_PROGRESS_MILESTONE', payload: milestone });
+  }, []);
+
+  const setLoadStartTime = useCallback((time) => {
+    dispatch({ type: 'SET_LOAD_START_TIME', payload: time });
   }, []);
 
   // AI-powered intelligent volume adjustment
@@ -573,6 +595,8 @@ const useAdvancedPlayerState = (options = {}) => {
     resetUITimer,
     recordGesture,
     updateUserPreference,
+    setLastProgressMilestone,
+    setLoadStartTime,
 
     // AI actions
     intelligentVolumeAdjust

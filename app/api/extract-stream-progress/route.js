@@ -61,17 +61,12 @@ function buildBulletproofUrl(searchParams, logger) {
   return bulletproofUrl.toString();
 }
 
-// Create SSE progress events
-function createProgressEvent(phase, progress, message, data = {}) {
-  return `data: ${JSON.stringify({ phase, progress, message, ...data })}\n\n`;
-}
-
-// Server-Sent Events proxy for real-time progress updates
+// Simple HTTP endpoint for stream extraction (no SSE)
 export async function GET(request) {
   const requestId = generateRequestId();
   const logger = createLogger(requestId);
 
-  logger.info('🚀 SSE PROXY REQUEST STARTED', {
+  logger.info('🚀 HTTP EXTRACTION REQUEST STARTED', {
     timestamp: new Date().toISOString(),
     userAgent: request.headers.get('user-agent'),
     referer: request.headers.get('referer'),
@@ -89,15 +84,15 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     
     // Use bulletproof extractor for all requests
-    return await proxyBulletproofExtractor(request, searchParams, logger, requestId);
+    return await callBulletproofExtractor(request, searchParams, logger, requestId);
   } catch (error) {
-    logger.error('SSE proxy initialization failed', error);
+    logger.error('HTTP extraction request failed', error);
 
     // Return error response
     return NextResponse.json(
       {
         success: false,
-        error: 'Failed to initialize stream extraction',
+        error: 'Failed to extract stream',
         requestId,
         debug: {
           errorType: error.name,
@@ -109,121 +104,96 @@ export async function GET(request) {
   }
 }
 
-// Proxy to bulletproof extractor
-async function proxyBulletproofExtractor(request, searchParams, logger, requestId) {
+// Direct call to bulletproof extractor (no SSE streaming)
+async function callBulletproofExtractor(request, searchParams, logger, requestId) {
   const bulletproofUrl = buildBulletproofUrl(searchParams, logger);
 
-  logger.info('Forwarding request to bulletproof extractor', {
+  logger.info('Making direct call to bulletproof extractor', {
     bulletproofUrl: bulletproofUrl.substring(0, 200) + (bulletproofUrl.length > 200 ? '...' : ''),
     bulletproofBaseUrl: BULLETPROOF_EXTRACTOR_URL
   });
 
-  // Create a readable stream for Server-Sent Events
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        // Send initializing progress event
-        controller.enqueue(createProgressEvent('initializing', 0, 'Starting extraction...'));
-        
-        // Make request to bulletproof extractor (regular HTTP, not SSE)
-        const bulletproofResponse = await fetch(bulletproofUrl, {
-          method: 'GET',
-          headers: {
-            'User-Agent': request.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache'
-          },
-          // Set a reasonable timeout for the VM request
-          signal: AbortSignal.timeout(180000) // 3 minutes timeout
-        });
+  try {
+    // Make direct HTTP request to bulletproof extractor
+    const bulletproofResponse = await fetch(bulletproofUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': request.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
+      },
+      // Set a reasonable timeout for the VM request
+      signal: AbortSignal.timeout(180000) // 3 minutes timeout
+    });
 
-        // Send progress update
-        controller.enqueue(createProgressEvent('processing', 50, 'Processing response...'));
+    if (!bulletproofResponse.ok) {
+      logger.error('Bulletproof extractor returned error', null, {
+        status: bulletproofResponse.status,
+        statusText: bulletproofResponse.statusText,
+        bulletproofUrl: bulletproofUrl.substring(0, 100)
+      });
 
-        if (!bulletproofResponse.ok) {
-          logger.error('Bulletproof extractor returned error', null, {
-            status: bulletproofResponse.status,
-            statusText: bulletproofResponse.statusText,
-            bulletproofUrl: bulletproofUrl.substring(0, 100)
-          });
-
-          // Send error event to client
-          const errorData = {
-            error: true,
-            message: `Bulletproof extractor error: ${bulletproofResponse.status} ${bulletproofResponse.statusText}`,
-            phase: 'error',
-            progress: 0,
-            requestId
-          };
-          controller.enqueue(`data: ${JSON.stringify(errorData)}\n\n`);
-          controller.close();
-          return;
-        }
-
-        // Parse extractor response
-        const extractorData = await bulletproofResponse.json();
-        
-        logger.info('Extractor response received', {
-          success: extractorData.success,
-          hasUrl: !!extractorData.data?.url,
-          requestId: extractorData.requestId
-        });
-
-        // Format Bulletproof response to match frontend expectations
-        const formattedResponse = {
-          success: extractorData.success,
-          streamUrl: extractorData.data?.url,
-          streamType: extractorData.data?.type || 'shadowlands',
-          server: 'vidsrc.xyz',
-          extractionMethod: 'bulletproof_puppeteer',
-          requiresProxy: false, // Shadowlands URLs don't need proxy
-          totalFound: extractorData.data?.url ? 1 : 0,
-          m3u8Count: 0, // Shadowlands URL, not m3u8 yet
-          subtitles: [],
-          requestId: extractorData.requestId || requestId,
-          debug: {
-            extractorType: 'bulletproof',
-            source: extractorData.data?.source || 'prorcp',
-            metadata: extractorData.data?.metadata || {}
-          }
-        };
-
-        // Send completion event with formatted response
-        controller.enqueue(createProgressEvent('complete', 100, 'Extraction complete', {
-          result: formattedResponse
-        }));
-        
-        controller.close();
-
-      } catch (error) {
-        logger.error('Bulletproof extractor proxy error', error);
-
-        // Send error event to client
-        const errorData = {
-          error: true,
-          message: error.name === 'AbortError' ? 'Request timeout' : 'Stream extraction failed',
-          phase: 'error',
-          progress: 0,
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Bulletproof extractor error: ${bulletproofResponse.status} ${bulletproofResponse.statusText}`,
           requestId,
           debug: {
-            errorType: error.name,
-            errorMessage: error.message
+            status: bulletproofResponse.status,
+            statusText: bulletproofResponse.statusText
           }
-        };
-        controller.enqueue(`data: ${JSON.stringify(errorData)}\n\n`);
-        controller.close();
-      }
+        },
+        { status: bulletproofResponse.status }
+      );
     }
-  });
 
-  // Return Server-Sent Events response
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control',
-    },
-  });
+    // Parse extractor response
+    const extractorData = await bulletproofResponse.json();
+    
+    logger.info('Extractor response received', {
+      success: extractorData.success,
+      hasUrl: !!extractorData.data?.url,
+      requestId: extractorData.requestId
+    });
+
+    // Format Bulletproof response to match frontend expectations
+    const formattedResponse = {
+      success: extractorData.success,
+      streamUrl: extractorData.data?.url,
+      streamType: extractorData.data?.type || 'shadowlands',
+      server: 'vidsrc.xyz',
+      extractionMethod: 'bulletproof_puppeteer',
+      requiresProxy: false, // Shadowlands URLs don't need proxy
+      totalFound: extractorData.data?.url ? 1 : 0,
+      m3u8Count: 0, // Shadowlands URL, not m3u8 yet
+      subtitles: [],
+      requestId: extractorData.requestId || requestId,
+      debug: {
+        extractorType: 'bulletproof',
+        source: extractorData.data?.source || 'prorcp',
+        metadata: extractorData.data?.metadata || {}
+      }
+    };
+
+    return NextResponse.json(formattedResponse);
+
+  } catch (error) {
+    logger.error('Bulletproof extractor call failed', error);
+
+    let errorMessage = error.name === 'AbortError' ? 'Request timeout' : 'Stream extraction failed';
+    let statusCode = error.name === 'AbortError' ? 504 : 500;
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: errorMessage,
+        requestId,
+        debug: {
+          errorType: error.name,
+          errorMessage: error.message
+        }
+      },
+      { status: statusCode }
+    );
+  }
 }

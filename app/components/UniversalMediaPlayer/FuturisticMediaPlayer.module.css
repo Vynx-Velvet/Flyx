@@ -100,17 +100,37 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
-    radial-gradient(circle at 20% 20%, rgba(0, 245, 255, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(255, 0, 110, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 50% 10%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(0, 245, 255, 0.05) 0%, transparent 70%),
+    radial-gradient(circle at 80% 80%, rgba(255, 0, 110, 0.05) 0%, transparent 70%),
+    radial-gradient(circle at 50% 10%, rgba(139, 92, 246, 0.03) 0%, transparent 70%);
   pointer-events: none;
-  z-index: 1;
+  z-index: 0; /* Changed from 1 to 0 to ensure it stays behind video */
   transition: opacity var(--animation-slow);
+  opacity: 0.3; /* Reduced opacity to minimize interference */
 }
 
 .futuristicPlayer.immersiveMode::before {
-  opacity: 0.3;
+  opacity: 0.1; /* Even lower opacity in immersive mode */
+}
+
+/* Disable any debugging overlays or grid lines */
+.futuristicPlayer * {
+  box-sizing: border-box;
+}
+
+/* Ensure no accidental grid debugging is showing */
+.futuristicPlayer *:not(.videoElement) {
+  outline: none !important;
+  border: none !important;
+}
+
+/* Hide only specific debug elements without affecting video player */
+.futuristicPlayer .gesture-debug-overlay,
+.futuristicPlayer .position-debug-text,
+.futuristicPlayer .interaction-debug-text {
+  display: none !important;
+  visibility: hidden !important;
 }
 
 /* Fullscreen Enhancements */
@@ -124,6 +144,21 @@
 }
 
 /* ==========================================
+   TARGETED DEBUG OVERLAY REMOVAL
+   ========================================== */
+
+/* Only hide specific debug elements - DO NOT hide video or controls */
+.futuristicPlayer [data-debug="true"],
+.futuristicPlayer [class*="debug-overlay"],
+.futuristicPlayer [class*="position-debug"],
+.futuristicPlayer [class*="interaction-debug"],
+.futuristicPlayer .gesture-debug-text {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* ==========================================
    VIDEO ELEMENT - ENHANCED
    ========================================== */
 
@@ -131,8 +166,8 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: transparent;
-  z-index: 2;
+  background: black; /* Ensure solid black background */
+  z-index: 10; /* Higher z-index to ensure video stays on top */
   position: relative;
   border-radius: 0;
   transition: all var(--animation-slow);
@@ -343,6 +378,12 @@
   backdrop-filter: blur(20px) saturate(180%);
 }
 
+/* Timeline Container */
+.timelineContainer {
+  margin-bottom: 2rem;
+  position: relative;
+}
+
 .timeline {
   position: relative;
   width: 100%;
@@ -393,6 +434,154 @@
 
 .timeline:hover .timelineThumb {
   transform: translateY(-50%) scale(1);
+}
+
+/* Timeline Buffered Progress */
+.timelineBuffered {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  z-index: 1;
+}
+
+/* Timeline Seeking States */
+.timelineSeeking {
+  cursor: grabbing;
+}
+
+.timelineDragging {
+  cursor: grabbing;
+}
+
+/* Timeline Preview */
+.timelinePreview {
+  position: absolute;
+  bottom: 20px;
+  z-index: 10;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.previewThumbnail {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-large);
+  overflow: hidden;
+  text-align: center;
+}
+
+.previewTime {
+  padding: 6px 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  backdrop-filter: blur(20px);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'Courier New', monospace;
+  box-shadow: var(--shadow-medium);
+  white-space: nowrap;
+}
+
+/* Time Display */
+.timeDisplay {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  margin-left: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-family: 'Courier New', monospace;
+  min-width: 140px;
+}
+
+.currentTime {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.timeSeparator {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.totalTime {
+  color: var(--text-secondary);
+}
+
+/* Dropdown Containers */
+.dropdownContainer {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdownMenu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 10px;
+  min-width: 200px;
+  max-height: 300px;
+  overflow-y: auto;
+  
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: var(--shadow-large);
+  
+  padding: 8px 0;
+  z-index: 100;
+}
+
+.dropdownItem {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--animation-fast);
+  position: relative;
+}
+
+.dropdownItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  transform: translateX(5px);
+}
+
+.dropdownItem.active {
+  color: var(--neon-cyan);
+  background: rgba(0, 245, 255, 0.1);
+  font-weight: 600;
+}
+
+.dropdownItem.active::before {
+  content: '✓';
+  position: absolute;
+  left: 8px;
+  color: var(--neon-cyan);
+}
+
+.checkmark {
+  position: absolute;
+  right: 12px;
+  color: var(--neon-cyan);
+  font-size: 14px;
+  opacity: 0.8;
 }
 
 .controlsRow {
@@ -548,6 +737,79 @@
 
 .volumeSlider:hover .volumeThumb {
   transform: translateY(-50%) scale(1);
+}
+
+/* Volume Track and States */
+.volumeTrack {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--glass-bg);
+  border-radius: 3px;
+}
+
+.volumeMuted {
+  opacity: 0.5;
+}
+
+.volumeMuted .volumeFill {
+  background: var(--neon-magenta);
+  box-shadow: 0 0 10px rgba(255, 0, 110, 0.5);
+}
+
+/* Voice Control States */
+.voiceActive {
+  background: linear-gradient(135deg, var(--neon-magenta), var(--neon-purple)) !important;
+  box-shadow: 0 0 20px rgba(255, 0, 110, 0.6) !important;
+  animation: voicePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes voicePulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(255, 0, 110, 0.6);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(255, 0, 110, 0.8);
+  }
+}
+
+/* Back Button */
+.backButton {
+  position: fixed;
+  top: 2rem;
+  left: 2rem;
+  z-index: 100;
+  
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-medium);
+  
+  color: var(--text-primary);
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  transition: all var(--animation-normal);
+}
+
+.backButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--neon-cyan);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow:
+    var(--shadow-medium),
+    0 0 20px rgba(0, 245, 255, 0.4);
 }
 
 /* ==========================================
