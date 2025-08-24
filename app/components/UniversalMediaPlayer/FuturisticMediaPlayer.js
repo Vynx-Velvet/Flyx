@@ -141,13 +141,7 @@ const FuturisticMediaPlayer = ({
       },
       setCurrentTime: (currentTime) => {
         if (isFinite(currentTime) && !isNaN(currentTime)) {
-          setSimplePlayerState(prev => {
-            // Update more frequently for smoother progress bar
-            if (Math.abs(prev.currentTime - currentTime) >= 0.05) {
-              return { ...prev, currentTime };
-            }
-            return prev;
-          });
+          setSimplePlayerState(prev => ({ ...prev, currentTime }));
         }
       },
       setDuration: (duration) => {
@@ -179,7 +173,8 @@ const FuturisticMediaPlayer = ({
     return actions;
   }, []);
 
-  // Use simple state as playerState for compatibility
+  // CRITICAL FIX: Use simplePlayerState directly as playerState
+  // This ensures controls get the updated state
   const playerState = simplePlayerState;
   
   // Enhanced media details with scene analysis
@@ -333,6 +328,16 @@ const FuturisticMediaPlayer = ({
       // Set initial volume and muted state
       videoRef.current.volume = simplePlayerState.volume;
       videoRef.current.muted = simplePlayerState.isMuted;
+      
+      // Try autoplay immediately
+      if (videoRef.current.paused) {
+        videoRef.current.play().then(() => {
+          console.log('✅ Autoplay started');
+          setSimplePlayerState(prev => ({ ...prev, isPlaying: true }));
+        }).catch(err => {
+          console.log('⚠️ Autoplay prevented, click to play:', err);
+        });
+      }
       
     }
     
@@ -518,25 +523,33 @@ const FuturisticMediaPlayer = ({
 
   // Time update handler - update state directly from video element
   const handleTimeUpdate = useCallback(() => {
-    if (videoRef.current && !isNaN(videoRef.current.duration)) {
-      const currentTime = videoRef.current.currentTime;
-      const duration = videoRef.current.duration;
+    const video = videoRef.current;
+    if (!video || isNaN(video.duration)) return;
+    
+    const currentTime = video.currentTime;
+    const duration = video.duration;
+    
+    // Always update state for UI sync
+    setSimplePlayerState(prev => {
+      let newState = {
+        ...prev,
+        currentTime: currentTime
+      };
       
-      // Update current time
-      playerActions.setCurrentTime(currentTime);
-      
-      // Update duration if changed
-      if (duration && Math.abs(duration - playerState.duration) > 0.01) {
-        playerActions.setDuration(duration);
+      // Update duration if it's valid
+      if (duration && !isNaN(duration)) {
+        newState.duration = duration;
       }
       
       // Update buffered progress
-      if (videoRef.current.buffered.length > 0) {
-        const bufferedEnd = videoRef.current.buffered.end(videoRef.current.buffered.length - 1);
-        playerActions.setBuffered(bufferedEnd);
+      if (video.buffered.length > 0) {
+        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+        newState.buffered = bufferedEnd;
       }
-    }
-  }, [playerActions, playerState.duration]);
+      
+      return newState;
+    });
+  }, []);
 
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
@@ -544,7 +557,8 @@ const FuturisticMediaPlayer = ({
       console.log('📊 Metadata loaded - Duration:', duration, 'Ready State:', videoRef.current.readyState);
       
       if (!isNaN(duration) && duration > 0) {
-        playerActions.setDuration(duration);
+        // Update state directly for immediate sync
+        setSimplePlayerState(prev => ({ ...prev, duration }));
       }
       
       // Ensure volume is properly set on metadata load
@@ -553,22 +567,34 @@ const FuturisticMediaPlayer = ({
       console.log('🔊 Volume set to:', simplePlayerState.volume, 'Muted:', simplePlayerState.isMuted);
       
       setIsInitialized(true);
+      
+      // Try to autoplay when metadata is loaded
+      if (videoRef.current.paused) {
+        videoRef.current.play().then(() => {
+          setSimplePlayerState(prev => ({ ...prev, isPlaying: true }));
+        }).catch(err => {
+          console.log('Autoplay on metadata failed:', err);
+        });
+      }
     }
-  }, [playerActions, simplePlayerState.volume, simplePlayerState.isMuted]);
+  }, [simplePlayerState.volume, simplePlayerState.isMuted]);
 
   // Video event handlers for play/pause state sync
   const handlePlay = useCallback(() => {
-    playerActions.setPlaying(true);
-  }, [playerActions]);
+    console.log('▶️ Video playing');
+    setSimplePlayerState(prev => ({ ...prev, isPlaying: true }));
+  }, []);
 
   const handlePause = useCallback(() => {
-    playerActions.setPlaying(false);
-  }, [playerActions]);
+    console.log('⏸️ Video paused');
+    setSimplePlayerState(prev => ({ ...prev, isPlaying: false }));
+  }, []);
 
   const handleVolumeChange = useCallback(() => {
     if (videoRef.current) {
       const volume = videoRef.current.volume;
       const isMuted = videoRef.current.muted;
+      console.log('🔊 Volume changed:', volume, 'Muted:', isMuted);
       setSimplePlayerState(prev => ({ ...prev, volume, isMuted }));
     }
   }, []);
@@ -588,6 +614,8 @@ const FuturisticMediaPlayer = ({
       { name: 'progress', handler: handleTimeUpdate }, // Also update on progress for buffering
       { name: 'loadeddata', handler: handleLoadedMetadata }, // Backup for metadata
       { name: 'durationchange', handler: handleLoadedMetadata }, // Handle duration changes
+      { name: 'canplay', handler: () => console.log('✅ Can play event') },
+      { name: 'canplaythrough', handler: () => console.log('✅ Can play through event') },
     ];
     
     // Add all event listeners
