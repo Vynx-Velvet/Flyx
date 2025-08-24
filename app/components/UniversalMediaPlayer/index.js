@@ -213,10 +213,10 @@ export const quickStart = {
     ...createPlayerInstance(config)
   }),
   
-  // Demo player
-  createDemo: (config = {}) => ({
+  // Demo player - requires real TMDB movie ID
+  createDemo: (movieId = null, config = {}) => ({
     mediaType: 'movie',
-    movieId: 'demo_movie_001',
+    movieId: movieId, // Must provide real TMDB movie ID
     seasonId: null,
     episodeId: null,
     ...createPlayerInstance({
@@ -250,16 +250,20 @@ export const devUtils = {
     console.groupEnd();
   },
   
-  mockMediaDetails: (type = 'movie') => ({
-    id: `demo_${type}_001`,
-    title: `Demo ${type.charAt(0).toUpperCase() + type.slice(1)}`,
-    description: 'A demonstration media file for testing',
-    duration: type === 'movie' ? 7200 : 2700,
-    genre: 'Demo',
-    year: new Date().getFullYear(),
-    rating: 8.5,
-    imdb_id: 'tt0000000'
-  }),
+  // Note: mockMediaDetails removed - use real TMDB API data
+  // For testing, use actual TMDB movie/TV IDs with the media player
+  testMovieIds: [
+    550, // Fight Club
+    13, // Forrest Gump
+    680, // Pulp Fiction
+    27205, // Inception
+  ],
+  testTVIds: [
+    1399, // Game of Thrones
+    1396, // Breaking Bad
+    94605, // Arcane
+    85271, // WandaVision
+  ],
   
   enableDebugMode: () => {
     window.FUTURISTIC_PLAYER_DEBUG = true;

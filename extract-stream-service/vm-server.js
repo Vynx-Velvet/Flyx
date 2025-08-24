@@ -1,10 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import puppeteer from 'puppeteer';
-import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -20,27 +18,25 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Advanced configuration
+// Simplified configuration - bulletproof method only
 const CONFIG = {
-  // Proxy configuration
-  proxies: process.env.PROXIES ? process.env.PROXIES.split(',') : [],
-  proxyAuth: process.env.PROXY_AUTH || null, // username:password
-  
   // Browser profiles directory
   profilesDir: path.join(__dirname, 'browser-profiles'),
   cookiesDir: path.join(__dirname, 'cookies'),
   
-  // Advanced timing configuration
+  // Timing configuration
   timing: {
-    humanDelayMin: 0,
-    humanDelayMax: 0,
-    mouseMovementSpeed: 100,
-    typingSpeed: { min: 50, max: 150 },
-    scrollSpeed: { min: 300, max: 700 },
-    pageLoadTimeout: 15000,
-    challengeTimeout: 10000,
-    retryAttempts: 2,
-    retryDelay: 500
+    humanDelayMin: 100,
+    humanDelayMax: 500,
+    mouseMovementSpeed: 80,
+    typingSpeed: { min: 80, max: 200 },
+    scrollSpeed: { min: 200, max: 500 },
+    pageLoadTimeout: 30000,
+    challengeTimeout: 20000,
+    retryAttempts: 3,
+    retryDelay: 2000,
+    navigationDelay: { min: 1000, max: 3000 },
+    requestDelay: { min: 500, max: 1500 }
   },
   
   // Fingerprint pools
@@ -50,41 +46,32 @@ const CONFIG = {
       { width: 1366, height: 768, availWidth: 1366, availHeight: 728, colorDepth: 24, pixelDepth: 24 },
       { width: 1440, height: 900, availWidth: 1440, availHeight: 860, colorDepth: 24, pixelDepth: 24 },
       { width: 1536, height: 864, availWidth: 1536, availHeight: 824, colorDepth: 24, pixelDepth: 24 },
-      { width: 2560, height: 1440, availWidth: 2560, availHeight: 1400, colorDepth: 24, pixelDepth: 24 },
-      { width: 1680, height: 1050, availWidth: 1680, availHeight: 1010, colorDepth: 24, pixelDepth: 24 }
+      { width: 2560, height: 1440, availWidth: 2560, availHeight: 1400, colorDepth: 24, pixelDepth: 24 }
     ],
     languages: [
       ['en-US', 'en'],
       ['en-GB', 'en'],
       ['en-CA', 'en'],
-      ['en-AU', 'en'],
-      ['en-US', 'en', 'es'],
-      ['en-US', 'en', 'fr'],
-      ['en-US', 'en', 'de']
+      ['en-AU', 'en']
     ],
     timezones: [
       'America/New_York',
       'America/Chicago',
       'America/Denver',
       'America/Los_Angeles',
-      'America/Phoenix',
-      'America/Detroit',
       'Europe/London',
-      'Europe/Paris',
-      'Europe/Berlin'
+      'Europe/Paris'
     ],
     webGLVendors: [
       'Intel Inc.',
       'NVIDIA Corporation',
       'AMD',
-      'Apple Inc.',
-      'Microsoft Corporation'
+      'Apple Inc.'
     ],
     webGLRenderers: [
       'Intel Iris OpenGL Engine',
       'NVIDIA GeForce GTX 1060 6GB/PCIe/SSE2',
       'AMD Radeon Pro 5500M OpenGL Engine',
-      'ANGLE (NVIDIA GeForce GTX 1660 Ti Direct3D11 vs_5_0 ps_5_0)',
       'ANGLE (Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0)'
     ]
   }
@@ -96,6 +83,10 @@ const CONFIG = {
     fs.mkdirSync(dir, { recursive: true });
   }
 });
+
+// Global request tracking
+const activeRequests = new Map();
+const profileUsage = new Map();
 
 // Enhanced logging with request tracking
 function createLogger(requestId) {
@@ -193,53 +184,14 @@ class HumanBehaviorSimulator {
   async moveMouseNaturally() {
     try {
       const viewport = await this.page.viewport();
-      const currentX = Math.random() * viewport.width;
-      const currentY = Math.random() * viewport.height;
       const targetX = Math.random() * viewport.width;
       const targetY = Math.random() * viewport.height;
       
-      // Generate bezier curve points for natural movement
-      const steps = 20 + Math.floor(Math.random() * 20);
-      const curve = this.generateBezierCurve(
-        { x: currentX, y: currentY },
-        { x: targetX, y: targetY },
-        steps
-      );
-      
-      for (const point of curve) {
-        await this.page.mouse.move(point.x, point.y);
-        await this.humanDelay(10, 30);
-      }
+      await this.page.mouse.move(targetX, targetY, { steps: 10 });
+      await this.humanDelay(10, 30);
     } catch (e) {
       this.logger.debug('Mouse movement error', { error: e.message });
     }
-  }
-
-  generateBezierCurve(start, end, steps) {
-    const curve = [];
-    const cp1 = {
-      x: start.x + (Math.random() - 0.5) * 200,
-      y: start.y + (Math.random() - 0.5) * 200
-    };
-    const cp2 = {
-      x: end.x + (Math.random() - 0.5) * 200,
-      y: end.y + (Math.random() - 0.5) * 200
-    };
-    
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const x = Math.pow(1 - t, 3) * start.x +
-                3 * Math.pow(1 - t, 2) * t * cp1.x +
-                3 * (1 - t) * Math.pow(t, 2) * cp2.x +
-                Math.pow(t, 3) * end.x;
-      const y = Math.pow(1 - t, 3) * start.y +
-                3 * Math.pow(1 - t, 2) * t * cp1.y +
-                3 * (1 - t) * Math.pow(t, 2) * cp2.y +
-                Math.pow(t, 3) * end.y;
-      curve.push({ x: Math.round(x), y: Math.round(y) });
-    }
-    
-    return curve;
   }
 
   async smoothScroll(distance) {
@@ -258,62 +210,9 @@ class HumanBehaviorSimulator {
     }
   }
 
-  async humanType(text, element = null) {
-    if (element) {
-      await element.click();
-      await this.humanDelay(100, 300);
-    }
-    
-    for (const char of text) {
-      await this.page.keyboard.type(char);
-      await this.humanDelay(
-        CONFIG.timing.typingSpeed.min,
-        CONFIG.timing.typingSpeed.max
-      );
-      
-      // Occasional typo and correction
-      if (Math.random() < 0.03) {
-        const typo = String.fromCharCode(97 + Math.floor(Math.random() * 26));
-        await this.page.keyboard.type(typo);
-        await this.humanDelay(100, 200);
-        await this.page.keyboard.press('Backspace');
-        await this.humanDelay(50, 150);
-      }
-    }
-  }
-
   async humanDelay(min = CONFIG.timing.humanDelayMin, max = CONFIG.timing.humanDelayMax) {
     const delay = min + Math.random() * (max - min);
     await new Promise(resolve => setTimeout(resolve, delay));
-  }
-
-  async simulateTabSwitch() {
-    // Simulate user switching tabs
-    await this.page.evaluate(() => {
-      Object.defineProperty(document, 'hidden', {
-        value: true,
-        writable: true
-      });
-      Object.defineProperty(document, 'visibilityState', {
-        value: 'hidden',
-        writable: true
-      });
-      window.dispatchEvent(new Event('blur'));
-    });
-    
-    await this.humanDelay(2000, 5000);
-    
-    await this.page.evaluate(() => {
-      Object.defineProperty(document, 'hidden', {
-        value: false,
-        writable: true
-      });
-      Object.defineProperty(document, 'visibilityState', {
-        value: 'visible',
-        writable: true
-      });
-      window.dispatchEvent(new Event('focus'));
-    });
   }
 }
 
@@ -341,10 +240,7 @@ class FingerprintManager {
       },
       hardwareConcurrency: [2, 4, 6, 8, 12, 16][Math.floor(Math.random() * 6)],
       deviceMemory: [2, 4, 8, 16, 32][Math.floor(Math.random() * 5)],
-      platform: this.getPlatformForUserAgent(),
-      canvas: {
-        noise: Math.random() * 0.0001
-      }
+      platform: this.getPlatformForUserAgent()
     };
   }
 
@@ -366,66 +262,54 @@ class FingerprintManager {
   }
 }
 
-// Browser profile manager
+// Simplified Browser profile manager
 class BrowserProfileManager {
   constructor(profilesDir) {
     this.profilesDir = profilesDir;
     this.profiles = new Map();
   }
 
-  async getProfile(domain) {
-    if (!this.profiles.has(domain)) {
-      const profilePath = path.join(this.profilesDir, `profile_${domain.replace(/[^a-z0-9]/gi, '_')}`);
-      
-      if (!fs.existsSync(profilePath)) {
-        fs.mkdirSync(profilePath, { recursive: true });
+  async getProfile(domain, requestId) {
+    const baseProfileName = `profile_${domain.replace(/[^a-z0-9]/gi, '_')}_${requestId}`;
+    const profilePath = path.join(this.profilesDir, baseProfileName);
+    
+    // Clean up any existing lock files
+    const lockFile = path.join(profilePath, 'SingletonLock');
+    if (fs.existsSync(lockFile)) {
+      try {
+        fs.unlinkSync(lockFile);
+      } catch (e) {
+        // Lock file might be in use
       }
-      
-      this.profiles.set(domain, profilePath);
     }
     
-    return this.profiles.get(domain);
+    if (!fs.existsSync(profilePath)) {
+      fs.mkdirSync(profilePath, { recursive: true });
+    }
+    
+    this.profiles.set(requestId, profilePath);
+    return profilePath;
+  }
+
+  cleanupProfile(requestId) {
+    const profilePath = this.profiles.get(requestId);
+    if (profilePath) {
+      try {
+        // Remove lock file if it exists
+        const lockFile = path.join(profilePath, 'SingletonLock');
+        if (fs.existsSync(lockFile)) {
+          fs.unlinkSync(lockFile);
+        }
+        
+        this.profiles.delete(requestId);
+      } catch (e) {
+        // Cleanup failed, but don't throw
+      }
+    }
   }
 }
 
-// Proxy manager
-class ProxyManager {
-  constructor(proxies, auth) {
-    this.proxies = proxies;
-    this.auth = auth;
-    this.currentIndex = 0;
-    this.blacklist = new Set();
-  }
-
-  getNext() {
-    if (this.proxies.length === 0) return null;
-    
-    let attempts = 0;
-    while (attempts < this.proxies.length) {
-      const proxy = this.proxies[this.currentIndex];
-      this.currentIndex = (this.currentIndex + 1) % this.proxies.length;
-      
-      if (!this.blacklist.has(proxy)) {
-        return {
-          server: proxy,
-          auth: this.auth
-        };
-      }
-      
-      attempts++;
-    }
-    
-    // All proxies blacklisted, clear blacklist and start over
-    this.blacklist.clear();
-    return this.getNext();
-  }
-
-  blacklistProxy(proxy) {
-    this.blacklist.add(proxy);
-  }
-}
-
-// Enhanced cookie management
+// Cookie management
 class CookieManager {
   constructor(cookiesDir) {
     this.cookiesDir = cookiesDir || CONFIG.cookiesDir;
@@ -536,39 +420,76 @@ class CloudflareSolver {
   async solveChallenge() {
     this.logger.info('Attempting to solve Cloudflare challenge');
     
+    // Enhanced challenge detection and handling
+    await this.behaviorSimulator.simulateReading(1500);
+    
     // Wait for challenge to appear
     try {
-      await this.page.waitForSelector('.cf-turnstile, #challenge-form', { 
-        timeout: 10000,
-        visible: true 
+      await this.page.waitForSelector('.cf-turnstile, #challenge-form, .cf-challenge-running', {
+        timeout: 15000,
+        visible: true
       });
     } catch (e) {
-      this.logger.debug('Challenge selector not found in time');
-    }
-    
-    // Minimal delay for challenge to load
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Check for checkbox-style challenge
-    const checkboxChallenge = await this.page.$('input[type="checkbox"]');
-    if (checkboxChallenge) {
-      this.logger.info('Found checkbox challenge');
-      const box = await checkboxChallenge.boundingBox();
-      if (box) {
-        // Move to checkbox naturally
-        await this.behaviorSimulator.moveMouseNaturally();
-        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-        await this.behaviorSimulator.humanDelay(300, 700);
-        await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-        this.logger.info('Clicked checkbox challenge');
+      this.logger.debug('Challenge selector not found, checking for other patterns');
+      
+      const hasChallengePage = await this.page.evaluate(() => {
+        return document.title.includes('Just a moment') ||
+               document.title.includes('Checking your browser') ||
+               document.body.textContent.includes('Cloudflare') ||
+               document.body.textContent.includes('checking your browser') ||
+               document.querySelector('script[src*="challenges.cloudflare.com"]') !== null;
+      });
+      
+      if (!hasChallengePage) {
+        this.logger.debug('No Cloudflare challenge detected');
+        return true;
       }
     }
     
-    // Wait for challenge to be solved
-    const solved = await this.waitForSolution();
+    // Extended delay for challenge to fully load
+    await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1000));
+    
+    // Simulate human-like interaction
+    await this.behaviorSimulator.moveMouseNaturally();
+    await this.behaviorSimulator.humanDelay(500, 1000);
+    
+    // Check for various challenge types
+    const challengeTypes = [
+      'input[type="checkbox"]',
+      '.cf-turnstile input',
+      '.challenge-form input[type="checkbox"]',
+      '#challenge-form input',
+      'input[name*="cf"]',
+      'button[type="submit"]'
+    ];
+    
+    for (const selector of challengeTypes) {
+      const element = await this.page.$(selector);
+      if (element) {
+        this.logger.info(`Found challenge element: ${selector}`);
+        const box = await element.boundingBox();
+        if (box) {
+          await this.behaviorSimulator.moveMouseNaturally();
+          await this.behaviorSimulator.humanDelay(1000, 2000);
+          
+          await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 10 });
+          await this.behaviorSimulator.humanDelay(300, 700);
+          
+          await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+          this.logger.info('Clicked challenge element');
+          
+          await this.behaviorSimulator.humanDelay(500, 1000);
+          break;
+        }
+      }
+    }
+    
+    // Wait for solution
+    const solved = await this.waitForSolution(45000);
     
     if (solved) {
       this.logger.info('Cloudflare challenge solved successfully');
+      await this.behaviorSimulator.humanDelay(1000, 2000);
     } else {
       this.logger.warn('Cloudflare challenge may not have been solved');
     }
@@ -583,7 +504,6 @@ class CloudflareSolver {
       const hasChallenge = await this.detectChallenge();
       
       if (!hasChallenge) {
-        // Check if we're on the target page
         const url = this.page.url();
         if (!url.includes('challenges.cloudflare.com')) {
           return true;
@@ -609,23 +529,22 @@ class CloudflareSolver {
   }
 }
 
-// Create browser with advanced stealth
+// Create browser without proxy functionality
 async function createStealthBrowser(logger, options = {}) {
+  const requestId = options.requestId || 'unknown';
   const fingerprintManager = new FingerprintManager();
   const fingerprint = fingerprintManager.generateFingerprint();
   const profileManager = new BrowserProfileManager(CONFIG.profilesDir);
-  const proxyManager = new ProxyManager(CONFIG.proxies, CONFIG.proxyAuth);
   
-  const proxy = proxyManager.getNext();
-  const profilePath = await profileManager.getProfile(options.domain || 'default');
+  const profilePath = await profileManager.getProfile(options.domain || 'default', requestId);
   
   logger.info('Creating stealth browser', {
+    requestId,
     fingerprint: {
       userAgent: fingerprint.userAgent.substring(0, 50) + '...',
       screen: fingerprint.screen,
       timezone: fingerprint.timezone
     },
-    proxy: proxy ? proxy.server : 'none',
     profile: profilePath
   });
   
@@ -654,36 +573,59 @@ async function createStealthBrowser(logger, options = {}) {
     '--disable-features=TranslateUI',
     '--disable-ipc-flooding-protection',
     '--enable-features=NetworkService,NetworkServiceInProcess',
-    '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
-    '--disable-webrtc-hw-encoding',
-    '--disable-webrtc-hw-decoding',
-    '--disable-webrtc-multiple-routes',
-    '--disable-webrtc-nonproxied-udp',
     `--lang=${fingerprint.languages[0]}`,
+    '--disable-features=VizDisplayCompositor',
+    '--disable-features=VizServiceDisplayCompositor',
+    '--disable-background-networking',
+    '--disable-sync',
+    '--disable-extensions',
+    '--disable-plugins',
+    '--disable-java',
+    '--disable-popup-blocking',
+    '--disable-prompt-on-repost',
+    '--disable-hang-monitor',
+    '--disable-client-side-phishing-detection',
+    '--disable-component-update',
+    '--disable-default-apps',
+    '--disable-domain-reliability',
+    '--autoplay-policy=no-user-gesture-required'
   ];
   
-  if (proxy) {
-    launchArgs.push(`--proxy-server=${proxy.server}`);
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: 'new',
+      userDataDir: profilePath,
+      args: launchArgs,
+      ignoreHTTPSErrors: true,
+      ignoreDefaultArgs: ['--enable-automation', '--enable-blink-features=AutomationControlled'],
+      defaultViewport: null
+    });
+    
+    logger.info('Browser launched successfully', { requestId, profilePath });
+    
+    // Apply fingerprint to all pages
+    browser.on('targetcreated', async (target) => {
+      const page = await target.page();
+      if (page) {
+        await applyFingerprint(page, fingerprint, logger);
+      }
+    });
+    
+    return { browser, fingerprint, profileManager, requestId };
+    
+  } catch (error) {
+    logger.error('Browser launch failed', error, {
+      requestId,
+      profilePath,
+      lockFileExists: fs.existsSync(path.join(profilePath, 'SingletonLock')),
+      profileExists: fs.existsSync(profilePath)
+    });
+    
+    // Clean up on failure
+    profileManager.cleanupProfile(requestId);
+    throw error;
   }
-  
-  const browser = await puppeteer.launch({
-    headless: 'new', // Keep visible for now to ensure compatibility
-    userDataDir: profilePath,
-    args: launchArgs,
-    ignoreHTTPSErrors: true,
-    ignoreDefaultArgs: ['--enable-automation', '--enable-blink-features=AutomationControlled'],
-    defaultViewport: null
-  });
-  
-  // Apply fingerprint to all pages
-  browser.on('targetcreated', async (target) => {
-    const page = await target.page();
-    if (page) {
-      await applyFingerprint(page, fingerprint, logger);
-    }
-  });
-  
-  return { browser, fingerprint, proxy, proxyManager };
 }
 
 // Apply fingerprint to page
@@ -834,61 +776,10 @@ export function extractProRcpUrl(html, logger) {
   return null;
 }
 
-// Extract stream URL from Shadowlands HTML
-function extractStreamFromShadowlands(html, logger) {
-  logger.info('Extracting stream URL from Shadowlands HTML...');
-
-  const patterns = [
-    /['"]?file['"]?\s*:\s*['"]([^'"]+)['"]/gi,
-    /source\s*:\s*['"]([^'"]+)['"]/gi,
-    /src\s*:\s*['"]([^'"]+m3u8[^'"]*)['"]/gi,
-    /['"]([^'"]*m3u8[^'"]*)['"]/gi,
-    /https:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/gi
-  ];
-
-  for (const pattern of patterns) {
-    const matches = html.match(pattern);
-    if (matches) {
-      for (const match of matches) {
-        let url = match;
-        
-        // Extract URL from the match
-        const fileMatch = match.match(/['"]?(?:file|source|src)['"]?\s*:\s*['"]([^'"]+)['"]/i);
-        if (fileMatch) {
-          url = fileMatch[1];
-        } else if (match.startsWith('"') || match.startsWith("'")) {
-          url = match.slice(1, -1);
-        }
-        
-        // Skip non-stream URLs
-        if (!url.includes('.m3u8') && !url.includes('/stream/') && !url.includes('/hls/')) {
-          continue;
-        }
-        
-        // Ensure it's a full URL
-        if (!url.startsWith('http')) {
-          if (url.startsWith('//')) {
-            url = `https:${url}`;
-          } else if (url.startsWith('/')) {
-            url = `https://tmstr2.shadowlandschronicles.com${url}`;
-          }
-        }
-        
-        logger.info('Found stream URL:', url);
-        return url;
-      }
-    }
-  }
-
-  logger.error('Stream URL not found in Shadowlands HTML');
-  return null;
-}
-
 // Extract Shadowlands URL from ProRCP HTML
 function extractShadowlandsUrlFromProRCP(html, logger) {
   logger.info('Extracting Shadowlands URL from ProRCP HTML...');
   
-  // Patterns to find Shadowlands URL in ProRCP HTML
   const patterns = [
     // Look for direct shadowlands URLs
     /https?:\/\/[^\s"'<>]*shadowlands[^\s"'<>]*/gi,
@@ -927,7 +818,7 @@ function extractShadowlandsUrlFromProRCP(html, logger) {
           if (url.startsWith('//')) {
             url = `https:${url}`;
           } else if (url.startsWith('/')) {
-            url = `https://shadowlands.com${url}`; // Adjust domain as needed
+            url = `https://shadowlands.com${url}`;
           } else {
             url = `https://${url}`;
           }
@@ -979,12 +870,20 @@ function extractShadowlandsUrlFromProRCP(html, logger) {
   return null;
 }
 
-// Bulletproof extraction function with all anti-detection features
+// Bulletproof extraction function - simplified without proxies
 async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
   const logger = createLogger(requestId);
   const startTime = Date.now();
   
   logger.info('Starting bulletproof extraction', { url, tmdbId, season, episode });
+  
+  // Track this request
+  activeRequests.set(requestId, {
+    id: requestId,
+    startTime: Date.now(),
+    url,
+    profilePath: null
+  });
   
   const cookieManager = new CookieManager();
   let browser = null;
@@ -998,9 +897,18 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
     
     try {
       // Create stealth browser
-      browserInfo = await createStealthBrowser(logger, { domain: 'vidsrc.cc' });
+      browserInfo = await createStealthBrowser(logger, {
+        domain: 'vidsrc.cc',
+        requestId: requestId
+      });
       browser = browserInfo.browser;
-      const { fingerprint, proxy, proxyManager } = browserInfo;
+      const { fingerprint, profileManager } = browserInfo;
+      
+      // Update request tracking
+      const requestData = activeRequests.get(requestId);
+      if (requestData) {
+        requestData.profilePath = browserInfo.profilePath;
+      }
       
       const page = await browser.newPage();
       const behaviorSimulator = new HumanBehaviorSimulator(page, logger);
@@ -1075,22 +983,34 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
       // Restore cookies for VidSrc
       await cookieManager.restore(page, 'vidsrc.cc', logger);
       
-      // Navigate to VidSrc with enhanced error handling
+      // Navigate to VidSrc
       logger.info('Navigating to VidSrc URL');
+      
+      const preNavDelay = CONFIG.timing.navigationDelay.min +
+        Math.random() * (CONFIG.timing.navigationDelay.max - CONFIG.timing.navigationDelay.min);
+      await new Promise(resolve => setTimeout(resolve, preNavDelay));
       
       try {
         await page.goto(url, {
-          waitUntil: 'domcontentloaded',
+          waitUntil: 'networkidle0',
           timeout: CONFIG.timing.pageLoadTimeout
         });
       } catch (navError) {
         logger.warn('Navigation error, checking if page loaded anyway', { error: navError.message });
+        
+        try {
+          await page.waitForSelector('body', { timeout: 5000 });
+        } catch (e) {
+          logger.error('Page did not load at all');
+          throw navError;
+        }
       }
       
-      // Wait a moment for page to stabilize
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Human-like behavior
+      await behaviorSimulator.simulateReading(2000);
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Check for Cloudflare challenge (reduced timeout)
+      // Check for Cloudflare challenge
       const hasChallenge = await cloudflareSolver.waitForChallenge(3000);
       if (hasChallenge) {
         const solved = await cloudflareSolver.solveChallenge();
@@ -1099,7 +1019,7 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
         }
       }
       
-      // Wait for CloudNestra URL to appear and extract it immediately
+      // Wait for CloudNestra URL
       logger.info('Waiting for CloudNestra URL...');
       let cloudNestraUrl = null;
       const startWait = Date.now();
@@ -1119,25 +1039,30 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
       // Navigate to CloudNestra
       logger.info('Navigating to CloudNestra');
       
+      const cloudNavDelay = CONFIG.timing.navigationDelay.min +
+        Math.random() * (CONFIG.timing.navigationDelay.max - CONFIG.timing.navigationDelay.min);
+      await new Promise(resolve => setTimeout(resolve, cloudNavDelay));
+      
       try {
         await page.goto(cloudNestraUrl, {
-          waitUntil: 'domcontentloaded',
+          waitUntil: 'networkidle2',
           timeout: CONFIG.timing.pageLoadTimeout
         });
       } catch (navError) {
         logger.warn('CloudNestra navigation error', { error: navError.message });
       }
       
-      // Wait for page to stabilize
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Human-like behavior
+      await behaviorSimulator.simulateReading(1500);
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      // Check for Cloudflare on CloudNestra (reduced timeout)
+      // Check for Cloudflare on CloudNestra
       const cloudNestraChallenge = await cloudflareSolver.waitForChallenge(2000);
       if (cloudNestraChallenge) {
         await cloudflareSolver.solveChallenge();
       }
       
-      // Wait for ProRCP URL to appear and extract it immediately
+      // Wait for ProRCP URL
       logger.info('Waiting for ProRCP URL...');
       let proRcpUrl = null;
       const proRcpStartWait = Date.now();
@@ -1181,7 +1106,7 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
                   episode,
                   duration,
                   attempts: attempt,
-                  proxy: proxy?.server || 'none'
+                  proxy: 'none'
                 }
               };
             }
@@ -1198,6 +1123,10 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
       // Navigate to ProRCP
       logger.info('Navigating to ProRCP');
       
+      const proNavDelay = CONFIG.timing.navigationDelay.min +
+        Math.random() * (CONFIG.timing.navigationDelay.max - CONFIG.timing.navigationDelay.min);
+      await new Promise(resolve => setTimeout(resolve, proNavDelay));
+      
       try {
         await page.goto(proRcpUrl, {
           waitUntil: 'domcontentloaded',
@@ -1207,8 +1136,9 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
         logger.warn('ProRCP navigation error', { error: navError.message });
       }
       
-      // Wait for page to stabilize
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Human-like behavior
+      await behaviorSimulator.simulateReading(1800);
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Check for Cloudflare on ProRCP
       const proRcpChallenge = await cloudflareSolver.waitForChallenge(5000);
@@ -1216,7 +1146,7 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
         await cloudflareSolver.solveChallenge();
       }
       
-      // Wait for Shadowlands URL to appear and extract it immediately
+      // Wait for Shadowlands URL
       logger.info('Waiting for Shadowlands URL...');
       let shadowlandsUrl = null;
       const shadowlandsStartWait = Date.now();
@@ -1255,10 +1185,16 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
       
       logger.info('Found Shadowlands URL, returning it directly:', shadowlandsUrl);
       
-      // Close browser as we're done
+      // Close browser
       if (browser) {
         await browser.close();
       }
+      
+      // Clean up profile and tracking
+      if (browserInfo?.profileManager && browserInfo?.requestId) {
+        browserInfo.profileManager.cleanupProfile(browserInfo.requestId);
+      }
+      activeRequests.delete(requestId);
       
       const duration = logger.timing('Total extraction time', startTime);
       
@@ -1273,7 +1209,7 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
           episode,
           duration,
           attempts: attempt,
-          proxy: proxy?.server || 'none'
+          proxy: 'none'
         }
       };
       
@@ -1281,14 +1217,14 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
       lastError = error;
       logger.error(`Attempt ${attempt} failed`, error);
       
-      // Blacklist proxy if it failed
-      if (browserInfo?.proxy) {
-        browserInfo.proxyManager.blacklistProxy(browserInfo.proxy.server);
-      }
-      
+      // Clean up browser and profile
       if (browser) {
         await browser.close();
         browser = null;
+      }
+      
+      if (browserInfo?.profileManager && browserInfo?.requestId) {
+        browserInfo.profileManager.cleanupProfile(browserInfo.requestId);
       }
       
       if (attempt < CONFIG.timing.retryAttempts) {
@@ -1298,6 +1234,9 @@ async function bulletproofExtraction(url, tmdbId, season, episode, requestId) {
       }
     }
   }
+  
+  // Clean up tracking
+  activeRequests.delete(requestId);
   
   throw new Error(`Failed after ${CONFIG.timing.retryAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
 }
@@ -1396,7 +1335,7 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
     memory: process.memoryUsage(),
     config: {
-      proxies: CONFIG.proxies.length,
+      proxies: 0, // No proxies in this version
       retryAttempts: CONFIG.timing.retryAttempts,
       profiles: fs.existsSync(CONFIG.profilesDir),
       cookies: fs.existsSync(CONFIG.cookiesDir)
@@ -1404,16 +1343,16 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Start server on all interfaces (0.0.0.0) for public access
+// Start server
 const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, () => {
-  console.log(`\n🚀 Bulletproof VM Server running on ${HOST}:${PORT}`);
+  console.log(`\n🚀 Bulletproof VM Server (No Proxies) running on ${HOST}:${PORT}`);
   console.log('\n🌐 Server is accessible from:');
   console.log(`   - Local: http://localhost:${PORT}`);
   console.log(`   - Network: http://${HOST}:${PORT}`);
   console.log(`   - Public: http://<your-public-ip>:${PORT}`);
   console.log('\n📋 Configuration:');
-  console.log(`   - Proxies configured: ${CONFIG.proxies.length}`);
+  console.log(`   - Proxies configured: 0 (bulletproof method only)`);
   console.log(`   - Retry attempts: ${CONFIG.timing.retryAttempts}`);
   console.log(`   - Human delay range: ${CONFIG.timing.humanDelayMin}-${CONFIG.timing.humanDelayMax}ms`);
   console.log(`   - Page load timeout: ${CONFIG.timing.pageLoadTimeout}ms`);
