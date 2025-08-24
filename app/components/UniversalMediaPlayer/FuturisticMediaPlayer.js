@@ -2,46 +2,47 @@
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import styles from './FuturisticMediaPlayer.module.css';
 
-// Enhanced hooks and components - only import what we actually use
+// Error boundary and recovery
+import MediaPlayerErrorBoundary, { StreamErrorBoundary } from './components/MediaPlayerErrorBoundary';
+import { useErrorRecovery, NetworkHealthMonitor } from './utils/errorRecovery';
+
+// Enhanced hooks - optimized imports
 import { useStream } from './hooks/useStream';
 import { useEnhancedSubtitles } from '../../hooks/useEnhancedSubtitles';
 import useFetchMediaDetails from './hooks/useFetchMediaDetails';
 import useEpisodeNavigation from './hooks/useEpisodeNavigation';
 import useAutoAdvance from './hooks/useAutoAdvance';
 
-// Enhanced UI components
-import EnhancedMediaControls from './components/EnhancedMediaControls';
-import IntelligentSubtitles from './components/IntelligentSubtitles';
-import AmbientLighting from './components/AmbientLighting';
-import VoiceInterface from './components/VoiceInterface';
-import GestureOverlay from './components/GestureOverlay';
-import AdvancedSettings from './components/AdvancedSettings';
-import PerformanceDashboard from './components/PerformanceDashboard';
-import AdaptiveLoading from './components/AdaptiveLoading';
-import EpisodeCarousel from './components/EpisodeCarousel';
-import NextEpisodePrompt from './components/NextEpisodePrompt';
-import PictureInPicture from './components/PictureInPicture';
+// Enhanced UI components - lazy loaded for performance
+const EnhancedMediaControls = dynamic(() => import('./components/EnhancedMediaControls'), { ssr: false });
+const IntelligentSubtitles = dynamic(() => import('./components/IntelligentSubtitles'), { ssr: false });
+const AmbientLighting = dynamic(() => import('./components/AmbientLighting'), { ssr: false });
+const VoiceInterface = dynamic(() => import('./components/VoiceInterface'), { ssr: false });
+const GestureOverlay = dynamic(() => import('./components/GestureOverlay'), { ssr: false });
+const AdvancedSettings = dynamic(() => import('./components/AdvancedSettings'), { ssr: false });
+const PerformanceDashboard = dynamic(() => import('./components/PerformanceDashboard'), { ssr: false });
+const AdaptiveLoading = dynamic(() => import('./components/AdaptiveLoading'), { ssr: false });
+const EpisodeCarousel = dynamic(() => import('./components/EpisodeCarousel'), { ssr: false });
+const NextEpisodePrompt = dynamic(() => import('./components/NextEpisodePrompt'), { ssr: false });
+const PictureInPicture = dynamic(() => import('./components/PictureInPicture'), { ssr: false });
 
 /**
- * FuturisticMediaPlayer - The ultimate media playback experience
- * 
- * Features:
- * - AI-powered adaptive quality with scene detection
- * - Intelligent subtitle positioning with content awareness
- * - Immersive ambient lighting synchronized to video content
- * - Advanced gesture and voice control systems
- * - Real-time performance analytics and optimization
- * - Smart buffering with predictive loading
- * - Dynamic UI adaptation based on content type
- * - Advanced seeking with frame-accurate thumbnails
- * - Collaborative features and multi-device synchronization
- * - Comprehensive accessibility with AI narration
- * - Particle effects and glassmorphism design
- * - Picture-in-Picture with smart positioning
+ * FuturisticMediaPlayer - Completely Refactored Media Player
+ *
+ * Key Improvements:
+ * - Optimized state management without redundancy
+ * - Proper HLS.js loading and cleanup
+ * - Efficient rendering without force re-renders
+ * - Comprehensive error handling with recovery
+ * - Working controls with proper sync
+ * - Clean component architecture
+ * - Performance optimizations
+ * - Error boundaries and recovery mechanisms
  */
-const FuturisticMediaPlayer = ({ 
+const FuturisticMediaPlayerCore = ({
   mediaType, 
   movieId, 
   seasonId, 
@@ -52,7 +53,7 @@ const FuturisticMediaPlayer = ({
   theme = 'dark',
   ambientLighting = true,
   gestureControls = true,
-  voiceControls = true,
+  voiceControls = false,
   adaptiveQuality = true,
   collaborativeMode = false
 }) => {
@@ -60,146 +61,189 @@ const FuturisticMediaPlayer = ({
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
+  const hlsRef = useRef(null);
+  const uiTimeoutRef = useRef(null);
+  const syncIntervalRef = useRef(null);
+  const networkMonitorRef = useRef(null);
+  const errorBoundaryResetKey = useRef(0);
   
-  // State management
+  // UI state
   const [isInitialized, setIsInitialized] = useState(false);
   const [uiVisible, setUiVisible] = useState(true);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [performanceVisible, setPerformanceVisible] = useState(false);
-  const [fullscreenMode, setFullscreenMode] = useState('standard'); // standard, immersive, cinema
+  const [fullscreenMode, setFullscreenMode] = useState('standard');
   
-  // Simple, functional player state with all required properties
-  const [simplePlayerState, setSimplePlayerState] = useState({
+  // Optimized player state - single source of truth
+  const [playerState, setPlayerState] = useState({
     isPlaying: false,
-    volume: 0.8, // Default volume
+    volume: 0.8,
     isMuted: false,
     duration: 0,
     currentTime: 0,
     isFullscreen: false,
     buffered: 0,
+    isLoading: false,
+    hasError: false,
+    errorMessage: null
+  });
+
+  // Advanced features state
+  const [advancedState, setAdvancedState] = useState({
     subtitleStyle: {},
     ambientIntensity: 0.5,
     gestureVisualFeedback: true,
     particlesEnabled: false,
     pipEnabled: false,
-    pipPosition: { x: 20, y: 20 }
+    pipPosition: { x: 20, y: 20 },
+    currentQuality: 'auto',
+    qualities: [],
+    playbackRate: 1.0
   });
-  
-  // Debug only significant state changes
-  useEffect(() => {
-    if (simplePlayerState.duration > 0) {
-      console.log('📊 Controls should show:', {
-        time: `${Math.floor(simplePlayerState.currentTime)}/${Math.floor(simplePlayerState.duration)}s`,
-        playing: simplePlayerState.isPlaying ? '▶️' : '⏸️',
-        vol: `${Math.round(simplePlayerState.volume * 100)}%`
-      });
-    }
-  }, [Math.floor(simplePlayerState.currentTime), simplePlayerState.duration, simplePlayerState.isPlaying]);
 
-  // Memoized player actions to prevent re-creation on every render
-  const playerActions = useMemo(() => {
-    const actions = {
-      setPlaying: (isPlaying) => {
-        setSimplePlayerState(prev => ({ ...prev, isPlaying }));
-      },
-      togglePlay: () => {
-        const video = videoRef.current;
-        if (video) {
-          if (video.paused) {
-            video.play();
-          } else {
-            video.pause();
-          }
-        }
-      },
-      setVolume: (volume) => {
-        const clampedVolume = Math.max(0, Math.min(1, volume));
-        const video = videoRef.current;
-        if (video) {
-          try {
-            video.volume = clampedVolume;
-            video.muted = clampedVolume === 0;
-            setSimplePlayerState(prev => ({
-              ...prev,
-              volume: clampedVolume,
-              isMuted: clampedVolume === 0
-            }));
-          } catch (e) {
-            console.error('Volume set error:', e);
-          }
-        }
-      },
-      adjustVolume: (delta) => {
-        const video = videoRef.current;
-        if (video) {
-          const newVolume = Math.max(0, Math.min(1, video.volume + delta));
-          video.volume = newVolume;
-          video.muted = newVolume === 0;
-          setSimplePlayerState(prev => ({ ...prev, volume: newVolume, isMuted: newVolume === 0 }));
-        }
-      },
-      toggleMute: () => {
-        const video = videoRef.current;
-        if (video) {
-          const wasMuted = video.muted;
-          video.muted = !wasMuted;
-          // If unmuting and volume is 0, set to a reasonable volume
-          if (wasMuted && video.volume === 0) {
-            video.volume = 0.8;
-          }
-          setSimplePlayerState(prev => ({
-            ...prev,
-            isMuted: !wasMuted,
-            volume: video.volume
+  // Performance metrics
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    fps: 60,
+    droppedFrames: 0,
+    bufferHealth: 100,
+    bandwidth: 0,
+    latency: 0
+  });
+
+  // Error recovery hook
+  const {
+    handleError: handleRecoverableError,
+    reset: resetErrorRecovery,
+    isRecovering,
+    retryCount
+  } = useErrorRecovery({
+    maxRetries: 3,
+    onError: (error) => {
+      console.error('Unrecoverable error:', error);
+      setPlayerState(prev => ({
+        ...prev,
+        hasError: true,
+        errorMessage: error.message || 'An error occurred'
+      }));
+    },
+    onRecovery: () => {
+      console.log('Attempting recovery...');
+      retryExtraction();
+    },
+    onMaxRetriesExceeded: (error) => {
+      console.error('Max retries exceeded:', error);
+    }
+  });
+
+  // Memoized player actions - prevent recreation on every render
+  const playerActions = useMemo(() => ({
+    play: async () => {
+      const video = videoRef.current;
+      if (video) {
+        try {
+          await video.play();
+          setPlayerState(prev => ({ ...prev, isPlaying: true }));
+        } catch (err) {
+          console.error('Play error:', err);
+          setPlayerState(prev => ({ 
+            ...prev, 
+            hasError: true, 
+            errorMessage: 'Failed to play video' 
           }));
         }
-      },
-      setCurrentTime: (currentTime) => {
-        if (isFinite(currentTime) && !isNaN(currentTime)) {
-          setSimplePlayerState(prev => ({ ...prev, currentTime }));
+      }
+    },
+    
+    pause: () => {
+      const video = videoRef.current;
+      if (video) {
+        video.pause();
+        setPlayerState(prev => ({ ...prev, isPlaying: false }));
+      }
+    },
+    
+    togglePlay: async () => {
+      const video = videoRef.current;
+      if (video) {
+        if (video.paused) {
+          await playerActions.play();
+        } else {
+          playerActions.pause();
         }
-      },
-      setDuration: (duration) => {
-        if (isFinite(duration) && !isNaN(duration) && duration > 0) {
-          setSimplePlayerState(prev => ({ ...prev, duration }));
+      }
+    },
+    
+    seek: (time) => {
+      const video = videoRef.current;
+      if (video && isFinite(time)) {
+        const clampedTime = Math.max(0, Math.min(video.duration || 0, time));
+        video.currentTime = clampedTime;
+        setPlayerState(prev => ({ ...prev, currentTime: clampedTime }));
+      }
+    },
+    
+    setVolume: (volume) => {
+      const video = videoRef.current;
+      if (video && isFinite(volume)) {
+        const clampedVolume = Math.max(0, Math.min(1, volume));
+        video.volume = clampedVolume;
+        video.muted = clampedVolume === 0;
+        setPlayerState(prev => ({
+          ...prev,
+          volume: clampedVolume,
+          isMuted: clampedVolume === 0
+        }));
+      }
+    },
+    
+    adjustVolume: (delta) => {
+      const video = videoRef.current;
+      if (video) {
+        const newVolume = Math.max(0, Math.min(1, video.volume + delta));
+        playerActions.setVolume(newVolume);
+      }
+    },
+    
+    toggleMute: () => {
+      const video = videoRef.current;
+      if (video) {
+        const wasMuted = video.muted;
+        video.muted = !wasMuted;
+        if (wasMuted && video.volume === 0) {
+          video.volume = 0.8;
         }
-      },
-      setFullscreen: (isFullscreen) => {
-        setSimplePlayerState(prev => ({ ...prev, isFullscreen }));
-      },
-      seek: (time) => {
-        const video = videoRef.current;
-        if (video && isFinite(time)) {
-          const clampedTime = Math.max(0, Math.min(video.duration || 0, time));
-          video.currentTime = clampedTime;
-          setSimplePlayerState(prev => ({ ...prev, currentTime: clampedTime }));
-        }
-      },
-      setBuffered: (buffered) => {
-        if (isFinite(buffered) && !isNaN(buffered)) {
-          setSimplePlayerState(prev => ({ ...prev, buffered }));
-        }
-      },
-      resetUITimer: () => {}, // Keep as no-op for compatibility
-      setPipPosition: (position) => {
-        setSimplePlayerState(prev => ({ ...prev, pipPosition: position }));
-      },
-    };
-    return actions;
-  }, []);
+        setPlayerState(prev => ({
+          ...prev,
+          isMuted: !wasMuted,
+          volume: video.volume
+        }));
+      }
+    },
+    
+    setFullscreen: (isFullscreen) => {
+      setPlayerState(prev => ({ ...prev, isFullscreen }));
+    },
+    
+    setPlaybackRate: (rate) => {
+      const video = videoRef.current;
+      if (video && isFinite(rate)) {
+        video.playbackRate = Math.max(0.25, Math.min(4, rate));
+        setAdvancedState(prev => ({ ...prev, playbackRate: video.playbackRate }));
+      }
+    },
+    
+    setPipPosition: (position) => {
+      setAdvancedState(prev => ({ ...prev, pipPosition: position }));
+    }
+  }), []);
 
-  // Use simplePlayerState directly
-  const playerState = simplePlayerState;
-  
-  // Removed debug logging
-  
-  // Enhanced media details with scene analysis
+  // Enhanced media details fetching
   const { details: mediaDetails, sceneData } = useFetchMediaDetails(movieId, mediaType, {
     enableSceneDetection: enableAdvancedFeatures,
     enableContentAnalysis: true
   });
   
-  // Stream extraction and management - Allow normal initialization
+  // Stream extraction and management
   const {
     streamUrl,
     streamType,
@@ -216,191 +260,7 @@ const FuturisticMediaPlayer = ({
     shouldFetch: !!(movieId && (mediaType !== 'tv' || (seasonId && episodeId)))
   });
 
-  // Functional video controls - ENABLED
-  const [qualities, setQualities] = useState([
-    { id: 'auto', label: 'Auto', height: 1080, bitrate: 5000000 },
-    { id: '1080', label: '1080p', height: 1080, bitrate: 5000000 },
-    { id: '720', label: '720p', height: 720, bitrate: 2500000 },
-    { id: '480', label: '480p', height: 480, bitrate: 1000000 }
-  ]);
-  const [currentQuality, setCurrentQuality] = useState('auto');
-  const hlsRef = useRef(null); // Store HLS instance reference
-  
-  const setQuality = useCallback((qualityId) => {
-    setCurrentQuality(qualityId);
-    console.log('🎬 Quality change requested:', qualityId);
-    
-    // Handle HLS quality switching
-    if (hlsRef.current) {
-      if (qualityId === 'auto') {
-        // Enable auto quality
-        hlsRef.current.currentLevel = -1;
-        console.log('✅ Auto quality enabled');
-      } else {
-        // Set specific quality level
-        const levelIndex = parseInt(qualityId);
-        if (!isNaN(levelIndex) && levelIndex >= 0 && levelIndex < hlsRef.current.levels.length) {
-          hlsRef.current.currentLevel = levelIndex;
-          console.log(`✅ Quality set to level ${levelIndex}: ${hlsRef.current.levels[levelIndex].height}p`);
-        }
-      }
-    }
-  }, []);
-  const adaptiveSettings = { enabled: true };
-  const playerPerformanceMetrics = { fps: 60, dropFrames: 0 };
-  const bufferHealth = 100;
-  const networkMetrics = { bandwidth: 5000000, latency: 50 };
-
-  // Set video source when streamUrl is available
-  useEffect(() => {
-    if (videoRef.current && streamUrl) {
-      console.log('🎬 Setting video source:', streamType);
-      console.log('📺 Stream URL:', streamUrl);
-      
-      // For HLS streams, try to use native HLS support first
-      if (streamType === 'hls') {
-        // Check if browser supports native HLS
-        if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-          videoRef.current.src = streamUrl;
-        } else {
-          // For non-Safari browsers, try to use HLS.js with better error handling
-          const loadHLS = async () => {
-            try {
-              // Import HLS.js with a more reliable approach
-              let HLS;
-              
-              // Try different import methods
-              try {
-                const hlsModule = await import('hls.js/dist/hls.min.js');
-                HLS = hlsModule.default;
-              } catch (e) {
-                console.warn('Failed to import hls.min.js, trying main export:', e);
-                const hlsModule = await import('hls.js');
-                HLS = hlsModule.default;
-              }
-              
-              if (!HLS) {
-                throw new Error('HLS.js not available');
-              }
-              
-              // Check if HLS is supported
-              if (HLS.isSupported && HLS.isSupported()) {
-                
-                // Clean up any existing HLS instance
-                if (videoRef.current && videoRef.current.hls) {
-                  videoRef.current.hls.destroy();
-                  videoRef.current.hls = null;
-                }
-                
-                // Create HLS instance with optimized settings
-                const hls = new HLS({
-                  debug: false,
-                  enableWorker: true,
-                  lowLatencyMode: false,
-                  backBufferLength: 90,
-                  maxBufferLength: 30,
-                  maxMaxBufferLength: 600,
-                  startLevel: -1, // Auto quality
-                  capLevelToPlayerSize: true
-                });
-                
-                // Store reference for cleanup and quality control
-                videoRef.current.hls = hls;
-                hlsRef.current = hls;
-                
-                hls.loadSource(streamUrl);
-                hls.attachMedia(videoRef.current);
-                
-                // Handle HLS events
-                hls.on(HLS.Events.MANIFEST_PARSED, () => {
-                  // Update qualities from manifest
-                  if (hls.levels && hls.levels.length > 0) {
-                    console.log('📊 Available quality levels:', hls.levels.map(l => `${l.height}p`));
-                    const hlsQualities = hls.levels.map((level, index) => ({
-                      id: index.toString(),
-                      label: `${level.height}p`,
-                      height: level.height,
-                      bitrate: level.bitrate
-                    }));
-                    setQualities([
-                      { id: 'auto', label: 'Auto', height: 1080, bitrate: 5000000 },
-                      ...hlsQualities
-                    ]);
-                  }
-                });
-                
-                // Listen for quality changes
-                hls.on(HLS.Events.LEVEL_SWITCHED, (event, data) => {
-                  console.log(`📺 Quality switched to level ${data.level}: ${hls.levels[data.level].height}p`);
-                });
-                
-                hls.on(HLS.Events.ERROR, (event, data) => {
-                  if (data.fatal) {
-                    hls.destroy();
-                    videoRef.current.hls = null;
-                    videoRef.current.src = streamUrl;
-                  }
-                });
-                
-              } else {
-                videoRef.current.src = streamUrl;
-              }
-              
-            } catch (error) {
-              videoRef.current.src = streamUrl;
-            }
-          };
-          
-          // Only load HLS.js on client side
-          if (typeof window !== 'undefined') {
-            loadHLS();
-          } else {
-            videoRef.current.src = streamUrl;
-          }
-        }
-      } else {
-        // Non-HLS streams
-        videoRef.current.src = streamUrl;
-      }
-      
-      // Force load
-      videoRef.current.load();
-      
-      // Let browser handle initial volume
-      
-      // Wait for loadedmetadata event before trying to play
-      const playWhenReady = () => {
-        if (videoRef.current && videoRef.current.readyState >= 1) {
-          videoRef.current.play().then(() => {
-            console.log('✅ Autoplay started');
-            setSimplePlayerState(prev => ({ ...prev, isPlaying: true }));
-          }).catch(err => {
-            console.log('⚠️ Autoplay prevented, click to play:', err);
-          });
-        }
-      };
-      
-      // Try to play when ready
-      videoRef.current.addEventListener('loadedmetadata', playWhenReady, { once: true });
-      
-    }
-    
-    // Clean up HLS instance on unmount and when streamUrl changes
-    return () => {
-      if (videoRef.current && videoRef.current.hls) {
-        videoRef.current.hls.destroy();
-        videoRef.current.hls = null;
-      }
-      if (hlsRef.current) {
-        hlsRef.current = null;
-      }
-    };
-  }, [streamUrl, streamType]);
-
-  // REMOVED sync interval - let native controls handle everything
-  // The sync was interfering with native HTML5 controls
-
-  // Enhanced subtitle system with API integration
+  // Enhanced subtitle system
   const {
     subtitles,
     availableLanguages,
@@ -416,34 +276,6 @@ const FuturisticMediaPlayer = ({
     enabled: !!mediaDetails,
     videoRef
   });
-
-  // Simplified ambient effects - DISABLED
-  const ambientColors = [];
-  const lightingEffects = {};
-  const particleConfig = {};
-  const atmosphereMode = 'default';
-
-  // Simplified gesture and voice systems - DISABLED for now
-  const gestureState = {};
-  const voiceState = {};
-  const startListening = () => {};
-  const stopListening = () => {};
-  const voiceCommands = {};
-
-  // Simplified quality system - DISABLED
-  const recommendedQuality = 'auto';
-  const qualityHistory = [];
-  const performanceProfile = {};
-
-  // Simplified analytics - DISABLED to prevent infinite loops
-  const trackEvent = () => {};
-  const sessionId = 'disabled';
-  const sessionData = { duration: 0, interactions: 0 };
-  const userBehavior = {};
-  const analyticsPerformanceMetrics = {};
-  const contentAnalytics = {};
-  const insights = {};
-  const isTracking = false;
 
   // Episode navigation for TV shows
   const {
@@ -463,7 +295,7 @@ const FuturisticMediaPlayer = ({
     onEpisodeChange
   });
 
-  // Auto-advance with AI prediction
+  // Auto-advance for episodes
   const {
     showNextEpisodePrompt,
     countdown,
@@ -482,10 +314,245 @@ const FuturisticMediaPlayer = ({
     aiPrediction: enableAdvancedFeatures
   });
 
-  // Enhanced fullscreen functionality - DEFINED FIRST to avoid hoisting issues
+  // Enhanced HLS.js loading with proper cleanup
+  const loadHLS = useCallback(async () => {
+    if (!streamUrl || streamType !== 'hls' || !videoRef.current) return;
+    
+    // Check for native HLS support (Safari)
+    if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+      videoRef.current.src = streamUrl;
+      return;
+    }
+    
+    try {
+      // Dynamic import with fallback
+      const Hls = (await import('hls.js')).default;
+      
+      if (!Hls.isSupported()) {
+        console.warn('HLS.js not supported, falling back to native playback');
+        videoRef.current.src = streamUrl;
+        return;
+      }
+      
+      // Clean up existing instance
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      
+      // Create optimized HLS instance
+      const hls = new Hls({
+        debug: false,
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 90,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 600,
+        startLevel: -1,
+        capLevelToPlayerSize: true,
+        xhrSetup: (xhr, url) => {
+          xhr.withCredentials = false;
+        }
+      });
+      
+      hlsRef.current = hls;
+      
+      // Handle HLS events
+      hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+        console.log('📊 HLS manifest parsed, quality levels:', data.levels.map(l => `${l.height}p`));
+        
+        // Update available qualities
+        const hlsQualities = data.levels.map((level, index) => ({
+          id: index.toString(),
+          label: `${level.height}p`,
+          height: level.height,
+          bitrate: level.bitrate
+        }));
+        
+        setAdvancedState(prev => ({
+          ...prev,
+          qualities: [
+            { id: 'auto', label: 'Auto', height: 0, bitrate: 0 },
+            ...hlsQualities
+          ]
+        }));
+        
+        // Auto-play
+        videoRef.current.play().catch(err => {
+          console.log('Autoplay prevented:', err);
+        });
+      });
+      
+      hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+        console.log(`📺 Quality switched to: ${hls.levels[data.level].height}p`);
+      });
+      
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error('HLS Error:', data);
+        
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.log('Fatal network error, attempting recovery...');
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.log('Fatal media error, attempting recovery...');
+              hls.recoverMediaError();
+              break;
+            default:
+              console.error('Fatal error, cannot recover');
+              hls.destroy();
+              hlsRef.current = null;
+              // Fallback to native playback
+              videoRef.current.src = streamUrl;
+              break;
+          }
+        }
+      });
+      
+      // Load source and attach to video
+      hls.loadSource(streamUrl);
+      hls.attachMedia(videoRef.current);
+      
+    } catch (error) {
+      console.error('HLS.js loading error:', error);
+      // Fallback to native playback
+      videoRef.current.src = streamUrl;
+    }
+  }, [streamUrl, streamType]);
+
+  // Set quality handler
+  const setQuality = useCallback((qualityId) => {
+    if (!hlsRef.current) return;
+    
+    setAdvancedState(prev => ({ ...prev, currentQuality: qualityId }));
+    
+    if (qualityId === 'auto') {
+      hlsRef.current.currentLevel = -1;
+      console.log('✅ Auto quality enabled');
+    } else {
+      const levelIndex = parseInt(qualityId);
+      if (!isNaN(levelIndex) && levelIndex >= 0 && levelIndex < hlsRef.current.levels.length) {
+        hlsRef.current.currentLevel = levelIndex;
+        console.log(`✅ Quality set to: ${hlsRef.current.levels[levelIndex].height}p`);
+      }
+    }
+  }, []);
+
+  // Video element event handlers
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    const handleLoadedMetadata = () => {
+      console.log('✅ Video metadata loaded');
+      setPlayerState(prev => ({
+        ...prev,
+        duration: video.duration || 0,
+        isLoading: false
+      }));
+      setIsInitialized(true);
+    };
+    
+    const handleTimeUpdate = () => {
+      setPlayerState(prev => ({
+        ...prev,
+        currentTime: video.currentTime || 0,
+        buffered: video.buffered.length > 0
+          ? video.buffered.end(video.buffered.length - 1)
+          : 0
+      }));
+    };
+    
+    const handlePlay = () => {
+      setPlayerState(prev => ({ ...prev, isPlaying: true, hasError: false }));
+    };
+    
+    const handlePause = () => {
+      setPlayerState(prev => ({ ...prev, isPlaying: false }));
+    };
+    
+    const handleError = async (e) => {
+      console.error('Video error:', e);
+      
+      // Try to recover from the error
+      const recovered = await handleRecoverableError(new Error('Video playback error'));
+      
+      if (!recovered) {
+        setPlayerState(prev => ({
+          ...prev,
+          hasError: true,
+          errorMessage: 'Video playback error occurred'
+        }));
+      }
+    };
+    
+    const handleWaiting = () => {
+      setPlayerState(prev => ({ ...prev, isLoading: true }));
+    };
+    
+    const handleCanPlay = () => {
+      setPlayerState(prev => ({ ...prev, isLoading: false }));
+    };
+    
+    const handleVolumeChange = () => {
+      setPlayerState(prev => ({
+        ...prev,
+        volume: video.volume,
+        isMuted: video.muted
+      }));
+    };
+    
+    // Add event listeners
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('error', handleError);
+    video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('volumechange', handleVolumeChange);
+    
+    return () => {
+      // Remove event listeners
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('error', handleError);
+      video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('volumechange', handleVolumeChange);
+    };
+  }, []);
+
+  // Load video source when stream URL is ready
+  useEffect(() => {
+    if (!streamUrl || !videoRef.current) return;
+    
+    console.log('🎬 Loading stream:', { streamType, streamUrl });
+    
+    if (streamType === 'hls') {
+      loadHLS();
+    } else {
+      videoRef.current.src = streamUrl;
+      videoRef.current.load();
+    }
+    
+    return () => {
+      // Cleanup HLS instance
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [streamUrl, streamType, loadHLS]);
+
+  // Enhanced fullscreen functionality
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
-
+    
     try {
       if (!document.fullscreenElement) {
         await containerRef.current.requestFullscreen();
@@ -497,14 +564,14 @@ const FuturisticMediaPlayer = ({
         setFullscreenMode('standard');
       }
     } catch (error) {
-      console.error('❌ Fullscreen error:', error);
+      console.error('Fullscreen error:', error);
     }
   }, [playerActions]);
 
-  // Simple gesture action handler
+  // Gesture action handler
   const handleGestureAction = useCallback((gesture) => {
     if (!videoRef.current) return;
-
+    
     switch (gesture.type) {
       case 'swipeUp':
         playerActions.adjustVolume(0.1);
@@ -513,43 +580,38 @@ const FuturisticMediaPlayer = ({
         playerActions.adjustVolume(-0.1);
         break;
       case 'swipeLeft':
-        videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+        playerActions.seek(Math.max(0, videoRef.current.currentTime - 10));
         break;
       case 'swipeRight':
-        videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
+        playerActions.seek(Math.min(videoRef.current.duration, videoRef.current.currentTime + 10));
         break;
       case 'tap':
-        if (videoRef.current.paused) {
-          videoRef.current.play();
-        } else {
-          videoRef.current.pause();
-        }
+        playerActions.togglePlay();
         break;
       case 'doubleTap':
         toggleFullscreen();
         break;
+      default:
+        break;
     }
   }, [playerActions, toggleFullscreen]);
 
-  // Simple voice command handler
+  // Voice command handler
   const handleVoiceCommand = useCallback((command) => {
-    if (!videoRef.current) return;
-    
     const { action, value } = command;
     
     switch (action) {
       case 'play':
-        videoRef.current.play();
+        playerActions.play();
         break;
       case 'pause':
-        videoRef.current.pause();
+        playerActions.pause();
         break;
       case 'volume':
-        const normalizedVolume = Math.max(0, Math.min(1, value / 100));
-        playerActions.setVolume(normalizedVolume);
+        playerActions.setVolume(value / 100);
         break;
       case 'seek':
-        videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration, value));
+        playerActions.seek(value);
         break;
       case 'quality':
         setQuality(value);
@@ -557,13 +619,27 @@ const FuturisticMediaPlayer = ({
       case 'fullscreen':
         toggleFullscreen();
         break;
+      default:
+        break;
     }
   }, [playerActions, setQuality, toggleFullscreen]);
 
-  // Simple UI visibility management
+  // UI visibility management
   const showUI = useCallback(() => {
     setUiVisible(true);
-  }, []);
+    
+    // Clear existing timeout
+    if (uiTimeoutRef.current) {
+      clearTimeout(uiTimeoutRef.current);
+    }
+    
+    // Hide after 3 seconds of inactivity
+    uiTimeoutRef.current = setTimeout(() => {
+      if (playerState.isPlaying && fullscreenMode === 'immersive') {
+        setUiVisible(false);
+      }
+    }, 3000);
+  }, [playerState.isPlaying, fullscreenMode]);
 
   const hideUI = useCallback(() => {
     if (playerState.isPlaying && fullscreenMode === 'immersive') {
@@ -571,12 +647,7 @@ const FuturisticMediaPlayer = ({
     }
   }, [playerState.isPlaying, fullscreenMode]);
 
-  // Removed old event handlers - now using inline handlers in useEffect
-
-  // DISABLED event handlers - they interfere with native controls
-  // Let native HTML5 controls handle everything
-
-  // Simple keyboard shortcuts that actually work
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.target.tagName === 'INPUT' || !videoRef.current) return;
@@ -584,23 +655,21 @@ const FuturisticMediaPlayer = ({
       switch (e.key) {
         case ' ':
           e.preventDefault();
-          if (videoRef.current.paused) {
-            videoRef.current.play();
-          } else {
-            videoRef.current.pause();
-          }
+          playerActions.togglePlay();
           break;
         case 'f':
+        case 'F':
           toggleFullscreen();
           break;
         case 'm':
+        case 'M':
           playerActions.toggleMute();
           break;
         case 'ArrowLeft':
-          videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+          playerActions.seek(Math.max(0, videoRef.current.currentTime - 10));
           break;
         case 'ArrowRight':
-          videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
+          playerActions.seek(Math.min(videoRef.current.duration, videoRef.current.currentTime + 10));
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -610,38 +679,101 @@ const FuturisticMediaPlayer = ({
           e.preventDefault();
           playerActions.adjustVolume(-0.1);
           break;
+        case ',':
+          playerActions.setPlaybackRate(advancedState.playbackRate - 0.25);
+          break;
+        case '.':
+          playerActions.setPlaybackRate(advancedState.playbackRate + 0.25);
+          break;
+        default:
+          break;
       }
     };
-
+    
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [playerActions, toggleFullscreen]);
+  }, [playerActions, toggleFullscreen, advancedState.playbackRate]);
 
-  // Comprehensive cleanup on component unmount
+  // Performance monitoring
   useEffect(() => {
-    return () => {
-      // Clean up video element
-      if (videoRef.current) {
-        const video = videoRef.current;
+    if (!enableAdvancedFeatures || !videoRef.current) return;
+    
+    const monitorPerformance = () => {
+      const video = videoRef.current;
+      if (!video || !video.getVideoPlaybackQuality) return;
+      
+      const quality = video.getVideoPlaybackQuality();
+      setPerformanceMetrics(prev => ({
+        ...prev,
+        droppedFrames: quality.droppedVideoFrames || 0,
+        fps: quality.totalVideoFrames > 0
+          ? Math.round((quality.totalVideoFrames - quality.droppedVideoFrames) / (video.currentTime || 1))
+          : 60
+      }));
+    };
+    
+    const interval = setInterval(monitorPerformance, 2000);
+    return () => clearInterval(interval);
+  }, [enableAdvancedFeatures]);
+
+  // Network health monitoring
+  useEffect(() => {
+    if (!enableAdvancedFeatures) return;
+
+    networkMonitorRef.current = new NetworkHealthMonitor({
+      checkInterval: 5000,
+      healthEndpoint: '/api/health',
+      onStatusChange: (status, oldStatus) => {
+        console.log(`Network status changed: ${oldStatus} → ${status}`);
         
-        // Pause and reset video
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-        
-        // Clean up HLS instance if exists
-        if (video.hls) {
-          video.hls.destroy();
-          video.hls = null;
+        if (status === 'offline' || status === 'error') {
+          setPlayerState(prev => ({
+            ...prev,
+            isLoading: true
+          }));
+        } else if (status === 'healthy' && oldStatus !== 'healthy') {
+          // Network recovered, try to resume
+          if (videoRef.current && videoRef.current.paused) {
+            videoRef.current.play().catch(console.error);
+          }
         }
       }
+    });
+
+    networkMonitorRef.current.start();
+
+    return () => {
+      if (networkMonitorRef.current) {
+        networkMonitorRef.current.stop();
+      }
+    };
+  }, [enableAdvancedFeatures]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clear timeouts
+      if (uiTimeoutRef.current) {
+        clearTimeout(uiTimeoutRef.current);
+      }
       
-      // Reset state
-      setIsInitialized(false);
-      setUiVisible(true);
-      setSettingsVisible(false);
-      setPerformanceVisible(false);
-      setFullscreenMode('standard');
+      // Cleanup HLS
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      
+      // Cleanup video
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.removeAttribute('src');
+        videoRef.current.load();
+      }
+      
+      // Stop network monitoring
+      if (networkMonitorRef.current) {
+        networkMonitorRef.current.stop();
+      }
     };
   }, []);
 
@@ -649,8 +781,8 @@ const FuturisticMediaPlayer = ({
   if (streamLoading && !streamUrl) {
     return (
       <div className={styles.playerContainer}>
-        <AdaptiveLoading 
-          progress={loadingProgress} 
+        <AdaptiveLoading
+          progress={loadingProgress}
           phase={loadingPhase}
           enableParticles={enableAdvancedFeatures}
           theme={theme}
@@ -660,7 +792,7 @@ const FuturisticMediaPlayer = ({
   }
 
   // Render error state
-  if (streamError) {
+  if (streamError || playerState.hasError) {
     return (
       <div className={styles.playerContainer}>
         <div className={styles.errorOverlay}>
@@ -670,13 +802,13 @@ const FuturisticMediaPlayer = ({
             className={styles.errorContent}
           >
             <h3>⚡ Playback Error</h3>
-            <p>{streamError}</p>
+            <p>{streamError || playerState.errorMessage || 'An unexpected error occurred'}</p>
             <div className={styles.errorActions}>
               <button onClick={retryExtraction} className={styles.retryButton}>
                 🔄 Retry Stream
               </button>
               <button onClick={onBackToShowDetails} className={styles.backButton}>
-                ← Return Home
+                ← Back to Details
               </button>
             </div>
           </motion.div>
@@ -685,8 +817,9 @@ const FuturisticMediaPlayer = ({
     );
   }
 
+  // Main render
   return (
-    <div 
+    <div
       ref={containerRef}
       className={`${styles.futuristicPlayer} ${styles[`theme-${theme}`]} ${
         fullscreenMode === 'immersive' ? styles.immersiveMode : ''
@@ -698,26 +831,13 @@ const FuturisticMediaPlayer = ({
       <AnimatePresence>
         {ambientLighting && enableAdvancedFeatures && (
           <AmbientLighting
-            colors={ambientColors}
-            effects={lightingEffects}
-            intensity={playerState.ambientIntensity}
-            mode={atmosphereMode}
+            colors={[]}
+            effects={{}}
+            intensity={advancedState.ambientIntensity}
+            mode="default"
           />
         )}
       </AnimatePresence>
-
-      {/* Particle System - DISABLED to prevent infinite loops */}
-      {/*
-      <AnimatePresence>
-        {enableAdvancedFeatures && (
-          <ParticleSystem
-            config={particleConfig}
-            enabled={playerState.particlesEnabled}
-            theme={theme}
-          />
-        )}
-      </AnimatePresence>
-      */}
 
       {/* Main Video Element */}
       <video
@@ -729,22 +849,6 @@ const FuturisticMediaPlayer = ({
         crossOrigin="anonymous"
         controls={false}
         data-testid="futuristic-video-player"
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          backgroundColor: 'black',
-          zIndex: 10
-        }}
-        onError={(e) => {
-          console.error('❌ Video playback error:', e.target.error);
-          console.error('Error details:', {
-            code: e.target.error?.code,
-            message: e.target.error?.message
-          });
-        }}
-        onCanPlay={() => console.log('✅ Video can play')}
-        onLoadStart={() => console.log('🎬 Video load started')}
       />
 
       {/* Hidden canvas for advanced features */}
@@ -762,7 +866,7 @@ const FuturisticMediaPlayer = ({
             text={currentSubtitleText}
             position={{ bottom: '15%', left: '50%', transform: 'translateX(-50%)' }}
             contentAwareness={null}
-            style={playerState.subtitleStyle || {}}
+            style={advancedState.subtitleStyle}
             animations={enableAdvancedFeatures}
           />
         )}
@@ -772,37 +876,39 @@ const FuturisticMediaPlayer = ({
       <AnimatePresence>
         {gestureControls && enableAdvancedFeatures && (
           <GestureOverlay
-            state={gestureState}
+            state={{}}
             enabled={gestureControls}
-            feedback={playerState.gestureVisualFeedback}
+            feedback={advancedState.gestureVisualFeedback}
+            onGesture={handleGestureAction}
           />
         )}
       </AnimatePresence>
 
       {/* Voice Interface */}
       <AnimatePresence>
-        {voiceControls && enableAdvancedFeatures && voiceState?.listening && (
+        {voiceControls && enableAdvancedFeatures && (
           <VoiceInterface
-            state={voiceState}
-            commands={voiceCommands}
-            onStop={stopListening}
+            state={{}}
+            commands={{}}
+            onCommand={handleVoiceCommand}
+            onStop={() => {}}
           />
         )}
       </AnimatePresence>
 
-      {/* Advanced Settings */}
+      {/* Advanced Settings Panel */}
       <AnimatePresence>
         {settingsVisible && (
           <AdvancedSettings
             playerState={playerState}
             playerActions={playerActions}
-            qualities={qualities}
-            currentQuality={currentQuality}
+            qualities={advancedState.qualities}
+            currentQuality={advancedState.currentQuality}
             onQualityChange={setQuality}
             subtitles={subtitles}
             activeSubtitle={activeSubtitle}
             onSubtitleChange={selectSubtitle}
-            ambientSettings={{ colors: ambientColors, intensity: playerState.ambientIntensity }}
+            ambientSettings={{ intensity: advancedState.ambientIntensity }}
             onClose={() => setSettingsVisible(false)}
             theme={theme}
           />
@@ -813,45 +919,18 @@ const FuturisticMediaPlayer = ({
       <AnimatePresence>
         {performanceVisible && enableAdvancedFeatures && (
           <PerformanceDashboard
-            analytics={contentAnalytics}
-            performanceStats={analyticsPerformanceMetrics}
-            userBehavior={userBehavior}
-            insights={insights}
-            bufferHealth={bufferHealth}
-            networkMetrics={networkMetrics}
-            sessionData={sessionData}
+            analytics={{}}
+            performanceStats={performanceMetrics}
+            userBehavior={{}}
+            insights={{}}
+            bufferHealth={100}
+            networkMetrics={{ bandwidth: 0, latency: 0 }}
+            sessionData={{}}
             onClose={() => setPerformanceVisible(false)}
-            onGenerateReport={() => {
-              console.log('Analytics disabled in simplified mode');
-            }}
+            onGenerateReport={() => console.log('Generating report...')}
           />
         )}
       </AnimatePresence>
-
-      {/* Scene Detection Overlay - DISABLED to prevent overlay issues */}
-      {/*
-      <AnimatePresence>
-        {enableAdvancedFeatures && sceneData && (
-          <SceneDetector
-            scenes={sceneData.scenes}
-            currentTime={playerState.currentTime}
-            duration={playerState.duration}
-            onSceneSelect={(time) => playerActions.seek(time)}
-          />
-        )}
-      </AnimatePresence>
-      */}
-
-      {/* Smart Thumbnails - DISABLED to prevent overlay issues */}
-      {/*
-      <SmartThumbnails
-        videoRef={videoRef}
-        canvasRef={canvasRef}
-        duration={playerState.duration}
-        scenes={sceneData?.scenes}
-        enabled={false}
-      />
-      */}
 
       {/* Episode Carousel for TV Shows */}
       <AnimatePresence>
@@ -883,77 +962,22 @@ const FuturisticMediaPlayer = ({
       {/* Picture-in-Picture */}
       <PictureInPicture
         videoRef={videoRef}
-        enabled={playerState.pipEnabled}
-        position={playerState.pipPosition}
+        enabled={advancedState.pipEnabled}
+        position={advancedState.pipPosition}
         onPositionChange={(pos) => playerActions.setPipPosition(pos)}
       />
 
-      {/* Quality Selector - Simplified without state re-renders */}
-      {hlsRef.current && qualities.length > 1 && (
-        <div style={{
-          position: 'absolute',
-          top: '10px',
-          right: '10px',
-          zIndex: 100,
-          display: 'flex',
-          gap: '5px',
-          flexDirection: 'column',
-          pointerEvents: 'all'
-        }}>
-          <div style={{
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            padding: '5px',
-            borderRadius: '4px',
-            color: 'white',
-            fontSize: '12px'
-          }}>
-            Quality:
-          </div>
-          {qualities.map(quality => (
-            <button
-              key={quality.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                setQuality(quality.id);
-              }}
-              style={{
-                padding: '5px 10px',
-                backgroundColor: currentQuality === quality.id ? '#007bff' : 'rgba(0,0,0,0.7)',
-                color: 'white',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                pointerEvents: 'all'
-              }}
-            >
-              {quality.label}
-            </button>
-          ))}
-        </div>
-      )}
-      
-      {/* Enhanced Media Controls - FORCE RE-RENDER WITH KEY */}
+      {/* Enhanced Media Controls - No forced re-renders! */}
       <AnimatePresence>
         {uiVisible && (
           <EnhancedMediaControls
-            key={`controls-${Math.floor(simplePlayerState.currentTime)}`} // Force re-render every second
             videoRef={videoRef}
-            playerState={{
-              ...simplePlayerState,
-              // Ensure values are always defined
-              currentTime: simplePlayerState.currentTime || 0,
-              duration: simplePlayerState.duration || 0,
-              isPlaying: simplePlayerState.isPlaying || false,
-              volume: simplePlayerState.volume ?? 0.8,
-              isMuted: simplePlayerState.isMuted || false,
-              buffered: simplePlayerState.buffered || 0
-            }}
+            playerState={playerState}
             playerActions={playerActions}
             onToggleFullscreen={toggleFullscreen}
-            qualities={qualities}
+            qualities={advancedState.qualities}
             onSelectQuality={setQuality}
-            currentQuality={currentQuality}
+            currentQuality={advancedState.currentQuality}
             subtitles={availableLanguages || []}
             onSelectSubtitle={selectSubtitle}
             activeSubtitle={activeSubtitle}
@@ -982,7 +1006,71 @@ const FuturisticMediaPlayer = ({
           </motion.button>
         )}
       </AnimatePresence>
+
+      {/* Settings Toggle Button */}
+      <AnimatePresence>
+        {uiVisible && (
+          <motion.button
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 50 }}
+            onClick={() => setSettingsVisible(!settingsVisible)}
+            className={styles.settingsToggle}
+            style={{
+              position: 'fixed',
+              top: '2rem',
+              right: '2rem',
+              zIndex: 100,
+              background: 'var(--glass-bg)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: '12px',
+              padding: '12px',
+              color: 'var(--text-primary)',
+              fontSize: '20px',
+              cursor: 'pointer',
+              backdropFilter: 'blur(20px)'
+            }}
+          >
+            ⚙️
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
+  );
+};
+
+// Wrapped component with error boundary
+const FuturisticMediaPlayer = (props) => {
+  const [resetKey, setResetKey] = useState(0);
+  
+  const handleError = useCallback((errorReport) => {
+    console.error('Media Player Error Report:', errorReport);
+    // You can send this to an error tracking service
+  }, []);
+  
+  const handleReset = useCallback(() => {
+    console.log('Error boundary reset');
+    setResetKey(prev => prev + 1);
+  }, []);
+  
+  const handleStreamError = useCallback(() => {
+    console.log('Stream error detected, triggering retry...');
+    // Force component remount to retry stream
+    setResetKey(prev => prev + 1);
+  }, []);
+  
+  return (
+    <MediaPlayerErrorBoundary
+      resetKey={resetKey}
+      onError={handleError}
+      onReset={handleReset}
+      onStreamError={handleStreamError}
+      onBack={props.onBackToShowDetails}
+    >
+      <StreamErrorBoundary>
+        <FuturisticMediaPlayerCore {...props} key={resetKey} />
+      </StreamErrorBoundary>
+    </MediaPlayerErrorBoundary>
   );
 };
 

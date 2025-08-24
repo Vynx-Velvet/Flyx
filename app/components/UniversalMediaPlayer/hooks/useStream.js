@@ -1,340 +1,415 @@
-import { useState, useEffect, useRef } from 'react';
+'use client';
 
-export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch = true }) => {
-  const [server, setServer] = useState("Vidsrc.xyz");
-  const [streamUrl, setStreamUrl] = useState(null);
-  const [streamType, setStreamType] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [loadingPhase, setLoadingPhase] = useState('initializing');
-  const [retryAttempt, setRetryAttempt] = useState(0);
-  const [maxRetries] = useState(3);
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+/**
+ * useStream Hook - Optimized Stream Extraction with Robust Error Handling
+ * 
+ * Key Improvements:
+ * - Intelligent retry mechanism with exponential backoff
+ * - Comprehensive error classification and recovery
+ * - Optimized request handling with proper cleanup
+ * - Server health checking and fallback
+ * - Memory leak prevention
+ * - Better progress tracking
+ */
+export const useStream = ({ 
+  mediaType, 
+  movieId, 
+  seasonId, 
+  episodeId, 
+  shouldFetch = true,
+  preferredServer = 'Vidsrc.xyz' 
+}) => {
+  // State management
+  const [state, setState] = useState({
+    server: preferredServer,
+    streamUrl: null,
+    streamType: null,
+    loading: true,
+    error: null,
+    loadingProgress: 0,
+    loadingPhase: 'initializing',
+    retryAttempt: 0,
+    serverHealth: 'unknown'
+  });
   
-  // Use refs to track extraction state and prevent race conditions
-  const extractionRef = useRef({ isExtracting: false, retryTimeout: null, abortController: null });
+  // Configuration
+  const config = {
+    maxRetries: 3,
+    retryDelays: [2000, 5000, 10000], // Exponential backoff
+    timeout: 30000,
+    servers: [
+      { name: 'Vidsrc.xyz', endpoint: '/api/extract-shadowlands', priority: 1 },
+      { name: 'embed.su', endpoint: '/api/extract-stream-progress', priority: 2 }
+    ]
+  };
+  
+  // Refs for cleanup and tracking
+  const abortControllerRef = useRef(null);
+  const retryTimeoutRef = useRef(null);
   const isMountedRef = useRef(true);
-
-  // Helper function to determine if an error is retryable
-  const isRetryableError = (errorMessage, data) => {
-    const nonRetryableErrors = [
+  const currentRequestRef = useRef(null);
+  
+  // Error classification
+  const classifyError = useCallback((error, response) => {
+    const errorLower = error?.toLowerCase() || '';
+    
+    // Non-retryable errors
+    const nonRetryable = [
       'invalid tmdb id',
       'media not found',
       'invalid parameters',
       'unsupported media type',
-      'rate limited',
-      'blocked by provider'
+      'authentication failed',
+      'forbidden',
+      'bad request'
     ];
     
-    const errorLower = errorMessage.toLowerCase();
-    return !nonRetryableErrors.some(nonRetryable => errorLower.includes(nonRetryable));
-  };
-
-  // Cleanup function to properly clear timeouts and abort requests
-  const cleanup = () => {
-    if (extractionRef.current.retryTimeout) {
-      clearTimeout(extractionRef.current.retryTimeout);
-      extractionRef.current.retryTimeout = null;
+    // Check if error is non-retryable
+    if (nonRetryable.some(e => errorLower.includes(e))) {
+      return { retryable: false, type: 'client_error' };
     }
-    if (extractionRef.current.abortController) {
-      extractionRef.current.abortController.abort();
-      extractionRef.current.abortController = null;
-    }
-    extractionRef.current.isExtracting = false;
-  };
-
-  // Extract stream function with proper retry logic
-  const extractStream = async (attemptNumber = 1) => {
-    // Prevent multiple simultaneous extraction attempts
-    if (extractionRef.current.isExtracting && attemptNumber === 1) {
-      console.log('🚫 Extraction already in progress, skipping duplicate request');
-      return;
-    }
-
-    // Clean up any existing connections
-    cleanup();
     
-    if (!isMountedRef.current) {
-      console.log('🚫 Component unmounted, aborting extraction');
-      return;
+    // Rate limiting
+    if (errorLower.includes('rate limit') || response?.status === 429) {
+      return { retryable: true, type: 'rate_limit', delay: 60000 };
     }
-
-    extractionRef.current.isExtracting = true;
     
-    setLoading(true);
-    setError(null);
-    setStreamUrl(null);
-    setLoadingProgress(0);
-    setLoadingPhase(attemptNumber > 1 ? `retrying (attempt ${attemptNumber}/${maxRetries})` : 'initializing');
-    setRetryAttempt(attemptNumber);
-
-    console.log(`🔄 Stream extraction attempt ${attemptNumber}/${maxRetries} for:`, { server, mediaType, movieId, seasonId, episodeId });
-
-    // Handle extraction failure with retry logic
-    const handleExtractionFailure = (errorMessage, attemptNumber, data) => {
-      console.log(`❌ Stream extraction failed on attempt ${attemptNumber}/${maxRetries}:`, errorMessage);
-      
-      // Check if this error should trigger a retry
-      const shouldRetry = isRetryableError(errorMessage, data) && attemptNumber < maxRetries;
-      
-      if (shouldRetry) {
-        console.log(`🔄 Retrying stream extraction in 5 seconds... (attempt ${attemptNumber + 1}/${maxRetries})`);
-        cleanup();
-        
-        // Use longer delay between retries to avoid overwhelming the server
-        extractionRef.current.retryTimeout = setTimeout(() => {
-          if (isMountedRef.current) {
-            extractStream(attemptNumber + 1);
-          }
-        }, 5000); // Increased to 5 seconds
-      } else {
-        // All retries exhausted or non-retryable error
-        cleanup();
-        const finalMessage = attemptNumber >= maxRetries
-          ? `${errorMessage} (Failed after ${maxRetries} attempts)`
-          : errorMessage;
-        
-        console.log(attemptNumber >= maxRetries ? `💥 All ${maxRetries} extraction attempts failed` : '🚫 Non-retryable error encountered');
-        setError(finalMessage);
-        setLoading(false);
-        setRetryAttempt(0);
+    // Server errors
+    if (response?.status >= 500 || errorLower.includes('server error')) {
+      return { retryable: true, type: 'server_error' };
+    }
+    
+    // Network errors
+    if (errorLower.includes('network') || errorLower.includes('timeout')) {
+      return { retryable: true, type: 'network_error' };
+    }
+    
+    // Default: retryable
+    return { retryable: true, type: 'unknown' };
+  }, []);
+  
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    currentRequestRef.current = null;
+  }, []);
+  
+  // Progress updater with validation
+  const updateProgress = useCallback((progress, phase) => {
+    if (!isMountedRef.current) return;
+    
+    setState(prev => ({
+      ...prev,
+      loadingProgress: Math.min(100, Math.max(0, progress)),
+      loadingPhase: phase || prev.loadingPhase
+    }));
+  }, []);
+  
+  // Build extraction URL based on server
+  const buildExtractionUrl = useCallback((server) => {
+    const serverConfig = config.servers.find(s => s.name === server) || config.servers[0];
+    
+    if (server === 'Vidsrc.xyz') {
+      const params = new URLSearchParams({
+        tmdbId: movieId.toString(),
+        ...(mediaType === 'tv' && {
+          season: seasonId.toString(),
+          episode: episodeId.toString()
+        }),
+      });
+      return `${serverConfig.endpoint}?${params.toString()}`;
+    } else {
+      const params = new URLSearchParams({
+        mediaType,
+        movieId: movieId.toString(),
+        server: 'embed.su',
+        ...(mediaType === 'tv' && {
+          seasonId: seasonId.toString(),
+          episodeId: episodeId.toString()
+        }),
+      });
+      const baseUrl = process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || serverConfig.endpoint;
+      return `${baseUrl}?${params.toString()}`;
+    }
+  }, [mediaType, movieId, seasonId, episodeId, config.servers]);
+  
+  // Process extraction response
+  const processExtractionResponse = useCallback((data, server) => {
+    if (!data.success || !data.streamUrl) {
+      throw new Error(data.error || 'Stream extraction failed');
+    }
+    
+    // Determine if proxy is needed
+    const isShadowlands = 
+      data.server === 'shadowlands' ||
+      data.streamType === 'shadowlands' ||
+      data.streamUrl.includes('shadowlands') ||
+      data.streamUrl.includes('shadowlandschronicles.com') ||
+      data.streamUrl.includes('tmstr');
+    
+    let finalStreamUrl;
+    
+    if (isShadowlands) {
+      finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(data.streamUrl)}&source=vidsrc`;
+      console.log('🌑 Using vidsrc.xyz proxy for shadowlands URL');
+    } else if (data.requiresProxy) {
+      const sourceParam = data.debug?.selectedStream?.source || server.toLowerCase();
+      finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(data.streamUrl)}&source=${sourceParam}`;
+      console.log(`🔄 Using proxy for ${server} URL`);
+    } else {
+      finalStreamUrl = data.streamUrl;
+      console.log('✅ Using direct stream URL');
+    }
+    
+    return {
+      streamUrl: finalStreamUrl,
+      streamType: data.streamType || 'hls',
+      serverInfo: {
+        server: data.server || server,
+        extractionMethod: data.extractionMethod,
+        chain: data.chain
       }
     };
-
+  }, []);
+  
+  // Main extraction function
+  const extractStream = useCallback(async (attemptNumber = 1, server = null) => {
+    if (!isMountedRef.current) return;
+    
+    // Prevent duplicate requests
+    const requestId = Date.now();
+    if (currentRequestRef.current && currentRequestRef.current > requestId - 1000) {
+      console.log('🚫 Duplicate request prevented');
+      return;
+    }
+    currentRequestRef.current = requestId;
+    
+    // Cleanup previous attempt
+    cleanup();
+    
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
+    
+    // Update state
+    setState(prev => ({
+      ...prev,
+      loading: true,
+      error: null,
+      retryAttempt: attemptNumber,
+      server: server || prev.server
+    }));
+    
+    // Progress tracking
+    updateProgress(10, attemptNumber > 1 ? `Retry ${attemptNumber}/${config.maxRetries}` : 'Connecting');
+    
+    const currentServer = server || state.server;
+    console.log(`🎯 Extraction attempt ${attemptNumber}/${config.maxRetries} using ${currentServer}`);
+    
     try {
-      let extractionUrl;
-      let params;
+      // Build URL
+      const extractionUrl = buildExtractionUrl(currentServer);
+      console.log('📡 Extraction URL:', extractionUrl);
       
-      // Use new extract-shadowlands API for Vidsrc.xyz
-      if (server === "Vidsrc.xyz") {
-        console.log('🎯 Using new extract-shadowlands API (direct HTTP method)');
-        
-        params = new URLSearchParams({
-          tmdbId: movieId.toString(),
-          ...(mediaType === 'tv' && {
-            season: seasonId.toString(),
-            episode: episodeId.toString()
-          }),
-        });
-        
-        extractionUrl = `/api/extract-shadowlands?${params.toString()}`;
-      } else {
-        // Use original extraction for other servers
-        params = new URLSearchParams({
-          mediaType,
-          movieId: movieId.toString(),
-          server: "embed.su",
-          ...(mediaType === 'tv' && {
-            seasonId: seasonId.toString(),
-            episodeId: episodeId.toString()
-          }),
-        });
-
-        // Use VM_EXTRACTION_URL for bulletproof route if available, otherwise fallback to local API
-        const baseUrl = process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || '/api/extract-stream-progress';
-        extractionUrl = `${baseUrl}?${params.toString()}`;
-      }
+      updateProgress(30, 'Fetching stream');
       
-      console.log('🔫 Using extraction endpoint:', extractionUrl);
+      // Set timeout
+      const timeoutId = setTimeout(() => {
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      }, config.timeout);
       
-      // Update progress to show we're starting
-      setLoadingProgress(10);
-      setLoadingPhase('connecting');
-
-      // Create abort controller for this request
-      extractionRef.current.abortController = new AbortController();
-      
-      // Make direct HTTP request (no EventSource)
+      // Make request
       const response = await fetch(extractionUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
           'Cache-Control': 'no-cache'
         },
-        // Use abort controller signal
-        signal: extractionRef.current.abortController.signal
+        signal: abortControllerRef.current.signal
       });
-
-      if (!isMountedRef.current) return;
-
-      // Update progress to show we're processing
-      setLoadingProgress(50);
-      setLoadingPhase('processing');
-
-      if (!response.ok) {
-        console.log(`❌ HTTP extraction failed with status ${response.status} on attempt ${attemptNumber}/${maxRetries}`);
-        handleExtractionFailure(`Extraction service error: ${response.status} ${response.statusText}`, attemptNumber, null);
-        return;
-      }
-
-      const extractData = await response.json();
+      
+      clearTimeout(timeoutId);
       
       if (!isMountedRef.current) return;
-
-      // Update progress to show we're finalizing
-      setLoadingProgress(90);
-      setLoadingPhase('finalizing');
-
-      console.log('🎯 Extraction response received:', {
-        success: extractData.success,
-        hasStreamUrl: !!extractData.streamUrl,
-        server: extractData.server,
-        extractionMethod: extractData.extractionMethod,
-        requiresProxy: extractData.requiresProxy,
-        ...(extractData.chain && { chain: extractData.chain })
-      });
-
-      if (extractData.success && extractData.streamUrl) {
-        // Log server selection information
-        console.log('🎯 Stream extracted with server info:', {
-          server: extractData.server || server,
-          serverHash: extractData.serverHash,
-          selectedServer: extractData.debug?.selectedStream?.source,
-          extractionMethod: extractData.extractionMethod,
-          requiresProxy: extractData.requiresProxy
-        });
-
-        // Check if URL is from shadowlands
-        const isShadowlands = extractData.server === 'shadowlands' ||
-                             extractData.streamType === 'shadowlands' ||
-                             extractData.streamUrl.includes('shadowlands') ||
-                             extractData.streamUrl.includes('shadowlandschronicles.com') ||
-                             extractData.streamUrl.includes('tmstr');
-
-        let finalStreamUrl;
+      
+      updateProgress(60, 'Processing response');
+      
+      // Check response status
+      if (!response.ok) {
+        const errorClass = classifyError(`HTTP ${response.status}`, response);
         
-        if (isShadowlands) {
-          // Shadowlands URLs use vidsrc.xyz proxy method (origin and referer only)
-          finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=vidsrc`;
-          console.log('🌑 Using vidsrc.xyz proxy method for shadowlands URL (origin and referer headers only)');
+        if (errorClass.retryable && attemptNumber < config.maxRetries) {
+          const delay = errorClass.delay || config.retryDelays[attemptNumber - 1];
+          console.log(`⏳ Retrying in ${delay}ms...`);
           
-          // Log the extraction chain if available
-          if (extractData.chain) {
-            console.log('📊 Extraction chain:', {
-              vidsrc: extractData.chain.vidsrc,
-              cloudnestra: extractData.chain.cloudnestra,
-              prorcp: extractData.chain.prorcp,
-              shadowlands: extractData.chain.shadowlands
-            });
-          }
-        } else {
-          // Check if other URLs need proxy
-          const isVidsrc = server === 'Vidsrc.xyz' || extractData.server === 'vidsrc.xyz' || extractData.server === 'vidsrc';
-          const needsProxy = extractData.requiresProxy ||
-                            extractData.streamUrl.includes('cloudnestra.com') ||
-                            !isVidsrc;
-
-          if (needsProxy) {
-            const sourceParam = extractData.debug?.selectedStream?.source ||
-                               (isVidsrc ? 'vidsrc' : 'embed.su');
-            finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=${sourceParam}`;
-            console.log(`🔄 Using proxy for ${extractData.server || server} URL (source: ${sourceParam})`);
-          } else {
-            finalStreamUrl = extractData.streamUrl;
-            console.log('✅ Using direct access for stream URL');
-          }
-        }
-
-        // Success - clean up and set results
-        cleanup();
-        setStreamUrl(finalStreamUrl);
-        setStreamType(isShadowlands ? 'hls' : (extractData.streamType || 'hls'));
-        setLoadingProgress(100);
-        setLoadingPhase('complete');
-        setLoading(false);
-        setRetryAttempt(0);
-        console.log(`✅ Stream extraction succeeded on attempt ${attemptNumber}/${maxRetries}`);
-        
-      } else {
-        console.log(`❌ Stream extraction succeeded but no URL found on attempt ${attemptNumber}/${maxRetries}`);
-        let errorMessage = extractData.error || 'Stream extraction succeeded but no URL was found.';
-        
-        // Enhanced error messages based on server selection
-        if (extractData.debug?.suggestSwitch) {
-          errorMessage += ` Try switching to ${extractData.debug.suggestSwitch}.`;
+          retryTimeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              extractStream(attemptNumber + 1, currentServer);
+            }
+          }, delay);
+          return;
         }
         
-        // Log debug information for troubleshooting
-        if (extractData.debug || extractData.metadata) {
-          console.log('🔍 Stream extraction debug info:', {
-            server: extractData.debug?.server || extractData.server,
-            totalFound: extractData.debug?.totalFound,
-            debugInfo: extractData.debug?.debugInfo,
-            suggestSwitch: extractData.debug?.suggestSwitch,
-            metadata: extractData.metadata
-          });
-        }
-        
-        handleExtractionFailure(errorMessage, attemptNumber, extractData);
+        throw new Error(`Extraction failed: ${response.status} ${response.statusText}`);
       }
-
-
-    } catch (err) {
-      if (isMountedRef.current) {
-        console.log(`❌ HTTP request error on attempt ${attemptNumber}/${maxRetries}:`, err.message);
-        
-        let errorMessage = 'Failed to connect to extraction service';
-        if (err.name === 'AbortError') {
-          errorMessage = 'Request timeout - extraction took too long';
-        } else if (err.name === 'TypeError') {
-          errorMessage = 'Network error - unable to reach extraction service';
+      
+      // Parse response
+      const data = await response.json();
+      
+      if (!isMountedRef.current) return;
+      
+      updateProgress(80, 'Finalizing');
+      
+      // Process extraction result
+      const result = processExtractionResponse(data, currentServer);
+      
+      // Success!
+      updateProgress(100, 'Complete');
+      
+      setState(prev => ({
+        ...prev,
+        streamUrl: result.streamUrl,
+        streamType: result.streamType,
+        loading: false,
+        error: null,
+        serverHealth: 'healthy',
+        loadingProgress: 100,
+        loadingPhase: 'complete'
+      }));
+      
+      console.log('✅ Stream extraction successful:', result.serverInfo);
+      
+    } catch (error) {
+      if (!isMountedRef.current) return;
+      
+      console.error(`❌ Extraction error on attempt ${attemptNumber}:`, error);
+      
+      // Check if we should retry
+      const errorClass = classifyError(error.message, null);
+      
+      if (error.name === 'AbortError') {
+        // Timeout or manual abort
+        if (attemptNumber < config.maxRetries) {
+          console.log('⏱️ Request timeout, retrying...');
+          retryTimeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              extractStream(attemptNumber + 1, currentServer);
+            }
+          }, config.retryDelays[attemptNumber - 1]);
+          return;
         }
+      } else if (errorClass.retryable && attemptNumber < config.maxRetries) {
+        const delay = config.retryDelays[attemptNumber - 1];
+        console.log(`🔄 Retrying in ${delay}ms (${errorClass.type})...`);
         
-        handleExtractionFailure(errorMessage, attemptNumber, null);
+        retryTimeoutRef.current = setTimeout(() => {
+          if (isMountedRef.current) {
+            // Try alternative server on last retry
+            const nextServer = attemptNumber === config.maxRetries - 1 && currentServer === 'Vidsrc.xyz'
+              ? 'embed.su'
+              : currentServer;
+            extractStream(attemptNumber + 1, nextServer);
+          }
+        }, delay);
+        return;
       }
+      
+      // Final failure
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message || 'Stream extraction failed',
+        serverHealth: 'unhealthy',
+        loadingProgress: 0,
+        loadingPhase: 'error'
+      }));
     }
-  };
-
+  }, [
+    cleanup,
+    updateProgress,
+    buildExtractionUrl,
+    processExtractionResponse,
+    classifyError,
+    config.maxRetries,
+    config.retryDelays,
+    config.timeout,
+    state.server
+  ]);
+  
+  // Effect to trigger extraction
   useEffect(() => {
     isMountedRef.current = true;
     
-    // CRITICAL: Immediately cleanup and abort if shouldFetch is false
     if (!shouldFetch) {
-      console.log('🚫 Stream fetching disabled - cleanup and abort all requests');
-      cleanup();
-      setLoading(false);
-      setError(null);
-      setStreamUrl(null);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: null,
+        streamUrl: null
+      }));
       return;
     }
-
+    
     if (!movieId || (mediaType === 'tv' && (!seasonId || !episodeId))) {
-      cleanup();
-      setLoading(false);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: 'Missing required parameters'
+      }));
       return;
     }
-
-    console.log('🚀 STARTING STREAM EXTRACTION for:', { server, mediaType, movieId, seasonId, episodeId });
-
-    extractStream(1);
-
+    
+    // Start extraction
+    extractStream(1, state.server);
+    
+    // Cleanup on unmount
     return () => {
-      console.log('🧹 useStream cleanup: aborting all requests and clearing timeouts');
       isMountedRef.current = false;
       cleanup();
     };
-  }, [server, mediaType, movieId, seasonId, episodeId, shouldFetch]);
-
-  // Manual retry function for external use
-  const retryExtraction = () => {
-    if (!extractionRef.current.isExtracting) {
+  }, [shouldFetch, movieId, mediaType, seasonId, episodeId]); // Removed extractStream from deps to prevent loops
+  
+  // Manual retry function
+  const retryExtraction = useCallback(() => {
+    if (!state.loading) {
       console.log('🔄 Manual retry triggered');
-      extractStream(1);
-    } else {
-      console.log('🚫 Extraction already in progress, ignoring manual retry');
+      extractStream(1, state.server);
     }
-  };
-
-  return { 
-    streamUrl, 
-    streamType, 
-    loading, 
-    error, 
-    loadingProgress, 
-    loadingPhase, 
-    setServer, 
-    retryAttempt, 
-    maxRetries,
-    retryExtraction 
+  }, [state.loading, state.server, extractStream]);
+  
+  // Server switch function
+  const switchServer = useCallback((newServer) => {
+    if (newServer !== state.server) {
+      console.log(`🔀 Switching server to ${newServer}`);
+      setState(prev => ({ ...prev, server: newServer }));
+      extractStream(1, newServer);
+    }
+  }, [state.server, extractStream]);
+  
+  return {
+    streamUrl: state.streamUrl,
+    streamType: state.streamType,
+    loading: state.loading,
+    error: state.error,
+    loadingProgress: state.loadingProgress,
+    loadingPhase: state.loadingPhase,
+    server: state.server,
+    serverHealth: state.serverHealth,
+    retryAttempt: state.retryAttempt,
+    retryExtraction,
+    switchServer,
+    setServer: (server) => setState(prev => ({ ...prev, server }))
   };
 };
+
+export default useStream;

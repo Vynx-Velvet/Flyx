@@ -1,21 +1,21 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+'use client';
+
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styles from '../FuturisticMediaPlayer.module.css';
 
 /**
- * EnhancedMediaControls - Complete refactored media player controls
+ * EnhancedMediaControls - Optimized and Refactored Media Controls
  * 
- * Features:
- * - HH:MM:SS time format display
- * - Full functioning volume controls with mute/unmute
- * - Comprehensive quality settings dropdown
- * - Enhanced subtitle functionality with language selection
- * - Fullscreen support with proper UI handling
- * - Complete player controls (play/pause, seek, skip, etc.)
- * - Modern glassmorphism design
- * - Touch and keyboard support
+ * Key Improvements:
+ * - Removed forced re-renders with key prop
+ * - Optimized with React.memo and proper memoization
+ * - Efficient event handling with throttling
+ * - Smooth animations without performance impact
+ * - Clean separation of concerns
+ * - Comprehensive accessibility support
  */
-const EnhancedMediaControls = ({
+const EnhancedMediaControls = memo(({
   videoRef,
   playerState,
   playerActions,
@@ -34,142 +34,140 @@ const EnhancedMediaControls = ({
   enableAdvanced = true,
   theme = 'dark'
 }) => {
-  // Local state for UI interactions
+  // Local UI state
   const [isDraggingVolume, setIsDraggingVolume] = useState(false);
   const [isDraggingTimeline, setIsDraggingTimeline] = useState(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [timelineHover, setTimelineHover] = useState({ show: false, x: 0, time: 0 });
-  const [lastSeekTime, setLastSeekTime] = useState(0);
-
-  // Refs for drag interactions
+  
+  // Refs for DOM elements
   const timelineRef = useRef(null);
   const volumeSliderRef = useRef(null);
   const settingsMenuRef = useRef(null);
+  const lastSeekTimeRef = useRef(0);
+  const rafIdRef = useRef(null);
   
-  // Enhanced time formatting with HH:MM:SS support
+  // Extract player state with defaults
+  const {
+    currentTime = 0,
+    duration = 0,
+    isPlaying = false,
+    volume = 0.8,
+    isMuted = false,
+    buffered = 0,
+    isFullscreen = false
+  } = playerState || {};
+  
+  // Calculate progress percentages
+  const progressPercentage = useMemo(() => {
+    if (!duration || duration === 0) return 0;
+    return Math.min(100, Math.max(0, (currentTime / duration) * 100));
+  }, [currentTime, duration]);
+  
+  const bufferedPercentage = useMemo(() => {
+    if (!duration || duration === 0) return 0;
+    return Math.min(100, Math.max(0, (buffered / duration) * 100));
+  }, [buffered, duration]);
+  
+  // Optimized time formatting
   const formatTime = useCallback((seconds) => {
-    if (!isFinite(seconds) || isNaN(seconds)) return '00:00:00';
+    if (!isFinite(seconds) || isNaN(seconds) || seconds < 0) {
+      return '00:00:00';
+    }
     
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
     
-    // Always return HH:MM:SS format as requested
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
-
-  // Calculate progress percentages with fallback to video element
-  const currentTime = playerState?.currentTime ?? videoRef?.current?.currentTime ?? 0;
-  const duration = playerState?.duration ?? videoRef?.current?.duration ?? 0;
-  const buffered = playerState?.buffered ?? 0;
   
-  const progressPercentage = duration > 0
-    ? Math.min(100, Math.max(0, (currentTime / duration) * 100))
-    : 0;
-    
-  const bufferedPercentage = duration > 0 && buffered > 0
-    ? Math.min(100, Math.max(0, (buffered / duration) * 100))
-    : 0;
-
-  // Timeline interaction handlers
+  // Timeline interaction handlers with throttling
   const calculateTimeFromEvent = useCallback((e) => {
-    if (!timelineRef.current || !playerState.duration) return 0;
+    if (!timelineRef.current || !duration) return 0;
     
     const rect = timelineRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const progress = Math.max(0, Math.min(1, clickX / rect.width));
-    return progress * playerState.duration;
-  }, [playerState.duration]);
-
+    const clickX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const progress = clickX / rect.width;
+    return progress * duration;
+  }, [duration]);
+  
+  const handleTimelineClick = useCallback((e) => {
+    e.preventDefault();
+    const newTime = calculateTimeFromEvent(e);
+    playerActions?.seek?.(newTime);
+  }, [calculateTimeFromEvent, playerActions]);
+  
   const handleTimelineMouseDown = useCallback((e) => {
     e.preventDefault();
     setIsDraggingTimeline(true);
-    
     const newTime = calculateTimeFromEvent(e);
-    if (playerActions?.seek) {
-      playerActions.seek(newTime);
-    } else if (videoRef?.current) {
-      // Fallback to direct video control
-      videoRef.current.currentTime = newTime;
-    }
-    setLastSeekTime(Date.now());
-  }, [calculateTimeFromEvent, videoRef, playerActions]);
-
+    playerActions?.seek?.(newTime);
+    lastSeekTimeRef.current = Date.now();
+  }, [calculateTimeFromEvent, playerActions]);
+  
   const handleTimelineMouseMove = useCallback((e) => {
     const rect = timelineRef.current?.getBoundingClientRect();
     if (!rect) return;
-
-    const x = e.clientX - rect.left;
-    const progress = Math.max(0, Math.min(1, x / rect.width));
-    const time = progress * playerState.duration;
-
+    
+    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const progress = x / rect.width;
+    const time = progress * duration;
+    
     // Update hover preview
     setTimelineHover({
       show: true,
       x: Math.max(30, Math.min(rect.width - 30, x)),
       time
     });
-
-    // Handle dragging with throttling
+    
+    // Handle dragging with RAF throttling
     if (isDraggingTimeline) {
       const now = Date.now();
-      if (now - lastSeekTime > 50) { // Throttle to 20fps
-        if (playerActions?.seek) {
-          playerActions.seek(time);
-        } else if (videoRef?.current) {
-          // Fallback to direct video control
-          videoRef.current.currentTime = time;
+      if (now - lastSeekTimeRef.current > 16) { // ~60fps
+        if (rafIdRef.current) {
+          cancelAnimationFrame(rafIdRef.current);
         }
-        setLastSeekTime(now);
+        rafIdRef.current = requestAnimationFrame(() => {
+          playerActions?.seek?.(time);
+        });
+        lastSeekTimeRef.current = now;
       }
     }
-  }, [isDraggingTimeline, playerState.duration, lastSeekTime, videoRef, playerActions]);
-
+  }, [isDraggingTimeline, duration, playerActions]);
+  
   const handleTimelineMouseLeave = useCallback(() => {
     setTimelineHover({ show: false, x: 0, time: 0 });
   }, []);
-
+  
   // Volume interaction handlers
   const calculateVolumeFromEvent = useCallback((e) => {
     if (!volumeSliderRef.current) return 0;
     
     const rect = volumeSliderRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const progress = Math.max(0, Math.min(1, clickX / rect.width));
-    return progress;
+    const clickX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    return clickX / rect.width;
   }, []);
-
+  
   const handleVolumeMouseDown = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDraggingVolume(true);
     
     const newVolume = calculateVolumeFromEvent(e);
-    if (playerActions?.setVolume) {
-      playerActions.setVolume(newVolume);
-    } else if (videoRef?.current) {
-      // Fallback to direct video control
-      videoRef.current.volume = newVolume;
-      videoRef.current.muted = newVolume === 0;
-    }
-  }, [calculateVolumeFromEvent, videoRef, playerActions]);
-
+    playerActions?.setVolume?.(newVolume);
+  }, [calculateVolumeFromEvent, playerActions]);
+  
   const handleVolumeMouseMove = useCallback((e) => {
     if (!isDraggingVolume) return;
     
     const newVolume = calculateVolumeFromEvent(e);
-    if (playerActions?.setVolume) {
-      playerActions.setVolume(newVolume);
-    } else if (videoRef?.current) {
-      // Fallback to direct video control
-      videoRef.current.volume = newVolume;
-      videoRef.current.muted = newVolume === 0;
-    }
-  }, [isDraggingVolume, calculateVolumeFromEvent, videoRef, playerActions]);
-
+    playerActions?.setVolume?.(newVolume);
+  }, [isDraggingVolume, calculateVolumeFromEvent, playerActions]);
+  
   // Global mouse event handlers for dragging
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -180,17 +178,21 @@ const EnhancedMediaControls = ({
         handleVolumeMouseMove(e);
       }
     };
-
+    
     const handleMouseUp = () => {
       setIsDraggingTimeline(false);
       setIsDraggingVolume(false);
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
     };
-
+    
     if (isDraggingTimeline || isDraggingVolume) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       document.body.style.userSelect = 'none';
-
+      
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
@@ -198,107 +200,111 @@ const EnhancedMediaControls = ({
       };
     }
   }, [isDraggingTimeline, isDraggingVolume, handleTimelineMouseMove, handleVolumeMouseMove]);
-
+  
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target)) {
         setShowQualityMenu(false);
         setShowSubtitleMenu(false);
-        setShowSettingsMenu(false);
+        setShowSpeedMenu(false);
       }
     };
-
+    
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
+  
   // Player control handlers
   const handlePlayPause = useCallback(() => {
-    if (playerActions?.togglePlay) {
-      playerActions.togglePlay();
-    } else if (videoRef?.current) {
-      // Fallback to direct video control
-      if (videoRef.current.paused) {
-        videoRef.current.play().catch(err => {
-          console.error('Play error:', err);
-        });
-      } else {
-        videoRef.current.pause();
-      }
-    }
-  }, [videoRef, playerActions]);
-
+    playerActions?.togglePlay?.();
+  }, [playerActions]);
+  
   const handleMute = useCallback(() => {
-    if (playerActions?.toggleMute) {
-      playerActions.toggleMute();
-    } else if (videoRef?.current) {
-      // Fallback to direct video control
-      videoRef.current.muted = !videoRef.current.muted;
-    }
-  }, [videoRef, playerActions]);
-
+    playerActions?.toggleMute?.();
+  }, [playerActions]);
+  
   const handleSkip = useCallback((seconds) => {
-    if (!videoRef?.current) return;
-    
-    const currentTime = playerState?.currentTime || videoRef.current.currentTime || 0;
-    const duration = playerState?.duration || videoRef.current.duration || 0;
     const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
-    
-    if (playerActions?.seek) {
-      playerActions.seek(newTime);
-    } else {
-      // Fallback to direct video control
-      videoRef.current.currentTime = newTime;
+    playerActions?.seek?.(newTime);
+  }, [currentTime, duration, playerActions]);
+  
+  // Speed control handlers
+  const playbackRates = useMemo(() => [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2], []);
+  const currentPlaybackRate = videoRef?.current?.playbackRate || 1;
+  
+  const handleSpeedChange = useCallback((rate) => {
+    if (videoRef?.current) {
+      videoRef.current.playbackRate = rate;
+      setShowSpeedMenu(false);
     }
-  }, [videoRef, playerActions, playerState]);
-
+  }, [videoRef]);
+  
   // Volume icon selection
   const getVolumeIcon = useCallback(() => {
-    if (playerState.isMuted || playerState.volume === 0) return '🔇';
-    if (playerState.volume <= 0.3) return '🔈';
-    if (playerState.volume <= 0.7) return '🔉';
+    if (isMuted || volume === 0) return '🔇';
+    if (volume <= 0.3) return '🔈';
+    if (volume <= 0.7) return '🔉';
     return '🔊';
-  }, [playerState.isMuted, playerState.volume]);
-
+  }, [isMuted, volume]);
+  
   // Quality label formatting
   const getQualityLabel = useCallback((quality) => {
     if (!quality) return 'Auto';
-    if (typeof quality === 'string') return quality;
-    
-    const label = quality.height ? `${quality.height}p` : quality.label || 'Unknown';
-    const bitrate = quality.bitrate ? ` (${Math.round(quality.bitrate / 1000)}k)` : '';
-    
-    return `${label}${bitrate}`;
+    if (quality.id === 'auto') return 'Auto';
+    return quality.label || `${quality.height}p` || 'Unknown';
   }, []);
-
+  
   // Subtitle label formatting
   const getSubtitleLabel = useCallback((subtitle) => {
-    if (!subtitle) return 'None';
-    
-    // Handle both API subtitle format and availableLanguages format
-    return subtitle.languageName || subtitle.language || subtitle.label || subtitle.langcode || 'Unknown Language';
+    if (!subtitle) return 'Off';
+    return subtitle.languageName || subtitle.language || subtitle.label || 'Unknown';
   }, []);
-
+  
+  // PiP handler
+  const handlePiP = useCallback(async () => {
+    if (!videoRef?.current) return;
+    
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await videoRef.current.requestPictureInPicture();
+      }
+    } catch (error) {
+      console.error('PiP error:', error);
+    }
+  }, [videoRef]);
+  
   return (
-    <div className={styles.controlsContainer}>
+    <motion.div 
+      className={styles.controlsContainer}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      transition={{ duration: 0.2 }}
+    >
       {/* Timeline Container */}
       <div className={styles.timelineContainer}>
         <div 
           ref={timelineRef}
           className={`${styles.timeline} ${isDraggingTimeline ? styles.timelineDragging : ''}`}
+          onClick={handleTimelineClick}
           onMouseDown={handleTimelineMouseDown}
           onMouseMove={handleTimelineMouseMove}
           onMouseLeave={handleTimelineMouseLeave}
           style={{ cursor: isDraggingTimeline ? 'grabbing' : 'pointer' }}
+          role="slider"
+          aria-label="Seek"
+          aria-valuemin={0}
+          aria-valuemax={duration}
+          aria-valuenow={currentTime}
         >
           {/* Buffered Progress */}
-          {bufferedPercentage > 0 && (
-            <div
-              className={styles.timelineBuffered}
-              style={{ width: `${bufferedPercentage}%` }}
-            />
-          )}
+          <div
+            className={styles.timelineBuffered}
+            style={{ width: `${bufferedPercentage}%` }}
+          />
           
           {/* Current Progress */}
           <div
@@ -307,7 +313,7 @@ const EnhancedMediaControls = ({
           >
             <div className={styles.timelineThumb} />
           </div>
-
+          
           {/* Timeline Preview */}
           <AnimatePresence>
             {timelineHover.show && enableAdvanced && (
@@ -326,7 +332,7 @@ const EnhancedMediaControls = ({
           </AnimatePresence>
         </div>
       </div>
-
+      
       {/* Main Controls Row */}
       <div className={styles.controlsRow}>
         {/* Left Controls */}
@@ -337,11 +343,11 @@ const EnhancedMediaControls = ({
             whileTap={{ scale: 0.95 }}
             onClick={handlePlayPause}
             className={styles.playButton}
-            aria-label={playerState.isPlaying ? 'Pause' : 'Play'}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
           >
-            {playerState.isPlaying ? '⏸️' : '▶️'}
+            {isPlaying ? '⏸️' : '▶️'}
           </motion.button>
-
+          
           {/* Skip Backward */}
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -352,7 +358,7 @@ const EnhancedMediaControls = ({
           >
             ⏮️ 10s
           </motion.button>
-
+          
           {/* Skip Forward */}
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -363,7 +369,7 @@ const EnhancedMediaControls = ({
           >
             10s ⏭️
           </motion.button>
-
+          
           {/* Volume Controls */}
           <div 
             className={styles.volumeContainer}
@@ -375,7 +381,7 @@ const EnhancedMediaControls = ({
               whileTap={{ scale: 0.95 }}
               onClick={handleMute}
               className={styles.glassButton}
-              aria-label={playerState.isMuted ? 'Unmute' : 'Mute'}
+              aria-label={isMuted ? 'Unmute' : 'Mute'}
             >
               {getVolumeIcon()}
             </motion.button>
@@ -387,33 +393,38 @@ const EnhancedMediaControls = ({
                   animate={{ width: 120, opacity: 1 }}
                   exit={{ width: 0, opacity: 0 }}
                   ref={volumeSliderRef}
-                  className={`${styles.volumeSlider} ${playerState.isMuted ? styles.volumeMuted : ''}`}
+                  className={`${styles.volumeSlider} ${isMuted ? styles.volumeMuted : ''}`}
                   onMouseDown={handleVolumeMouseDown}
                   style={{ cursor: isDraggingVolume ? 'grabbing' : 'pointer' }}
+                  role="slider"
+                  aria-label="Volume"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(volume * 100)}
                 >
                   <div className={styles.volumeTrack} />
                   <div 
                     className={styles.volumeFill} 
-                    style={{ width: `${(playerState.volume || 0) * 100}%` }}
+                    style={{ width: `${volume * 100}%` }}
                   />
                   <div 
                     className={styles.volumeThumb} 
-                    style={{ left: `${(playerState.volume || 0) * 100}%` }}
+                    style={{ left: `${volume * 100}%` }}
                   />
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-
-          {/* Time Display - HH:MM:SS format */}
+          
+          {/* Time Display */}
           <div className={styles.timeDisplay}>
             <span className={styles.currentTime}>{formatTime(currentTime)}</span>
             <span className={styles.timeSeparator}> / </span>
             <span className={styles.totalTime}>{formatTime(duration)}</span>
           </div>
         </div>
-
-        {/* Center Controls - Episode Navigation for TV Shows */}
+        
+        {/* Center Controls - Episode Navigation */}
         <div className={styles.centerControls}>
           {mediaType === 'tv' && (
             <>
@@ -443,9 +454,53 @@ const EnhancedMediaControls = ({
             </>
           )}
         </div>
-
+        
         {/* Right Controls */}
         <div className={styles.rightControls} ref={settingsMenuRef}>
+          {/* Playback Speed */}
+          <div className={styles.dropdownContainer}>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setShowSpeedMenu(!showSpeedMenu);
+                setShowQualityMenu(false);
+                setShowSubtitleMenu(false);
+              }}
+              className={styles.glassButton}
+              aria-label="Playback Speed"
+            >
+              ⚡ {currentPlaybackRate}x
+            </motion.button>
+            
+            <AnimatePresence>
+              {showSpeedMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className={styles.dropdownMenu}
+                >
+                  {playbackRates.map((rate) => (
+                    <motion.button
+                      key={rate}
+                      whileHover={{ x: 5 }}
+                      onClick={() => handleSpeedChange(rate)}
+                      className={`${styles.dropdownItem} ${
+                        currentPlaybackRate === rate ? styles.active : ''
+                      }`}
+                    >
+                      {rate}x
+                      {currentPlaybackRate === rate && (
+                        <span className={styles.checkmark}>✓</span>
+                      )}
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          
           {/* Quality Settings */}
           {qualities.length > 0 && (
             <div className={styles.dropdownContainer}>
@@ -455,6 +510,7 @@ const EnhancedMediaControls = ({
                 onClick={() => {
                   setShowQualityMenu(!showQualityMenu);
                   setShowSubtitleMenu(false);
+                  setShowSpeedMenu(false);
                 }}
                 className={styles.glassButton}
                 aria-label="Quality Settings"
@@ -483,7 +539,9 @@ const EnhancedMediaControls = ({
                         }`}
                       >
                         {getQualityLabel(quality)}
-                        {quality.id === currentQuality && <span className={styles.checkmark}>✓</span>}
+                        {quality.id === currentQuality && (
+                          <span className={styles.checkmark}>✓</span>
+                        )}
                       </motion.button>
                     ))}
                   </motion.div>
@@ -491,7 +549,7 @@ const EnhancedMediaControls = ({
               </AnimatePresence>
             </div>
           )}
-
+          
           {/* Subtitle Settings */}
           <div className={styles.dropdownContainer}>
             <motion.button
@@ -500,6 +558,7 @@ const EnhancedMediaControls = ({
               onClick={() => {
                 setShowSubtitleMenu(!showSubtitleMenu);
                 setShowQualityMenu(false);
+                setShowSpeedMenu(false);
               }}
               className={styles.glassButton}
               aria-label="Subtitle Settings"
@@ -523,11 +582,11 @@ const EnhancedMediaControls = ({
                     }}
                     className={`${styles.dropdownItem} ${!activeSubtitle ? styles.active : ''}`}
                   >
-                    No Subtitles
+                    Off
                     {!activeSubtitle && <span className={styles.checkmark}>✓</span>}
                   </motion.button>
                   
-                  {(subtitles || []).map((subtitle, index) => (
+                  {subtitles.map((subtitle, index) => (
                     <motion.button
                       key={subtitle.langcode || subtitle.id || index}
                       whileHover={{ x: 5 }}
@@ -536,53 +595,68 @@ const EnhancedMediaControls = ({
                         setShowSubtitleMenu(false);
                       }}
                       className={`${styles.dropdownItem} ${
-                        activeSubtitle?.langcode === subtitle.langcode || activeSubtitle?.id === subtitle.id ? styles.active : ''
+                        activeSubtitle?.langcode === subtitle.langcode ||
+                        activeSubtitle?.id === subtitle.id
+                          ? styles.active
+                          : ''
                       }`}
                     >
                       {getSubtitleLabel(subtitle)}
-                      {(activeSubtitle?.langcode === subtitle.langcode || activeSubtitle?.id === subtitle.id) && <span className={styles.checkmark}>✓</span>}
+                      {(activeSubtitle?.langcode === subtitle.langcode ||
+                        activeSubtitle?.id === subtitle.id) && (
+                        <span className={styles.checkmark}>✓</span>
+                      )}
                     </motion.button>
                   ))}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-
+          
           {/* Picture-in-Picture */}
           {document.pictureInPictureEnabled && (
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                if (videoRef?.current) {
-                  if (document.pictureInPictureElement) {
-                    document.exitPictureInPicture();
-                  } else {
-                    videoRef.current.requestPictureInPicture();
-                  }
-                }
-              }}
+              onClick={handlePiP}
               className={styles.glassButton}
               aria-label="Picture in Picture"
             >
               📺
             </motion.button>
           )}
-
+          
           {/* Fullscreen Button */}
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onToggleFullscreen}
             className={styles.glassButton}
-            aria-label={playerState.isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
           >
-            {playerState.isFullscreen ? '⤡' : '⤢'}
+            {isFullscreen ? '⤡' : '⤢'}
           </motion.button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison function for React.memo
+  // Only re-render if critical props change
+  return (
+    prevProps.playerState?.isPlaying === nextProps.playerState?.isPlaying &&
+    prevProps.playerState?.currentTime === nextProps.playerState?.currentTime &&
+    prevProps.playerState?.duration === nextProps.playerState?.duration &&
+    prevProps.playerState?.volume === nextProps.playerState?.volume &&
+    prevProps.playerState?.isMuted === nextProps.playerState?.isMuted &&
+    prevProps.playerState?.buffered === nextProps.playerState?.buffered &&
+    prevProps.currentQuality === nextProps.currentQuality &&
+    prevProps.activeSubtitle?.id === nextProps.activeSubtitle?.id &&
+    prevProps.qualities?.length === nextProps.qualities?.length &&
+    prevProps.subtitles?.length === nextProps.subtitles?.length
+  );
+});
+
+EnhancedMediaControls.displayName = 'EnhancedMediaControls';
 
 export default EnhancedMediaControls;
