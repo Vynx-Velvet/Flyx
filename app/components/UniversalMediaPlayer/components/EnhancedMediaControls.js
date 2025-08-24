@@ -61,13 +61,17 @@ const EnhancedMediaControls = ({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  // Calculate progress percentages
-  const progressPercentage = playerState.duration > 0 
-    ? Math.min(100, Math.max(0, (playerState.currentTime / playerState.duration) * 100))
+  // Calculate progress percentages with fallback to video element
+  const currentTime = playerState?.currentTime ?? videoRef?.current?.currentTime ?? 0;
+  const duration = playerState?.duration ?? videoRef?.current?.duration ?? 0;
+  const buffered = playerState?.buffered ?? 0;
+  
+  const progressPercentage = duration > 0
+    ? Math.min(100, Math.max(0, (currentTime / duration) * 100))
     : 0;
     
-  const bufferedPercentage = playerState.duration > 0 && playerState.buffered
-    ? Math.min(100, Math.max(0, (playerState.buffered / playerState.duration) * 100))
+  const bufferedPercentage = duration > 0 && buffered > 0
+    ? Math.min(100, Math.max(0, (buffered / duration) * 100))
     : 0;
 
   // Timeline interaction handlers
@@ -85,11 +89,11 @@ const EnhancedMediaControls = ({
     setIsDraggingTimeline(true);
     
     const newTime = calculateTimeFromEvent(e);
-    if (videoRef?.current) {
-      videoRef.current.currentTime = newTime;
-    }
     if (playerActions?.seek) {
       playerActions.seek(newTime);
+    } else if (videoRef?.current) {
+      // Fallback to direct video control
+      videoRef.current.currentTime = newTime;
     }
     setLastSeekTime(Date.now());
   }, [calculateTimeFromEvent, videoRef, playerActions]);
@@ -113,11 +117,11 @@ const EnhancedMediaControls = ({
     if (isDraggingTimeline) {
       const now = Date.now();
       if (now - lastSeekTime > 50) { // Throttle to 20fps
-        if (videoRef?.current) {
-          videoRef.current.currentTime = time;
-        }
         if (playerActions?.seek) {
           playerActions.seek(time);
+        } else if (videoRef?.current) {
+          // Fallback to direct video control
+          videoRef.current.currentTime = time;
         }
         setLastSeekTime(now);
       }
@@ -140,15 +144,16 @@ const EnhancedMediaControls = ({
 
   const handleVolumeMouseDown = useCallback((e) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDraggingVolume(true);
     
     const newVolume = calculateVolumeFromEvent(e);
-    if (videoRef?.current) {
-      videoRef.current.volume = newVolume;
-      videoRef.current.muted = newVolume === 0;
-    }
     if (playerActions?.setVolume) {
       playerActions.setVolume(newVolume);
+    } else if (videoRef?.current) {
+      // Fallback to direct video control
+      videoRef.current.volume = newVolume;
+      videoRef.current.muted = newVolume === 0;
     }
   }, [calculateVolumeFromEvent, videoRef, playerActions]);
 
@@ -156,12 +161,12 @@ const EnhancedMediaControls = ({
     if (!isDraggingVolume) return;
     
     const newVolume = calculateVolumeFromEvent(e);
-    if (videoRef?.current) {
-      videoRef.current.volume = newVolume;
-      videoRef.current.muted = newVolume === 0;
-    }
     if (playerActions?.setVolume) {
       playerActions.setVolume(newVolume);
+    } else if (videoRef?.current) {
+      // Fallback to direct video control
+      videoRef.current.volume = newVolume;
+      videoRef.current.muted = newVolume === 0;
     }
   }, [isDraggingVolume, calculateVolumeFromEvent, videoRef, playerActions]);
 
@@ -210,37 +215,43 @@ const EnhancedMediaControls = ({
 
   // Player control handlers
   const handlePlayPause = useCallback(() => {
-    if (!videoRef?.current) return;
-    
-    if (videoRef.current.paused) {
-      videoRef.current.play();
-    } else {
-      videoRef.current.pause();
+    if (playerActions?.togglePlay) {
+      playerActions.togglePlay();
+    } else if (videoRef?.current) {
+      // Fallback to direct video control
+      if (videoRef.current.paused) {
+        videoRef.current.play().catch(err => {
+          console.error('Play error:', err);
+        });
+      } else {
+        videoRef.current.pause();
+      }
     }
-  }, [videoRef]);
+  }, [videoRef, playerActions]);
 
   const handleMute = useCallback(() => {
-    if (!videoRef?.current) return;
-    
-    videoRef.current.muted = !videoRef.current.muted;
     if (playerActions?.toggleMute) {
       playerActions.toggleMute();
+    } else if (videoRef?.current) {
+      // Fallback to direct video control
+      videoRef.current.muted = !videoRef.current.muted;
     }
   }, [videoRef, playerActions]);
 
   const handleSkip = useCallback((seconds) => {
     if (!videoRef?.current) return;
     
-    const newTime = Math.max(0, Math.min(
-      videoRef.current.duration || 0,
-      videoRef.current.currentTime + seconds
-    ));
+    const currentTime = playerState?.currentTime || videoRef.current.currentTime || 0;
+    const duration = playerState?.duration || videoRef.current.duration || 0;
+    const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
     
-    videoRef.current.currentTime = newTime;
     if (playerActions?.seek) {
       playerActions.seek(newTime);
+    } else {
+      // Fallback to direct video control
+      videoRef.current.currentTime = newTime;
     }
-  }, [videoRef, playerActions]);
+  }, [videoRef, playerActions, playerState]);
 
   // Volume icon selection
   const getVolumeIcon = useCallback(() => {
@@ -396,9 +407,9 @@ const EnhancedMediaControls = ({
 
           {/* Time Display - HH:MM:SS format */}
           <div className={styles.timeDisplay}>
-            <span className={styles.currentTime}>{formatTime(playerState.currentTime)}</span>
+            <span className={styles.currentTime}>{formatTime(currentTime)}</span>
             <span className={styles.timeSeparator}> / </span>
-            <span className={styles.totalTime}>{formatTime(playerState.duration)}</span>
+            <span className={styles.totalTime}>{formatTime(duration)}</span>
           </div>
         </div>
 
