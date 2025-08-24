@@ -232,9 +232,27 @@ const FuturisticMediaPlayer = ({
     { id: '480', label: '480p', height: 480, bitrate: 1000000 }
   ]);
   const [currentQuality, setCurrentQuality] = useState('auto');
+  const hlsRef = useRef(null); // Store HLS instance reference
+  
   const setQuality = useCallback((qualityId) => {
     setCurrentQuality(qualityId);
-    // trackEvent disabled for performance
+    console.log('🎬 Quality change requested:', qualityId);
+    
+    // Handle HLS quality switching
+    if (hlsRef.current) {
+      if (qualityId === 'auto') {
+        // Enable auto quality
+        hlsRef.current.currentLevel = -1;
+        console.log('✅ Auto quality enabled');
+      } else {
+        // Set specific quality level
+        const levelIndex = parseInt(qualityId);
+        if (!isNaN(levelIndex) && levelIndex >= 0 && levelIndex < hlsRef.current.levels.length) {
+          hlsRef.current.currentLevel = levelIndex;
+          console.log(`✅ Quality set to level ${levelIndex}: ${hlsRef.current.levels[levelIndex].height}p`);
+        }
+      }
+    }
   }, []);
   const adaptiveSettings = { enabled: true };
   const playerPerformanceMetrics = { fps: 60, dropFrames: 0 };
@@ -294,8 +312,9 @@ const FuturisticMediaPlayer = ({
                   capLevelToPlayerSize: true
                 });
                 
-                // Store reference for cleanup
+                // Store reference for cleanup and quality control
                 videoRef.current.hls = hls;
+                hlsRef.current = hls;
                 
                 hls.loadSource(streamUrl);
                 hls.attachMedia(videoRef.current);
@@ -304,6 +323,7 @@ const FuturisticMediaPlayer = ({
                 hls.on(HLS.Events.MANIFEST_PARSED, () => {
                   // Update qualities from manifest
                   if (hls.levels && hls.levels.length > 0) {
+                    console.log('📊 Available quality levels:', hls.levels.map(l => `${l.height}p`));
                     const hlsQualities = hls.levels.map((level, index) => ({
                       id: index.toString(),
                       label: `${level.height}p`,
@@ -315,6 +335,11 @@ const FuturisticMediaPlayer = ({
                       ...hlsQualities
                     ]);
                   }
+                });
+                
+                // Listen for quality changes
+                hls.on(HLS.Events.LEVEL_SWITCHED, (event, data) => {
+                  console.log(`📺 Quality switched to level ${data.level}: ${hls.levels[data.level].height}p`);
                 });
                 
                 hls.on(HLS.Events.ERROR, (event, data) => {
@@ -375,6 +400,9 @@ const FuturisticMediaPlayer = ({
       if (videoRef.current && videoRef.current.hls) {
         videoRef.current.hls.destroy();
         videoRef.current.hls = null;
+      }
+      if (hlsRef.current) {
+        hlsRef.current = null;
       }
     };
   }, [streamUrl, streamType]);
@@ -984,6 +1012,37 @@ const FuturisticMediaPlayer = ({
         onPositionChange={(pos) => playerActions.setPipPosition(pos)}
       />
 
+      {/* Quality Selector Overlay - Add simple quality buttons */}
+      {qualities.length > 1 && (
+        <div style={{
+          position: 'absolute',
+          top: '10px',
+          right: '10px',
+          zIndex: 100,
+          display: 'flex',
+          gap: '5px',
+          flexDirection: 'column'
+        }}>
+          {qualities.map(quality => (
+            <button
+              key={quality.id}
+              onClick={() => setQuality(quality.id)}
+              style={{
+                padding: '5px 10px',
+                backgroundColor: currentQuality === quality.id ? '#007bff' : 'rgba(0,0,0,0.7)',
+                color: 'white',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              {quality.label}
+            </button>
+          ))}
+        </div>
+      )}
+      
       {/* Enhanced Media Controls - FORCE RE-RENDER WITH KEY */}
       <AnimatePresence>
         {uiVisible && (
