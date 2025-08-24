@@ -68,7 +68,7 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
     setLoadingPhase(attemptNumber > 1 ? `retrying (attempt ${attemptNumber}/${maxRetries})` : 'initializing');
     setRetryAttempt(attemptNumber);
 
-    console.log(`🔄 Stream extraction attempt ${attemptNumber}/${maxRetries} for:`, { mediaType, movieId, seasonId, episodeId });
+    console.log(`🔄 Stream extraction attempt ${attemptNumber}/${maxRetries} for:`, { server, mediaType, movieId, seasonId, episodeId });
 
     // Handle extraction failure with retry logic
     const handleExtractionFailure = (errorMessage, attemptNumber, data) => {
@@ -102,19 +102,38 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
     };
 
     try {
-      const params = new URLSearchParams({
-        mediaType,
-        movieId: movieId.toString(),
-        server: server === "Vidsrc.xyz" ? "vidsrc.xyz" : "embed.su",
-        ...(mediaType === 'tv' && {
-          seasonId: seasonId.toString(),
-          episodeId: episodeId.toString()
-        }),
-      });
+      let extractionUrl;
+      let params;
+      
+      // Use new extract-shadowlands API for Vidsrc.xyz
+      if (server === "Vidsrc.xyz") {
+        console.log('🎯 Using new extract-shadowlands API (direct HTTP method)');
+        
+        params = new URLSearchParams({
+          tmdbId: movieId.toString(),
+          ...(mediaType === 'tv' && {
+            season: seasonId.toString(),
+            episode: episodeId.toString()
+          }),
+        });
+        
+        extractionUrl = `/api/extract-shadowlands?${params.toString()}`;
+      } else {
+        // Use original extraction for other servers
+        params = new URLSearchParams({
+          mediaType,
+          movieId: movieId.toString(),
+          server: "embed.su",
+          ...(mediaType === 'tv' && {
+            seasonId: seasonId.toString(),
+            episodeId: episodeId.toString()
+          }),
+        });
 
-      // Use VM_EXTRACTION_URL for bulletproof route if available, otherwise fallback to local API
-      const baseUrl = process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || '/api/extract-stream-progress';
-      const extractionUrl = `${baseUrl}?${params.toString()}`;
+        // Use VM_EXTRACTION_URL for bulletproof route if available, otherwise fallback to local API
+        const baseUrl = process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || '/api/extract-stream-progress';
+        extractionUrl = `${baseUrl}?${params.toString()}`;
+      }
       
       console.log('🔫 Using extraction endpoint:', extractionUrl);
       
@@ -161,13 +180,14 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
         hasStreamUrl: !!extractData.streamUrl,
         server: extractData.server,
         extractionMethod: extractData.extractionMethod,
-        requiresProxy: extractData.requiresProxy
+        requiresProxy: extractData.requiresProxy,
+        ...(extractData.chain && { chain: extractData.chain })
       });
 
       if (extractData.success && extractData.streamUrl) {
         // Log server selection information
         console.log('🎯 Stream extracted with server info:', {
-          server: extractData.server,
+          server: extractData.server || server,
           serverHash: extractData.serverHash,
           selectedServer: extractData.debug?.selectedStream?.source,
           extractionMethod: extractData.extractionMethod,
@@ -175,8 +195,9 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
         });
 
         // Process stream URL to handle CORS issues
-        const isVidsrc = extractData.server === 'vidsrc.xyz' || extractData.server === 'vidsrc';
-        const isShadowlands = extractData.streamType === 'shadowlands' ||
+        const isVidsrc = server === 'Vidsrc.xyz' || extractData.server === 'vidsrc.xyz' || extractData.server === 'vidsrc';
+        const isShadowlands = extractData.server === 'shadowlands' ||
+                             extractData.streamType === 'shadowlands' ||
                              extractData.streamUrl.includes('shadowlands') ||
                              extractData.streamUrl.includes('shadowlandschronicles.com') ||
                              extractData.streamUrl.includes('tmstr');
@@ -189,11 +210,21 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
           // Shadowlands URLs routed through stream-proxy with shadowlands source
           finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=shadowlands`;
           console.log('🌑 Using stream-proxy for shadowlands URL');
+          
+          // Log the extraction chain if available
+          if (extractData.chain) {
+            console.log('📊 Extraction chain:', {
+              vidsrc: extractData.chain.vidsrc,
+              cloudnestra: extractData.chain.cloudnestra,
+              prorcp: extractData.chain.prorcp,
+              shadowlands: extractData.chain.shadowlands
+            });
+          }
         } else if (needsProxy) {
           const sourceParam = extractData.debug?.selectedStream?.source ||
                              (isVidsrc ? 'vidsrc' : 'embed.su');
           finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=${sourceParam}`;
-          console.log(`🔄 Using proxy for ${extractData.server} URL (source: ${sourceParam})`);
+          console.log(`🔄 Using proxy for ${extractData.server || server} URL (source: ${sourceParam})`);
         } else {
           finalStreamUrl = extractData.streamUrl;
           console.log('✅ Using direct access for stream URL');
@@ -219,12 +250,13 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
         }
         
         // Log debug information for troubleshooting
-        if (extractData.debug) {
+        if (extractData.debug || extractData.metadata) {
           console.log('🔍 Stream extraction debug info:', {
-            server: extractData.debug.server,
-            totalFound: extractData.debug.totalFound,
-            debugInfo: extractData.debug.debugInfo,
-            suggestSwitch: extractData.debug.suggestSwitch
+            server: extractData.debug?.server || extractData.server,
+            totalFound: extractData.debug?.totalFound,
+            debugInfo: extractData.debug?.debugInfo,
+            suggestSwitch: extractData.debug?.suggestSwitch,
+            metadata: extractData.metadata
           });
         }
         
@@ -267,7 +299,7 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
       return;
     }
 
-    console.log('🚀 STARTING STREAM EXTRACTION for:', { mediaType, movieId, seasonId, episodeId });
+    console.log('🚀 STARTING STREAM EXTRACTION for:', { server, mediaType, movieId, seasonId, episodeId });
 
     extractStream(1);
 
@@ -300,4 +332,4 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
     maxRetries,
     retryExtraction 
   };
-}; 
+};
