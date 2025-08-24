@@ -71,7 +71,7 @@ const FuturisticMediaPlayer = ({
   // Simple, functional player state with all required properties
   const [simplePlayerState, setSimplePlayerState] = useState({
     isPlaying: false,
-    volume: 0.7, // Start with a reasonable volume
+    volume: 0.8, // Default volume
     isMuted: false,
     duration: 0,
     currentTime: 0,
@@ -86,102 +86,98 @@ const FuturisticMediaPlayer = ({
   });
 
   // Memoized player actions to prevent re-creation on every render
-  const playerActions = useMemo(() => ({
-    setPlaying: (isPlaying) => {
-      setSimplePlayerState(prev => ({ ...prev, isPlaying }));
-    },
-    togglePlay: () => {
-      if (videoRef.current) {
-        if (videoRef.current.paused) {
-          videoRef.current.play().catch(err => {
-            console.error('Play error:', err);
-          });
-        } else {
-          videoRef.current.pause();
-        }
-      }
-    },
-    setVolume: (volume) => {
-      const clampedVolume = Math.max(0, Math.min(1, volume));
-      if (videoRef.current) {
-        videoRef.current.volume = clampedVolume;
-        videoRef.current.muted = clampedVolume === 0;
-      }
-      setSimplePlayerState(prev => ({
-        ...prev,
-        volume: clampedVolume,
-        isMuted: clampedVolume === 0
-      }));
-    },
-    adjustVolume: (delta) => {
-      if (videoRef.current) {
-        const newVolume = Math.max(0, Math.min(1, videoRef.current.volume + delta));
-        videoRef.current.volume = newVolume;
-        videoRef.current.muted = newVolume === 0;
-        setSimplePlayerState(prev => ({ ...prev, volume: newVolume, isMuted: newVolume === 0 }));
-      }
-    },
-    toggleMute: () => {
-      if (videoRef.current) {
-        const wasMuted = videoRef.current.muted;
-        
-        if (wasMuted) {
-          // Unmuting: restore previous volume or set default
-          const volumeToRestore = simplePlayerState.volume > 0 ? simplePlayerState.volume : 0.8;
-          videoRef.current.volume = volumeToRestore;
-          videoRef.current.muted = false;
-          setSimplePlayerState(prev => ({
-            ...prev,
-            isMuted: false,
-            volume: volumeToRestore
-          }));
-        } else {
-          // Muting
-          videoRef.current.muted = true;
-          setSimplePlayerState(prev => ({
-            ...prev,
-            isMuted: true
-          }));
-        }
-      }
-    },
-    setCurrentTime: (currentTime) => {
-      if (isFinite(currentTime) && !isNaN(currentTime)) {
-        setSimplePlayerState(prev => {
-          // Update more frequently for smoother progress bar
-          if (Math.abs(prev.currentTime - currentTime) >= 0.05) {
-            return { ...prev, currentTime };
+  const playerActions = useMemo(() => {
+    const actions = {
+      setPlaying: (isPlaying) => {
+        setSimplePlayerState(prev => ({ ...prev, isPlaying }));
+      },
+      togglePlay: () => {
+        const video = videoRef.current;
+        if (video) {
+          if (video.paused) {
+            video.play();
+          } else {
+            video.pause();
           }
-          return prev;
-        });
-      }
-    },
-    setDuration: (duration) => {
-      if (isFinite(duration) && !isNaN(duration) && duration > 0) {
-        setSimplePlayerState(prev => ({ ...prev, duration }));
-      }
-    },
-    setFullscreen: (isFullscreen) => {
-      setSimplePlayerState(prev => ({ ...prev, isFullscreen }));
-    },
-    seek: (time) => {
-      if (videoRef.current && isFinite(time) && !isNaN(time)) {
-        const duration = videoRef.current.duration || 0;
-        const clampedTime = Math.max(0, Math.min(duration, time));
-        videoRef.current.currentTime = clampedTime;
-        // Don't update state here - let timeupdate event handle it
-      }
-    },
-    setBuffered: (buffered) => {
-      if (isFinite(buffered) && !isNaN(buffered)) {
-        setSimplePlayerState(prev => ({ ...prev, buffered }));
-      }
-    },
-    resetUITimer: () => {}, // Keep as no-op for compatibility
-    setPipPosition: (position) => {
-      setSimplePlayerState(prev => ({ ...prev, pipPosition: position }));
-    },
-  }), [simplePlayerState.volume]);
+        }
+      },
+      setVolume: (volume) => {
+        const clampedVolume = Math.max(0, Math.min(1, volume));
+        const video = videoRef.current;
+        if (video) {
+          video.volume = clampedVolume;
+          video.muted = clampedVolume === 0;
+        }
+        setSimplePlayerState(prev => ({
+          ...prev,
+          volume: clampedVolume,
+          isMuted: clampedVolume === 0
+        }));
+      },
+      adjustVolume: (delta) => {
+        const video = videoRef.current;
+        if (video) {
+          const newVolume = Math.max(0, Math.min(1, video.volume + delta));
+          video.volume = newVolume;
+          video.muted = newVolume === 0;
+          setSimplePlayerState(prev => ({ ...prev, volume: newVolume, isMuted: newVolume === 0 }));
+        }
+      },
+      toggleMute: () => {
+        const video = videoRef.current;
+        if (video) {
+          const wasMuted = video.muted;
+          video.muted = !wasMuted;
+          // If unmuting and volume is 0, set to a reasonable volume
+          if (wasMuted && video.volume === 0) {
+            video.volume = 0.8;
+          }
+          setSimplePlayerState(prev => ({
+            ...prev,
+            isMuted: !wasMuted,
+            volume: video.volume
+          }));
+        }
+      },
+      setCurrentTime: (currentTime) => {
+        if (isFinite(currentTime) && !isNaN(currentTime)) {
+          setSimplePlayerState(prev => {
+            // Update more frequently for smoother progress bar
+            if (Math.abs(prev.currentTime - currentTime) >= 0.05) {
+              return { ...prev, currentTime };
+            }
+            return prev;
+          });
+        }
+      },
+      setDuration: (duration) => {
+        if (isFinite(duration) && !isNaN(duration) && duration > 0) {
+          setSimplePlayerState(prev => ({ ...prev, duration }));
+        }
+      },
+      setFullscreen: (isFullscreen) => {
+        setSimplePlayerState(prev => ({ ...prev, isFullscreen }));
+      },
+      seek: (time) => {
+        const video = videoRef.current;
+        if (video && isFinite(time)) {
+          const clampedTime = Math.max(0, Math.min(video.duration || 0, time));
+          video.currentTime = clampedTime;
+          setSimplePlayerState(prev => ({ ...prev, currentTime: clampedTime }));
+        }
+      },
+      setBuffered: (buffered) => {
+        if (isFinite(buffered) && !isNaN(buffered)) {
+          setSimplePlayerState(prev => ({ ...prev, buffered }));
+        }
+      },
+      resetUITimer: () => {}, // Keep as no-op for compatibility
+      setPipPosition: (position) => {
+        setSimplePlayerState(prev => ({ ...prev, pipPosition: position }));
+      },
+    };
+    return actions;
+  }, []);
 
   // Use simple state as playerState for compatibility
   const playerState = simplePlayerState;
@@ -229,8 +225,8 @@ const FuturisticMediaPlayer = ({
   // Set video source when streamUrl is available
   useEffect(() => {
     if (videoRef.current && streamUrl) {
-      // Minimal logging for performance
-      console.log('🎬 Setting video source:', streamType, streamUrl);
+      console.log('🎬 Setting video source:', streamType);
+      console.log('📺 Stream URL:', streamUrl);
       
       // For HLS streams, try to use native HLS support first
       if (streamType === 'hls') {
@@ -334,14 +330,9 @@ const FuturisticMediaPlayer = ({
       // Force load
       videoRef.current.load();
       
-      // Set initial volume and muted state after a small delay to ensure video is ready
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.volume = simplePlayerState.volume;
-          videoRef.current.muted = simplePlayerState.isMuted;
-          console.log('🔊 Initial volume set:', simplePlayerState.volume, 'Muted:', simplePlayerState.isMuted);
-        }
-      }, 100);
+      // Set initial volume and muted state
+      videoRef.current.volume = simplePlayerState.volume;
+      videoRef.current.muted = simplePlayerState.isMuted;
       
     }
     
@@ -352,7 +343,7 @@ const FuturisticMediaPlayer = ({
         videoRef.current.hls = null;
       }
     };
-  }, [streamUrl, streamType]); // Remove volume/muted deps to prevent re-initialization
+  }, [streamUrl, streamType, simplePlayerState.volume, simplePlayerState.isMuted]);
 
   // Enhanced subtitle system with API integration
   const {
@@ -548,22 +539,22 @@ const FuturisticMediaPlayer = ({
   }, [playerActions, playerState.duration]);
 
   const handleLoadedMetadata = useCallback(() => {
-    if (videoRef.current && !isNaN(videoRef.current.duration)) {
+    if (videoRef.current) {
       const duration = videoRef.current.duration;
-      console.log('🎬 Video metadata loaded, duration:', duration);
+      console.log('📊 Metadata loaded - Duration:', duration, 'Ready State:', videoRef.current.readyState);
       
-      playerActions.setDuration(duration);
-      
-      // Apply initial volume settings if not already set
-      if (!isInitialized) {
-        videoRef.current.volume = simplePlayerState.volume;
-        videoRef.current.muted = simplePlayerState.isMuted;
-        console.log('🔊 Volume initialized on metadata load:', simplePlayerState.volume);
+      if (!isNaN(duration) && duration > 0) {
+        playerActions.setDuration(duration);
       }
+      
+      // Ensure volume is properly set on metadata load
+      videoRef.current.volume = simplePlayerState.volume;
+      videoRef.current.muted = simplePlayerState.isMuted;
+      console.log('🔊 Volume set to:', simplePlayerState.volume, 'Muted:', simplePlayerState.isMuted);
       
       setIsInitialized(true);
     }
-  }, [playerActions, simplePlayerState.volume, simplePlayerState.isMuted, isInitialized]);
+  }, [playerActions, simplePlayerState.volume, simplePlayerState.isMuted]);
 
   // Video event handlers for play/pause state sync
   const handlePlay = useCallback(() => {
@@ -769,7 +760,7 @@ const FuturisticMediaPlayer = ({
       <video
         ref={videoRef}
         className={styles.videoElement}
-        autoPlay={false} // Don't autoplay by default
+        autoPlay
         playsInline
         preload="metadata"
         crossOrigin="anonymous"
@@ -782,7 +773,15 @@ const FuturisticMediaPlayer = ({
           backgroundColor: 'black',
           zIndex: 10
         }}
-        onError={(e) => console.error('Video error:', e)}
+        onError={(e) => {
+          console.error('❌ Video playback error:', e.target.error);
+          console.error('Error details:', {
+            code: e.target.error?.code,
+            message: e.target.error?.message
+          });
+        }}
+        onCanPlay={() => console.log('✅ Video can play')}
+        onLoadStart={() => console.log('🎬 Video load started')}
       />
 
       {/* Hidden canvas for advanced features */}
