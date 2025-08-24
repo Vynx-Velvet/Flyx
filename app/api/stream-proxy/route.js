@@ -161,8 +161,17 @@ function validateRequest(request, logger) {
 
 // SIMPLIFIED fetch with minimal retries for stability
 async function fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex = 0, retryCount = 0) {
-  // Use simplified headers - no complex strategies
-  const headers = getSimplifiedHeaders(url, userAgent, source);
+  // Check if this is a shadowlands URL
+  const isShadowlands = source === 'shadowlands' || 
+                       source === 'vidsrc' ||  // vidsrc source is used for shadowlands
+                       url.includes('shadowlandschronicles') || 
+                       url.includes('shadowlands') || 
+                       url.includes('tmstr');
+  
+  // Use appropriate headers based on URL type
+  const headers = isShadowlands 
+    ? getShadowlandsHeaders(url, logger)
+    : getSimplifiedHeaders(url, userAgent, source);
   
   const options = {
     ...baseOptions,
@@ -176,7 +185,9 @@ async function fetchWithHeaderFallback(url, baseOptions, logger, userAgent, sour
   try {
     logger.debug('Fetch attempt', {
       url: url.substring(0, 100),
-      retryCount: retryCount
+      retryCount: retryCount,
+      isShadowlands: isShadowlands,
+      headers: Object.keys(headers)
     });
     
     const response = await fetch(url, options);
@@ -227,7 +238,20 @@ async function fetchWithHeaderFallback(url, baseOptions, logger, userAgent, sour
   }
 }
 
-// SIMPLIFIED headers - only what's absolutely necessary
+// Shadowlands-specific headers (ONLY Origin and Referer like extract-shadowlands)
+function getShadowlandsHeaders(url, logger) {
+  logger.info('Using shadowlands headers (Origin and Referer only)', {
+    url: url.substring(0, 100)
+  });
+  
+  // ONLY Origin and Referer headers for shadowlands URLs
+  return {
+    'Origin': 'https://vidsrc.xyz',
+    'Referer': 'https://vidsrc.xyz/'
+  };
+}
+
+// SIMPLIFIED headers for non-shadowlands URLs
 function getSimplifiedHeaders(url, userAgent, source) {
   const baseUserAgent = userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
   
@@ -239,11 +263,8 @@ function getSimplifiedHeaders(url, userAgent, source) {
     'Connection': 'keep-alive'
   };
   
-  // Handle shadowlands source or shadowlands URLs with vidsrc.xyz headers
-  if (source === 'shadowlands' || url.includes('shadowlandschronicles') || url.includes('shadowlands') || url.includes('tmstr')) {
-    headers['Referer'] = 'https://vidsrc.xyz/';
-    headers['Origin'] = 'https://vidsrc.xyz';
-  } else if (url.includes('embed.su')) {
+  // Add Origin/Referer for specific non-shadowlands sources
+  if (url.includes('embed.su')) {
     headers['Referer'] = 'https://embed.su/';
     headers['Origin'] = 'https://embed.su';
   } else if (url.includes('lightningbolt')) {
@@ -454,7 +475,7 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   const streamUrl = searchParams.get('url');
-  const source = searchParams.get('source'); // 'vidsrc', 'embed.su', etc.
+  const source = searchParams.get('source'); // 'vidsrc', 'embed.su', 'shadowlands', etc.
 
   // Rate limiting check (Requirement 5.3)
   const isLightningboltUrl = (streamUrl?.includes('lightningbolt') || streamUrl?.includes('lightningbolts.ru')) || false;
@@ -860,10 +881,10 @@ export async function HEAD(request) {
     };
 
     const response = await fetchWithHeaderFallback(
-      streamUrl, 
-      baseFetchOptions, 
-      logger, 
-      userAgent, 
+      streamUrl,
+      baseFetchOptions,
+      logger,
+      userAgent,
       source
     );
 
