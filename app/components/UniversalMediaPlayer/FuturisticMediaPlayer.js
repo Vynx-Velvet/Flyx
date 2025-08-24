@@ -68,14 +68,21 @@ const FuturisticMediaPlayer = ({
   const [performanceVisible, setPerformanceVisible] = useState(false);
   const [fullscreenMode, setFullscreenMode] = useState('standard'); // standard, immersive, cinema
   
-  // Simple, functional player state
+  // Simple, functional player state with all required properties
   const [simplePlayerState, setSimplePlayerState] = useState({
     isPlaying: false,
     volume: 0.8,
     isMuted: false,
     duration: 0,
     currentTime: 0,
-    isFullscreen: false
+    isFullscreen: false,
+    buffered: 0,
+    subtitleStyle: {},
+    ambientIntensity: 0.5,
+    gestureVisualFeedback: true,
+    particlesEnabled: false,
+    pipEnabled: false,
+    pipPosition: { x: 20, y: 20 }
   });
 
   // Memoized player actions to prevent re-creation on every render
@@ -93,22 +100,34 @@ const FuturisticMediaPlayer = ({
       }
     },
     setVolume: (volume) => {
-      setSimplePlayerState(prev => ({ ...prev, volume, isMuted: volume === 0 }));
+      const clampedVolume = Math.max(0, Math.min(1, volume));
+      setSimplePlayerState(prev => ({ ...prev, volume: clampedVolume, isMuted: clampedVolume === 0 }));
       if (videoRef.current) {
-        videoRef.current.volume = volume;
+        videoRef.current.volume = clampedVolume;
+        videoRef.current.muted = clampedVolume === 0;
       }
     },
     adjustVolume: (delta) => {
       if (videoRef.current) {
         const newVolume = Math.max(0, Math.min(1, videoRef.current.volume + delta));
         videoRef.current.volume = newVolume;
+        videoRef.current.muted = newVolume === 0;
         setSimplePlayerState(prev => ({ ...prev, volume: newVolume, isMuted: newVolume === 0 }));
       }
     },
     toggleMute: () => {
       if (videoRef.current) {
-        videoRef.current.muted = !videoRef.current.muted;
-        setSimplePlayerState(prev => ({ ...prev, isMuted: videoRef.current.muted }));
+        const wasMuted = videoRef.current.muted;
+        videoRef.current.muted = !wasMuted;
+        // If unmuting and volume is 0, set to a reasonable volume
+        if (wasMuted && videoRef.current.volume === 0) {
+          videoRef.current.volume = 0.8;
+        }
+        setSimplePlayerState(prev => ({
+          ...prev,
+          isMuted: !wasMuted,
+          volume: videoRef.current.volume
+        }));
       }
     },
     setCurrentTime: (currentTime) => {
@@ -127,14 +146,19 @@ const FuturisticMediaPlayer = ({
       setSimplePlayerState(prev => ({ ...prev, isFullscreen }));
     },
     seek: (time) => {
-      if (videoRef.current) {
-        videoRef.current.currentTime = time;
+      if (videoRef.current && isFinite(time)) {
+        const clampedTime = Math.max(0, Math.min(videoRef.current.duration || 0, time));
+        videoRef.current.currentTime = clampedTime;
+        setSimplePlayerState(prev => ({ ...prev, currentTime: clampedTime }));
       }
     },
-    // No-op methods to prevent TypeErrors from old cached code
-    setBuffered: () => {}, // Disabled for performance - not needed in simple mode
-    resetUITimer: () => {}, // Disabled for performance - not needed in simple mode
-    setPipPosition: () => {}, // Disabled for performance - not needed in simple mode
+    setBuffered: (buffered) => {
+      setSimplePlayerState(prev => ({ ...prev, buffered }));
+    },
+    resetUITimer: () => {}, // Keep as no-op for compatibility
+    setPipPosition: (position) => {
+      setSimplePlayerState(prev => ({ ...prev, pipPosition: position }));
+    },
   }), []);
 
   // Use simple state as playerState for compatibility
@@ -288,6 +312,10 @@ const FuturisticMediaPlayer = ({
       // Force load
       videoRef.current.load();
       
+      // Set initial volume and muted state
+      videoRef.current.volume = simplePlayerState.volume;
+      videoRef.current.muted = simplePlayerState.isMuted;
+      
     }
     
     // Clean up HLS instance on unmount and when streamUrl changes
@@ -297,7 +325,7 @@ const FuturisticMediaPlayer = ({
         videoRef.current.hls = null;
       }
     };
-  }, [streamUrl, streamType]);
+  }, [streamUrl, streamType, simplePlayerState.volume, simplePlayerState.isMuted]);
 
   // Enhanced subtitle system with API integration
   const {
@@ -406,12 +434,10 @@ const FuturisticMediaPlayer = ({
 
     switch (gesture.type) {
       case 'swipeUp':
-        videoRef.current.volume = Math.min(1, videoRef.current.volume + 0.1);
-        playerActions.setVolume(videoRef.current.volume);
+        playerActions.adjustVolume(0.1);
         break;
       case 'swipeDown':
-        videoRef.current.volume = Math.max(0, videoRef.current.volume - 0.1);
-        playerActions.setVolume(videoRef.current.volume);
+        playerActions.adjustVolume(-0.1);
         break;
       case 'swipeLeft':
         videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
@@ -446,8 +472,8 @@ const FuturisticMediaPlayer = ({
         videoRef.current.pause();
         break;
       case 'volume':
-        videoRef.current.volume = Math.max(0, Math.min(1, value / 100));
-        playerActions.setVolume(videoRef.current.volume);
+        const normalizedVolume = Math.max(0, Math.min(1, value / 100));
+        playerActions.setVolume(normalizedVolume);
         break;
       case 'seek':
         videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration, value));
@@ -485,6 +511,12 @@ const FuturisticMediaPlayer = ({
       if (duration && Math.abs(duration - playerState.duration) > 0.01) {
         playerActions.setDuration(duration);
       }
+      
+      // Update buffered progress
+      if (videoRef.current.buffered.length > 0) {
+        const buffered = videoRef.current.buffered.end(videoRef.current.buffered.length - 1);
+        playerActions.setBuffered(buffered);
+      }
     }
   }, [playerActions, playerState.duration]);
 
@@ -492,9 +524,14 @@ const FuturisticMediaPlayer = ({
     if (videoRef.current) {
       const duration = videoRef.current.duration;
       playerActions.setDuration(duration);
+      
+      // Ensure volume is properly set on metadata load
+      videoRef.current.volume = simplePlayerState.volume;
+      videoRef.current.muted = simplePlayerState.isMuted;
+      
       setIsInitialized(true);
     }
-  }, [playerActions]);
+  }, [playerActions, simplePlayerState.volume, simplePlayerState.isMuted]);
 
   // Video event handlers for play/pause state sync
   const handlePlay = useCallback(() => {
@@ -507,9 +544,11 @@ const FuturisticMediaPlayer = ({
 
   const handleVolumeChange = useCallback(() => {
     if (videoRef.current) {
-      playerActions.setVolume(videoRef.current.volume);
+      const volume = videoRef.current.volume;
+      const isMuted = videoRef.current.muted;
+      setSimplePlayerState(prev => ({ ...prev, volume, isMuted }));
     }
-  }, [playerActions]);
+  }, []);
 
   // Simple video event setup that actually works
   useEffect(() => {
@@ -551,8 +590,7 @@ const FuturisticMediaPlayer = ({
           toggleFullscreen();
           break;
         case 'm':
-          videoRef.current.muted = !videoRef.current.muted;
-          playerActions.setVolume(videoRef.current.muted ? 0 : videoRef.current.volume);
+          playerActions.toggleMute();
           break;
         case 'ArrowLeft':
           videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
@@ -562,13 +600,11 @@ const FuturisticMediaPlayer = ({
           break;
         case 'ArrowUp':
           e.preventDefault();
-          videoRef.current.volume = Math.min(1, videoRef.current.volume + 0.1);
-          playerActions.setVolume(videoRef.current.volume);
+          playerActions.adjustVolume(0.1);
           break;
         case 'ArrowDown':
           e.preventDefault();
-          videoRef.current.volume = Math.max(0, videoRef.current.volume - 0.1);
-          playerActions.setVolume(videoRef.current.volume);
+          playerActions.adjustVolume(-0.1);
           break;
       }
     };
@@ -697,6 +733,7 @@ const FuturisticMediaPlayer = ({
         playsInline
         preload="metadata"
         crossOrigin="anonymous"
+        controls={false}
         data-testid="futuristic-video-player"
         style={{
           width: '100%',
