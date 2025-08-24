@@ -325,8 +325,24 @@ const FuturisticMediaPlayerCore = ({
     }
     
     try {
-      // Dynamic import with fallback
-      const Hls = (await import('hls.js')).default;
+      // Use global HLS.js if available, otherwise load from CDN
+      let Hls;
+      
+      if (window.Hls) {
+        Hls = window.Hls;
+        console.log('✅ Using global HLS.js');
+      } else {
+        console.log('🔄 Loading HLS.js from CDN...');
+        // Load HLS.js from CDN
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.6.10/dist/hls.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        Hls = window.Hls;
+      }
       
       if (!Hls.isSupported()) {
         console.warn('HLS.js not supported, falling back to native playback');
