@@ -1,11 +1,16 @@
 'use client';
 
+import React from 'react';
+
 /**
  * Error Recovery Utilities
- * 
+ *
  * Provides intelligent error recovery strategies and utilities
  * for the media player components
  */
+
+// Debug logging for React reference
+console.log('[errorRecovery.js] React import status:', typeof React !== 'undefined' ? 'SUCCESS' : 'FAILED');
 
 // Error severity levels
 export const ErrorSeverity = {
@@ -309,6 +314,8 @@ function delay(ms) {
  * Error recovery hook
  */
 export function useErrorRecovery(options = {}) {
+  console.log('[useErrorRecovery] Hook called, React available:', typeof React !== 'undefined');
+  
   const {
     maxRetries = 3,
     onError,
@@ -321,6 +328,7 @@ export function useErrorRecovery(options = {}) {
   const [lastError, setLastError] = React.useState(null);
   
   const handleError = React.useCallback(async (error) => {
+    console.log('[errorRecovery] Handling error:', error?.message, 'React available:', typeof React !== 'undefined');
     setLastError(error);
     
     if (!isRecoverableError(error, { retryCount })) {
@@ -354,6 +362,7 @@ export function useErrorRecovery(options = {}) {
   }, [retryCount, maxRetries, onError, onRecovery, onMaxRetriesExceeded]);
   
   const reset = React.useCallback(() => {
+    console.log('[errorRecovery] Resetting error state');
     setRetryCount(0);
     setIsRecovering(false);
     setLastError(null);
