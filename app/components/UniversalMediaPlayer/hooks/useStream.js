@@ -204,9 +204,9 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
         let finalStreamUrl;
         
         if (isShadowlands) {
-          // Shadowlands URLs run directly without proxy
-          finalStreamUrl = extractData.streamUrl;
-          console.log('🌑 Using direct access for shadowlands URL (no proxy)');
+          // Shadowlands URLs use vidsrc.xyz proxy method (origin and referer only)
+          finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=vidsrc`;
+          console.log('🌑 Using vidsrc.xyz proxy method for shadowlands URL (origin and referer headers only)');
           
           // Log the extraction chain if available
           if (extractData.chain) {
