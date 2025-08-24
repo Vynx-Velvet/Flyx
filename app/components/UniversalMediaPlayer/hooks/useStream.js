@@ -194,22 +194,19 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
           requiresProxy: extractData.requiresProxy
         });
 
-        // Process stream URL to handle CORS issues
-        const isVidsrc = server === 'Vidsrc.xyz' || extractData.server === 'vidsrc.xyz' || extractData.server === 'vidsrc';
+        // Check if URL is from shadowlands
         const isShadowlands = extractData.server === 'shadowlands' ||
                              extractData.streamType === 'shadowlands' ||
                              extractData.streamUrl.includes('shadowlands') ||
                              extractData.streamUrl.includes('shadowlandschronicles.com') ||
                              extractData.streamUrl.includes('tmstr');
-        const needsProxy = extractData.requiresProxy ||
-                          (!isShadowlands && (extractData.streamUrl.includes('cloudnestra.com'))) ||
-                          !isVidsrc;
 
         let finalStreamUrl;
+        
         if (isShadowlands) {
-          // Shadowlands URLs routed through stream-proxy with shadowlands source
-          finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=shadowlands`;
-          console.log('🌑 Using stream-proxy for shadowlands URL');
+          // Shadowlands URLs run directly without proxy
+          finalStreamUrl = extractData.streamUrl;
+          console.log('🌑 Using direct access for shadowlands URL (no proxy)');
           
           // Log the extraction chain if available
           if (extractData.chain) {
@@ -220,14 +217,22 @@ export const useStream = ({ mediaType, movieId, seasonId, episodeId, shouldFetch
               shadowlands: extractData.chain.shadowlands
             });
           }
-        } else if (needsProxy) {
-          const sourceParam = extractData.debug?.selectedStream?.source ||
-                             (isVidsrc ? 'vidsrc' : 'embed.su');
-          finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=${sourceParam}`;
-          console.log(`🔄 Using proxy for ${extractData.server || server} URL (source: ${sourceParam})`);
         } else {
-          finalStreamUrl = extractData.streamUrl;
-          console.log('✅ Using direct access for stream URL');
+          // Check if other URLs need proxy
+          const isVidsrc = server === 'Vidsrc.xyz' || extractData.server === 'vidsrc.xyz' || extractData.server === 'vidsrc';
+          const needsProxy = extractData.requiresProxy ||
+                            extractData.streamUrl.includes('cloudnestra.com') ||
+                            !isVidsrc;
+
+          if (needsProxy) {
+            const sourceParam = extractData.debug?.selectedStream?.source ||
+                               (isVidsrc ? 'vidsrc' : 'embed.su');
+            finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=${sourceParam}`;
+            console.log(`🔄 Using proxy for ${extractData.server || server} URL (source: ${sourceParam})`);
+          } else {
+            finalStreamUrl = extractData.streamUrl;
+            console.log('✅ Using direct access for stream URL');
+          }
         }
 
         // Success - clean up and set results
