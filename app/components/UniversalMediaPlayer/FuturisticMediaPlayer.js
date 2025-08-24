@@ -349,9 +349,9 @@ const FuturisticMediaPlayer = ({
       // Force load
       videoRef.current.load();
       
-      // Set initial volume and muted state
-      videoRef.current.volume = 0.8;
-      videoRef.current.muted = false;
+      // Don't force volume - let user control it
+      // videoRef.current.volume = 0.8;
+      // videoRef.current.muted = false;
       
       // Wait for loadedmetadata event before trying to play
       const playWhenReady = () => {
@@ -379,7 +379,7 @@ const FuturisticMediaPlayer = ({
     };
   }, [streamUrl, streamType]);
 
-  // Force sync state with video element every 250ms
+  // Force sync state with video element - but don't override volume
   useEffect(() => {
     if (!videoRef.current || !streamUrl) return;
     
@@ -387,28 +387,27 @@ const FuturisticMediaPlayer = ({
       const video = videoRef.current;
       if (video && video.readyState >= 2 && !isNaN(video.duration)) {
         setSimplePlayerState(prev => {
+          // Don't update volume/muted from sync - let user control it
           const newState = {
             ...prev,
             currentTime: video.currentTime || 0,
             duration: video.duration || 0,
             isPlaying: !video.paused,
-            volume: video.volume || 0.8,
-            isMuted: video.muted || false,
-            buffered: video.buffered.length > 0 ? video.buffered.end(0) : 0
+            // Keep existing volume/muted unless they're uninitialized
+            volume: prev.volume !== undefined ? prev.volume : video.volume,
+            isMuted: prev.isMuted !== undefined ? prev.isMuted : video.muted,
+            buffered: video.buffered.length > 0 ? video.buffered.end(0) : prev.buffered
           };
           
           // Only log significant changes
-          if (Math.floor(newState.currentTime) !== Math.floor(prev.currentTime)) {
-            console.log('⏱️ Sync:', {
-              time: `${newState.currentTime.toFixed(1)}/${newState.duration.toFixed(1)}`,
-              playing: newState.isPlaying
-            });
+          if (Math.floor(newState.currentTime) !== Math.floor(prev.currentTime) && Math.floor(newState.currentTime) % 10 === 0) {
+            console.log('⏱️ Time:', `${Math.floor(newState.currentTime)}/${Math.floor(newState.duration)}s`);
           }
           
           return newState;
         });
       }
-    }, 250); // Update 4 times per second
+    }, 500); // Reduce to 2 times per second to reduce flickering
     
     return () => clearInterval(syncInterval);
   }, [streamUrl]);
@@ -632,11 +631,13 @@ const FuturisticMediaPlayer = ({
     
     const volumeHandler = () => {
       if (!video) return;
+      // Update state when user changes volume
       setSimplePlayerState(prev => ({
         ...prev,
         volume: video.volume,
         isMuted: video.muted
       }));
+      console.log('🔊 User changed volume:', video.volume.toFixed(2));
     };
     
     // Add event listeners
@@ -653,7 +654,10 @@ const FuturisticMediaPlayer = ({
       setSimplePlayerState(prev => ({
         ...prev,
         duration: video.duration,
-        isPlaying: !video.paused
+        isPlaying: !video.paused,
+        // Initialize volume from video element
+        volume: video.volume,
+        isMuted: video.muted
       }));
     }
     
