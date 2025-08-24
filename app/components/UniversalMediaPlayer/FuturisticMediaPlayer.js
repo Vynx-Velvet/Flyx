@@ -191,15 +191,7 @@ const FuturisticMediaPlayer = ({
   // Use simplePlayerState directly
   const playerState = simplePlayerState;
   
-  // Log state for debugging
-  useEffect(() => {
-    console.log('🎮 State being passed to controls:', {
-      currentTime: playerState.currentTime,
-      duration: playerState.duration,
-      isPlaying: playerState.isPlaying,
-      volume: playerState.volume
-    });
-  }, [playerState.currentTime, playerState.duration, playerState.isPlaying, playerState.volume]);
+  // Removed debug logging
   
   // Enhanced media details with scene analysis
   const { details: mediaDetails, sceneData } = useFetchMediaDetails(movieId, mediaType, {
@@ -374,9 +366,7 @@ const FuturisticMediaPlayer = ({
       // Force load
       videoRef.current.load();
       
-      // Don't force volume - let user control it
-      // videoRef.current.volume = 0.8;
-      // videoRef.current.muted = false;
+      // Let browser handle initial volume
       
       // Wait for loadedmetadata event before trying to play
       const playWhenReady = () => {
@@ -407,38 +397,8 @@ const FuturisticMediaPlayer = ({
     };
   }, [streamUrl, streamType]);
 
-  // Force sync state with video element - but don't override volume
-  useEffect(() => {
-    if (!videoRef.current || !streamUrl) return;
-    
-    const syncInterval = setInterval(() => {
-      const video = videoRef.current;
-      if (video && video.readyState >= 2 && !isNaN(video.duration)) {
-        setSimplePlayerState(prev => {
-          // Don't update volume/muted from sync - let user control it
-          const newState = {
-            ...prev,
-            currentTime: video.currentTime || 0,
-            duration: video.duration || 0,
-            isPlaying: !video.paused,
-            // Keep existing volume/muted unless they're uninitialized
-            volume: prev.volume !== undefined ? prev.volume : video.volume,
-            isMuted: prev.isMuted !== undefined ? prev.isMuted : video.muted,
-            buffered: video.buffered.length > 0 ? video.buffered.end(0) : prev.buffered
-          };
-          
-          // Only log significant changes
-          if (Math.floor(newState.currentTime) !== Math.floor(prev.currentTime) && Math.floor(newState.currentTime) % 10 === 0) {
-            console.log('⏱️ Time:', `${Math.floor(newState.currentTime)}/${Math.floor(newState.duration)}s`);
-          }
-          
-          return newState;
-        });
-      }
-    }, 500); // Reduce to 2 times per second to reduce flickering
-    
-    return () => clearInterval(syncInterval);
-  }, [streamUrl]);
+  // REMOVED sync interval - let native controls handle everything
+  // The sync was interfering with native HTML5 controls
 
   // Enhanced subtitle system with API integration
   const {
@@ -613,92 +573,8 @@ const FuturisticMediaPlayer = ({
 
   // Removed old event handlers - now using inline handlers in useEffect
 
-  // Video event setup - needs to run when video source changes
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !streamUrl) return;
-    
-    console.log('🎬 Setting up video event listeners for:', streamUrl);
-    
-    // Event handlers need to be inline to access current state
-    const timeHandler = () => {
-      if (!video) return;
-      const currentTime = video.currentTime || 0;
-      const duration = video.duration || 0;
-      
-      setSimplePlayerState(prev => {
-        const newState = {
-          ...prev,
-          currentTime: currentTime,
-          duration: !isNaN(duration) ? duration : prev.duration,
-          buffered: video.buffered.length > 0 ? video.buffered.end(video.buffered.length - 1) : 0
-        };
-        return newState;
-      });
-    };
-    
-    const metadataHandler = () => {
-      if (!video) return;
-      const duration = video.duration;
-      console.log('📊 Metadata event - Duration:', duration);
-      
-      if (!isNaN(duration) && duration > 0) {
-        setSimplePlayerState(prev => ({ ...prev, duration }));
-      }
-    };
-    
-    const playHandler = () => {
-      console.log('▶️ Play event');
-      setSimplePlayerState(prev => ({ ...prev, isPlaying: true }));
-    };
-    
-    const pauseHandler = () => {
-      console.log('⏸️ Pause event');
-      setSimplePlayerState(prev => ({ ...prev, isPlaying: false }));
-    };
-    
-    const volumeHandler = () => {
-      if (!video) return;
-      // Update state when user changes volume
-      setSimplePlayerState(prev => ({
-        ...prev,
-        volume: video.volume,
-        isMuted: video.muted
-      }));
-      console.log('🔊 User changed volume:', video.volume.toFixed(2));
-    };
-    
-    // Add event listeners
-    video.addEventListener('timeupdate', timeHandler);
-    video.addEventListener('loadedmetadata', metadataHandler);
-    video.addEventListener('play', playHandler);
-    video.addEventListener('pause', pauseHandler);
-    video.addEventListener('volumechange', volumeHandler);
-    video.addEventListener('durationchange', metadataHandler);
-    
-    // Check if video already has metadata
-    if (video.readyState >= 1 && video.duration) {
-      console.log('🎯 Video ready with duration:', video.duration);
-      setSimplePlayerState(prev => ({
-        ...prev,
-        duration: video.duration,
-        isPlaying: !video.paused,
-        // Initialize volume from video element
-        volume: video.volume,
-        isMuted: video.muted
-      }));
-    }
-    
-    // Cleanup
-    return () => {
-      video.removeEventListener('timeupdate', timeHandler);
-      video.removeEventListener('loadedmetadata', metadataHandler);
-      video.removeEventListener('play', playHandler);
-      video.removeEventListener('pause', pauseHandler);
-      video.removeEventListener('volumechange', volumeHandler);
-      video.removeEventListener('durationchange', metadataHandler);
-    };
-  }, [streamUrl]); // Run when stream URL changes
+  // DISABLED event handlers - they interfere with native controls
+  // Let native HTML5 controls handle everything
 
   // Simple keyboard shortcuts that actually work
   useEffect(() => {
@@ -1012,8 +888,8 @@ const FuturisticMediaPlayer = ({
         onPositionChange={(pos) => playerActions.setPipPosition(pos)}
       />
 
-      {/* Quality Selector Overlay - Add simple quality buttons */}
-      {qualities.length > 1 && (
+      {/* Quality Selector - Simplified without state re-renders */}
+      {hlsRef.current && qualities.length > 1 && (
         <div style={{
           position: 'absolute',
           top: '10px',
@@ -1021,12 +897,25 @@ const FuturisticMediaPlayer = ({
           zIndex: 100,
           display: 'flex',
           gap: '5px',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          pointerEvents: 'all'
         }}>
+          <div style={{
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            padding: '5px',
+            borderRadius: '4px',
+            color: 'white',
+            fontSize: '12px'
+          }}>
+            Quality:
+          </div>
           {qualities.map(quality => (
             <button
               key={quality.id}
-              onClick={() => setQuality(quality.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setQuality(quality.id);
+              }}
               style={{
                 padding: '5px 10px',
                 backgroundColor: currentQuality === quality.id ? '#007bff' : 'rgba(0,0,0,0.7)',
@@ -1034,7 +923,8 @@ const FuturisticMediaPlayer = ({
                 border: '1px solid rgba(255,255,255,0.3)',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px'
+                fontSize: '12px',
+                pointerEvents: 'all'
               }}
             >
               {quality.label}
