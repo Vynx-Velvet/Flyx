@@ -188,9 +188,18 @@ const FuturisticMediaPlayer = ({
     return actions;
   }, []);
 
-  // CRITICAL FIX: Use simplePlayerState directly as playerState
-  // This ensures controls get the updated state
+  // Use simplePlayerState directly
   const playerState = simplePlayerState;
+  
+  // Log state for debugging
+  useEffect(() => {
+    console.log('🎮 State being passed to controls:', {
+      currentTime: playerState.currentTime,
+      duration: playerState.duration,
+      isPlaying: playerState.isPlaying,
+      volume: playerState.volume
+    });
+  }, [playerState.currentTime, playerState.duration, playerState.isPlaying, playerState.volume]);
   
   // Enhanced media details with scene analysis
   const { details: mediaDetails, sceneData } = useFetchMediaDetails(movieId, mediaType, {
@@ -971,12 +980,22 @@ const FuturisticMediaPlayer = ({
         onPositionChange={(pos) => playerActions.setPipPosition(pos)}
       />
 
-      {/* Enhanced Media Controls */}
+      {/* Enhanced Media Controls - FORCE RE-RENDER WITH KEY */}
       <AnimatePresence>
         {uiVisible && (
           <EnhancedMediaControls
+            key={`controls-${Math.floor(simplePlayerState.currentTime)}`} // Force re-render every second
             videoRef={videoRef}
-            playerState={playerState}
+            playerState={{
+              ...simplePlayerState,
+              // Ensure values are always defined
+              currentTime: simplePlayerState.currentTime || 0,
+              duration: simplePlayerState.duration || 0,
+              isPlaying: simplePlayerState.isPlaying || false,
+              volume: simplePlayerState.volume ?? 0.8,
+              isMuted: simplePlayerState.isMuted || false,
+              buffered: simplePlayerState.buffered || 0
+            }}
             playerActions={playerActions}
             onToggleFullscreen={toggleFullscreen}
             qualities={qualities}
