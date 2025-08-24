@@ -162,32 +162,45 @@ function validateRequest(request, logger) {
 // SIMPLIFIED fetch with minimal retries for stability
 async function fetchWithHeaderFallback(url, baseOptions, logger, userAgent, source, strategyIndex = 0, retryCount = 0) {
   // Check if this is a shadowlands URL
-  const isShadowlands = source === 'shadowlands' || 
+  const isShadowlands = source === 'shadowlands' ||
                        source === 'vidsrc' ||  // vidsrc source is used for shadowlands
-                       url.includes('shadowlandschronicles') || 
-                       url.includes('shadowlands') || 
+                       url.includes('shadowlandschronicles') ||
+                       url.includes('shadowlands') ||
                        url.includes('tmstr');
   
-  // Use appropriate headers based on URL type
-  const headers = isShadowlands 
-    ? getShadowlandsHeaders(url, logger)
-    : getSimplifiedHeaders(url, userAgent, source);
+  let options;
   
-  const options = {
-    ...baseOptions,
-    headers: {
-      ...headers,
-      // Preserve range header if present
-      ...(baseOptions.headers?.Range && { 'Range': baseOptions.headers.Range })
-    }
-  };
+  if (isShadowlands) {
+    // For shadowlands URLs, fetch directly without any header modifications
+    logger.info('Fetching shadowlands URL directly without header modifications', {
+      url: url.substring(0, 100)
+    });
+    
+    options = {
+      ...baseOptions,
+      // Only preserve range header if present, no other headers
+      headers: baseOptions.headers?.Range ? { 'Range': baseOptions.headers.Range } : {}
+    };
+  } else {
+    // Use simplified headers for non-shadowlands URLs
+    const headers = getSimplifiedHeaders(url, userAgent, source);
+    
+    options = {
+      ...baseOptions,
+      headers: {
+        ...headers,
+        // Preserve range header if present
+        ...(baseOptions.headers?.Range && { 'Range': baseOptions.headers.Range })
+      }
+    };
+  }
   
   try {
     logger.debug('Fetch attempt', {
       url: url.substring(0, 100),
       retryCount: retryCount,
       isShadowlands: isShadowlands,
-      headers: Object.keys(headers)
+      headers: Object.keys(options.headers || {})
     });
     
     const response = await fetch(url, options);
@@ -236,19 +249,6 @@ async function fetchWithHeaderFallback(url, baseOptions, logger, userAgent, sour
     // Re-throw the error if retries exhausted
     throw error;
   }
-}
-
-// Shadowlands-specific headers (ONLY Origin and Referer like extract-shadowlands)
-function getShadowlandsHeaders(url, logger) {
-  logger.info('Using shadowlands headers (Origin and Referer only)', {
-    url: url.substring(0, 100)
-  });
-  
-  // ONLY Origin and Referer headers for shadowlands URLs
-  return {
-    'Origin': 'https://vidsrc.xyz',
-    'Referer': 'https://vidsrc.xyz/'
-  };
 }
 
 // SIMPLIFIED headers for non-shadowlands URLs

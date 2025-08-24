@@ -312,6 +312,11 @@ extractFullChain()
     
     console.log('\n🎯 The Shadowlands URL is the final streaming URL!');
     console.log('📺 This URL can be played directly in a video player');
+    const m3u8 = fetch(result.shadowlandsUrl).then(result => {
+      const content = result.text().then(text => {
+        console.log(text)
+      })
+    })
   })
   .catch(error => {
     console.error('\n=== ❌ Extraction Failed ===');
