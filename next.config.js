@@ -17,21 +17,13 @@ const nextConfig = {
         crypto: false,
       };
       
-      // Handle HLS.js dynamic imports properly
-      config.module.rules.push({
-        test: /hls\.js/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-env'],
-            plugins: [
-              ['@babel/plugin-transform-runtime', {
-                regenerator: true
-              }]
-            ]
-          }
-        }
-      });
+      // Force HLS.js to be treated as external module for proper loading
+      config.externals = config.externals || [];
+      if (Array.isArray(config.externals)) {
+        config.externals.push({
+          'hls.js': 'hls.js'
+        });
+      }
     }
     
     return config;
