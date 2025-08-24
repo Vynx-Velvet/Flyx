@@ -325,15 +325,8 @@ const FuturisticMediaPlayerCore = ({
     }
     
     try {
-      console.log('🔄 Loading HLS.js module...');
-      // Enhanced dynamic import with error handling
-      const hlsModule = await import('hls.js').catch(err => {
-        console.error('HLS.js import error:', err);
-        throw new Error('Failed to load HLS.js module');
-      });
-      
-      const Hls = hlsModule.default || hlsModule;
-      console.log('✅ HLS.js loaded successfully:', typeof Hls);
+      // Dynamic import with fallback
+      const Hls = (await import('hls.js')).default;
       
       if (!Hls.isSupported()) {
         console.warn('HLS.js not supported, falling back to native playback');
