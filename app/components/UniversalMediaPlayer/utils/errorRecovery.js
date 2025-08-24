@@ -455,7 +455,7 @@ export class NetworkHealthMonitor {
 }
 
 // Export React hooks
-export { useErrorHandler } from './MediaPlayerErrorBoundary';
+export { useErrorHandler } from '../components/MediaPlayerErrorBoundary';
 
 export default {
   ErrorSeverity,
