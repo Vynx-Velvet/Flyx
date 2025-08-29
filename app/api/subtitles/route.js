@@ -261,6 +261,7 @@ export async function GET(request) {
       id: sub.IDSubtitleFile,
       url: sub.SubDownloadLink,
       downloadLink: sub.SubDownloadLink,
+      download_link: sub.SubDownloadLink, // Add this for compatibility with download API
       language: languageInfo.name,
       languageName: languageInfo.name,
       iso639: languageInfo.iso639,

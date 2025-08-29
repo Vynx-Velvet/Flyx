@@ -32,7 +32,14 @@ const EnhancedMediaControls = memo(({
   onNextEpisode,
   onPreviousEpisode,
   enableAdvanced = true,
-  theme = 'dark'
+  theme = 'dark',
+  episodeCarouselVisible = false, // NEW: Episode carousel visibility state
+  onToggleEpisodeCarousel, // NEW: Toggle function
+  // NEW: Watch progress props
+  progressData = null,
+  onMarkCompleted = null,
+  onClearProgress = null,
+  onSaveProgress = null
 }) => {
   // Local UI state
   const [isDraggingVolume, setIsDraggingVolume] = useState(false);
@@ -41,6 +48,7 @@ const EnhancedMediaControls = memo(({
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [showProgressMenu, setShowProgressMenu] = useState(false); // NEW: Progress menu state
   const [timelineHover, setTimelineHover] = useState({ show: false, x: 0, time: 0 });
   
   // Refs for DOM elements
@@ -61,21 +69,45 @@ const EnhancedMediaControls = memo(({
     isFullscreen = false
   } = playerState || {};
   
-  // Calculate progress percentages
+  // Calculate progress percentages with enhanced error handling
   const progressPercentage = useMemo(() => {
-    if (!duration || duration === 0) return 0;
-    return Math.min(100, Math.max(0, (currentTime / duration) * 100));
+    // Enhanced validation for duration and currentTime
+    if (!duration || duration === 0 || !isFinite(duration) || isNaN(duration)) {
+      return 0;
+    }
+    if (!isFinite(currentTime) || isNaN(currentTime) || currentTime < 0) {
+      return 0;
+    }
+    
+    const progress = (currentTime / duration) * 100;
+    const clampedProgress = Math.min(100, Math.max(0, progress));
+    
+    return clampedProgress;
   }, [currentTime, duration]);
   
   const bufferedPercentage = useMemo(() => {
-    if (!duration || duration === 0) return 0;
-    return Math.min(100, Math.max(0, (buffered / duration) * 100));
+    // Enhanced validation for buffered calculation
+    if (!duration || duration === 0 || !isFinite(duration) || isNaN(duration)) {
+      return 0;
+    }
+    if (!isFinite(buffered) || isNaN(buffered) || buffered < 0) {
+      return 0;
+    }
+    
+    const bufferProgress = (buffered / duration) * 100;
+    return Math.min(100, Math.max(0, bufferProgress));
   }, [buffered, duration]);
   
-  // Optimized time formatting
+  // Enhanced time formatting with better error handling
   const formatTime = useCallback((seconds) => {
-    if (!isFinite(seconds) || isNaN(seconds) || seconds < 0) {
+    // Enhanced validation and error handling
+    if (typeof seconds !== 'number' || !isFinite(seconds) || isNaN(seconds) || seconds < 0) {
       return '00:00:00';
+    }
+    
+    // Handle very large numbers that might cause display issues
+    if (seconds > 359999) { // 99:59:59
+      return '99:59:59';
     }
     
     const hours = Math.floor(seconds / 3600);
@@ -85,14 +117,31 @@ const EnhancedMediaControls = memo(({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
   
-  // Timeline interaction handlers with throttling
+  // Timeline interaction handlers with enhanced error handling
   const calculateTimeFromEvent = useCallback((e) => {
-    if (!timelineRef.current || !duration) return 0;
+    if (!timelineRef.current) {
+      return 0;
+    }
+    
+    if (!duration || !isFinite(duration) || isNaN(duration) || duration <= 0) {
+      return 0;
+    }
     
     const rect = timelineRef.current.getBoundingClientRect();
+    if (!rect.width || rect.width <= 0) {
+      return 0;
+    }
+    
     const clickX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const progress = clickX / rect.width;
-    return progress * duration;
+    const calculatedTime = progress * duration;
+    
+    // Ensure calculated time is valid
+    if (!isFinite(calculatedTime) || isNaN(calculatedTime)) {
+      return 0;
+    }
+    
+    return Math.max(0, Math.min(duration, calculatedTime));
   }, [duration]);
   
   const handleTimelineClick = useCallback((e) => {
@@ -111,17 +160,25 @@ const EnhancedMediaControls = memo(({
   
   const handleTimelineMouseMove = useCallback((e) => {
     const rect = timelineRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect || !rect.width || rect.width <= 0) return;
+    
+    // Enhanced validation for duration
+    if (!duration || !isFinite(duration) || isNaN(duration) || duration <= 0) return;
     
     const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const progress = x / rect.width;
     const time = progress * duration;
     
+    // Validate calculated time
+    if (!isFinite(time) || isNaN(time) || time < 0) return;
+    
+    const clampedTime = Math.max(0, Math.min(duration, time));
+    
     // Update hover preview
     setTimelineHover({
       show: true,
       x: Math.max(30, Math.min(rect.width - 30, x)),
-      time
+      time: clampedTime
     });
     
     // Handle dragging with RAF throttling
@@ -132,7 +189,9 @@ const EnhancedMediaControls = memo(({
           cancelAnimationFrame(rafIdRef.current);
         }
         rafIdRef.current = requestAnimationFrame(() => {
-          playerActions?.seek?.(time);
+          if (isFinite(clampedTime) && !isNaN(clampedTime)) {
+            playerActions?.seek?.(clampedTime);
+          }
         });
         lastSeekTimeRef.current = now;
       }
@@ -208,6 +267,7 @@ const EnhancedMediaControls = memo(({
         setShowQualityMenu(false);
         setShowSubtitleMenu(false);
         setShowSpeedMenu(false);
+        setShowProgressMenu(false); // NEW: Close progress menu
       }
     };
     
@@ -276,6 +336,30 @@ const EnhancedMediaControls = memo(({
     }
   }, [videoRef]);
   
+  // NEW: Progress control handlers
+  const handleMarkCompleted = useCallback(() => {
+    onMarkCompleted?.();
+    setShowProgressMenu(false);
+  }, [onMarkCompleted]);
+
+  const handleClearProgress = useCallback(() => {
+    onClearProgress?.();
+    setShowProgressMenu(false);
+  }, [onClearProgress]);
+
+  const handleSaveProgress = useCallback(() => {
+    onSaveProgress?.();
+    setShowProgressMenu(false);
+  }, [onSaveProgress]);
+
+  // NEW: Get progress status text
+  const getProgressStatusText = useCallback(() => {
+    if (!progressData) return 'No Progress';
+    if (progressData.isCompleted) return 'Completed';
+    if (progressData.isStarted) return `${Math.round(progressData.progress * 100)}%`;
+    return 'Not Started';
+  }, [progressData]);
+
   return (
     <motion.div 
       className={styles.controlsContainer}
@@ -313,6 +397,25 @@ const EnhancedMediaControls = memo(({
           >
             <div className={styles.timelineThumb} />
           </div>
+          
+          {/* NEW: Watch Progress Indicator on Timeline */}
+          {progressData?.isStarted && progressData.progress > 0 && (
+            <div
+              className={styles.watchProgressMarker}
+              style={{
+                left: `${Math.min(100, progressData.progress * 100)}%`,
+                position: 'absolute',
+                top: '0',
+                width: '2px',
+                height: '100%',
+                background: progressData.isCompleted ? '#00ff88' : '#ffaa00',
+                opacity: 0.8,
+                zIndex: 2,
+                pointerEvents: 'none'
+              }}
+              title={progressData.isCompleted ? 'Completed' : `Last position: ${Math.round(progressData.progress * 100)}%`}
+            />
+          )}
           
           {/* Timeline Preview */}
           <AnimatePresence>
@@ -439,6 +542,18 @@ const EnhancedMediaControls = memo(({
                   ⏮️ Previous
                 </motion.button>
               )}
+              
+              {/* NEW: Episode Carousel Toggle Button */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onToggleEpisodeCarousel}
+                className={`${styles.glassButton} ${episodeCarouselVisible ? styles.active : ''}`}
+                aria-label={episodeCarouselVisible ? "Hide Episodes" : "Show Episodes"}
+                title={`${episodeCarouselVisible ? "Hide" : "Show"} episode list (E key)`}
+              >
+                📺 Episodes
+              </motion.button>
               
               {hasNextEpisode && (
                 <motion.button
@@ -613,6 +728,102 @@ const EnhancedMediaControls = memo(({
             </AnimatePresence>
           </div>
           
+          {/* NEW: Watch Progress Controls */}
+          {progressData && enableAdvanced && (
+            <div className={styles.dropdownContainer}>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setShowProgressMenu(!showProgressMenu);
+                  setShowQualityMenu(false);
+                  setShowSubtitleMenu(false);
+                  setShowSpeedMenu(false);
+                }}
+                className={`${styles.glassButton} ${progressData.isCompleted ? styles.completedButton : ''}`}
+                aria-label="Watch Progress"
+                style={{
+                  color: progressData.isCompleted ? '#00ff88' :
+                         progressData.isStarted ? '#ffaa00' : 'inherit'
+                }}
+              >
+                📊 {getProgressStatusText()}
+              </motion.button>
+              
+              <AnimatePresence>
+                {showProgressMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className={styles.dropdownMenu}
+                  >
+                    {/* Progress Info */}
+                    <div className={styles.progressInfo} style={{
+                      padding: '8px 12px',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                      fontSize: '12px',
+                      color: 'rgba(255, 255, 255, 0.8)'
+                    }}>
+                      <div>Progress: {Math.round((progressData.progress || 0) * 100)}%</div>
+                      {progressData.lastWatched && (
+                        <div>Last watched: {new Date(progressData.lastWatched).toLocaleDateString()}</div>
+                      )}
+                    </div>
+                    
+                    {/* Save Current Progress */}
+                    <motion.button
+                      whileHover={{ x: 5 }}
+                      onClick={handleSaveProgress}
+                      className={styles.dropdownItem}
+                    >
+                      💾 Save Progress
+                    </motion.button>
+                    
+                    {/* Mark as Completed */}
+                    {!progressData.isCompleted && (
+                      <motion.button
+                        whileHover={{ x: 5 }}
+                        onClick={handleMarkCompleted}
+                        className={styles.dropdownItem}
+                        style={{ color: '#00ff88' }}
+                      >
+                        ✅ Mark as Completed
+                      </motion.button>
+                    )}
+                    
+                    {/* Clear Progress */}
+                    {progressData.isStarted && (
+                      <motion.button
+                        whileHover={{ x: 5 }}
+                        onClick={handleClearProgress}
+                        className={styles.dropdownItem}
+                        style={{ color: '#ff6b6b' }}
+                      >
+                        🗑️ Clear Progress
+                      </motion.button>
+                    )}
+                    
+                    {/* Resume from Last Position */}
+                    {progressData.canResume && (
+                      <motion.button
+                        whileHover={{ x: 5 }}
+                        onClick={() => {
+                          playerActions?.seek?.(progressData.currentTime);
+                          setShowProgressMenu(false);
+                        }}
+                        className={styles.dropdownItem}
+                        style={{ color: '#00f5ff' }}
+                      >
+                        ⏯️ Resume from {Math.round(progressData.progress * 100)}%
+                      </motion.button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+          
           {/* Picture-in-Picture */}
           {document.pictureInPictureEnabled && (
             <motion.button
@@ -641,20 +852,9 @@ const EnhancedMediaControls = memo(({
     </motion.div>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison function for React.memo
-  // Only re-render if critical props change
-  return (
-    prevProps.playerState?.isPlaying === nextProps.playerState?.isPlaying &&
-    prevProps.playerState?.currentTime === nextProps.playerState?.currentTime &&
-    prevProps.playerState?.duration === nextProps.playerState?.duration &&
-    prevProps.playerState?.volume === nextProps.playerState?.volume &&
-    prevProps.playerState?.isMuted === nextProps.playerState?.isMuted &&
-    prevProps.playerState?.buffered === nextProps.playerState?.buffered &&
-    prevProps.currentQuality === nextProps.currentQuality &&
-    prevProps.activeSubtitle?.id === nextProps.activeSubtitle?.id &&
-    prevProps.qualities?.length === nextProps.qualities?.length &&
-    prevProps.subtitles?.length === nextProps.subtitles?.length
-  );
+  // Always re-render to ensure controls stay in sync with video state
+  // This ensures timeline and controls update properly when video state changes
+  return false;
 });
 
 EnhancedMediaControls.displayName = 'EnhancedMediaControls';

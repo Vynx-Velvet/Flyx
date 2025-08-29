@@ -1,154 +1,28 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 /**
- * useEpisodeNavigation - Manages TV show episode navigation and metadata
+ * useEpisodeNavigation - Refactored to work with provided episode data
  * 
- * Features:
- * - Episode list management and navigation using real TMDB API
- * - Season and episode metadata from TMDB
- * - Next/previous episode logic
- * - Auto-advance functionality integration
- * - Watch progress tracking
+ * Key Changes:
+ * - NO MORE DATA FETCHING - receives data from parent component
+ * - Single source of truth pattern
+ * - Optimized navigation logic
+ * - Consistent data structure
  */
 const useEpisodeNavigation = ({
   mediaType,
   movieId,
   seasonId,
   episodeId,
+  episodeData = null, // NEW: Receive data instead of fetching
   onEpisodeChange
 } = {}) => {
-  // State management
-  const [episodeData, setEpisodeData] = useState(null);
+  // State management - simplified since no fetching
   const [currentEpisode, setCurrentEpisode] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [lastFetch, setLastFetch] = useState(0);
+  const [loading] = useState(false); // Always false since no fetching
+  const [error] = useState(null); // Always null since no fetching
 
-  // Cache management
-  const getCacheKey = useCallback((id) => `tv_episodes_${id}`, []);
-  
-  const getCachedData = useCallback((key) => {
-    try {
-      const cached = localStorage.getItem(key);
-      if (cached) {
-        const data = JSON.parse(cached);
-        if (Date.now() - data.timestamp < 60 * 60 * 1000) { // 1 hour cache
-          return data.value;
-        }
-      }
-    } catch (e) {
-      console.warn('Cache read error:', e);
-    }
-    return null;
-  }, []);
-
-  const setCachedData = useCallback((key, value) => {
-    try {
-      localStorage.setItem(key, JSON.stringify({
-        value,
-        timestamp: Date.now()
-      }));
-    } catch (e) {
-      console.warn('Cache write error:', e);
-    }
-  }, []);
-
-  // Fetch TV show details and episodes from TMDB API
-  const fetchEpisodeData = useCallback(async (showId) => {
-    if (!showId || mediaType !== 'tv') return null;
-
-    const cacheKey = getCacheKey(showId);
-    const cached = getCachedData(cacheKey);
-    
-    if (cached) {
-      setEpisodeData(cached);
-      return cached;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Fetch show details using the existing TMDB API
-      const response = await fetch(`/api/tmdb?action=getShowDetails&movieId=${showId}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch TV show details: ${response.status}`);
-      }
-      
-      const show = await response.json();
-      
-      // Fetch detailed episode data for each season
-      const seasons = [];
-      
-      for (const seasonInfo of show.seasons || []) {
-        try {
-          const seasonResponse = await fetch(`/api/tmdb/tv/${showId}/season/${seasonInfo.season_number}`);
-          
-          if (seasonResponse.ok) {
-            const season = await seasonResponse.json();
-              
-            seasons.push({
-              id: `season_${season.season_number}`,
-              number: season.season_number,
-              title: season.name,
-              episodeCount: season.episodes?.length || 0,
-              year: season.air_date ? new Date(season.air_date).getFullYear() : null,
-              episodes: (season.episodes || []).map(episode => ({
-                id: `ep_${season.season_number}_${episode.episode_number}`,
-                number: episode.episode_number,
-                title: episode.name,
-                description: episode.overview,
-                duration: episode.runtime ? episode.runtime * 60 : 2700, // Convert to seconds, default 45min
-                airDate: episode.air_date,
-                thumbnail: episode.still_path ?
-                  `https://image.tmdb.org/t/p/w500${episode.still_path}` : null,
-                watchProgress: 0, // Will be managed by watch progress system later
-                rating: episode.vote_average || 0,
-                seasonId: `season_${season.season_number}`,
-                seasonNumber: season.season_number,
-                tmdbId: episode.id,
-                imdbId: episode.external_ids?.imdb_id || null
-              }))
-            });
-          }
-        } catch (seasonError) {
-          console.warn(`Failed to fetch season ${seasonInfo.season_number}:`, seasonError);
-          // Add basic season info even if detailed fetch fails
-          seasons.push({
-            id: `season_${seasonInfo.season_number}`,
-            number: seasonInfo.season_number,
-            title: seasonInfo.name,
-            episodeCount: seasonInfo.episode_count || 0,
-            year: seasonInfo.air_date ? new Date(seasonInfo.air_date).getFullYear() : null,
-            episodes: []
-          });
-        }
-      }
-
-      const episodeData = {
-        showId: showId,
-        showTitle: show.name,
-        totalSeasons: show.number_of_seasons,
-        totalEpisodes: show.number_of_episodes,
-        seasons: seasons.sort((a, b) => a.number - b.number)
-      };
-
-      setEpisodeData(episodeData);
-      setCachedData(cacheKey, episodeData);
-      setLastFetch(Date.now());
-      
-      return episodeData;
-    } catch (err) {
-      console.error('Failed to fetch episode data:', err);
-      setError(err.message);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [mediaType, getCacheKey, getCachedData, setCachedData]);
-
-  // Convert season/episode IDs to find current episode
+  // Parse season/episode IDs to find current episode
   const parseIds = useCallback((sId, eId) => {
     if (!sId || !eId) return { seasonNumber: null, episodeNumber: null };
     
@@ -165,51 +39,104 @@ const useEpisodeNavigation = ({
     return { seasonNumber, episodeNumber };
   }, []);
 
-  // Find current episode
+  // Find current episode from provided data
   const findCurrentEpisode = useCallback((sId, eId) => {
     if (!episodeData || !sId || !eId) return null;
 
     const { seasonNumber, episodeNumber } = parseIds(sId, eId);
     if (!seasonNumber || !episodeNumber) return null;
 
-    const season = episodeData.seasons.find(s => s.number === seasonNumber);
+    const season = episodeData.seasons?.find(s => s.season_number === seasonNumber);
     if (!season) return null;
 
-    const episode = season.episodes.find(e => e.number === episodeNumber);
-    return episode || null;
+    const episode = season.episodes?.find(e => e.episode_number === episodeNumber);
+    if (!episode) return null;
+
+    // Return normalized episode data
+    return {
+      id: `ep_${seasonNumber}_${episodeNumber}`,
+      number: episode.episode_number,
+      title: episode.name,
+      description: episode.overview,
+      duration: episode.runtime ? episode.runtime * 60 : 2700, // Convert to seconds
+      airDate: episode.air_date,
+      thumbnail: episode.still_path ?
+        `https://image.tmdb.org/t/p/w500${episode.still_path}` : null,
+      watchProgress: 0, // Will be managed by watch progress system later
+      rating: episode.vote_average || 0,
+      seasonId: `season_${seasonNumber}`,
+      seasonNumber,
+      tmdbId: episode.id,
+      imdbId: episode.external_ids?.imdb_id || null
+    };
   }, [episodeData, parseIds]);
 
-  // Navigation functions
+  // Navigation functions using provided data
   const getNextEpisode = useCallback(() => {
     if (!episodeData || !seasonId || !episodeId) return null;
 
     const { seasonNumber, episodeNumber } = parseIds(seasonId, episodeId);
     if (!seasonNumber || !episodeNumber) return null;
 
-    const season = episodeData.seasons.find(s => s.number === seasonNumber);
-    if (!season) return null;
+    const currentSeason = episodeData.seasons?.find(s => s.season_number === seasonNumber);
+    if (!currentSeason) return null;
 
-    const currentIndex = season.episodes.findIndex(e => e.number === episodeNumber);
+    const currentIndex = currentSeason.episodes?.findIndex(e => e.episode_number === episodeNumber);
     if (currentIndex === -1) return null;
 
     // Check for next episode in current season
-    if (currentIndex < season.episodes.length - 1) {
+    if (currentIndex < currentSeason.episodes.length - 1) {
+      const nextEpisode = currentSeason.episodes[currentIndex + 1];
       return {
-        episode: season.episodes[currentIndex + 1],
-        season: season
+        episode: {
+          id: `ep_${seasonNumber}_${nextEpisode.episode_number}`,
+          number: nextEpisode.episode_number,
+          title: nextEpisode.name,
+          description: nextEpisode.overview,
+          duration: nextEpisode.runtime ? nextEpisode.runtime * 60 : 2700,
+          airDate: nextEpisode.air_date,
+          thumbnail: nextEpisode.still_path ?
+            `https://image.tmdb.org/t/p/w500${nextEpisode.still_path}` : null,
+          watchProgress: 0,
+          rating: nextEpisode.vote_average || 0,
+          seasonNumber,
+          tmdbId: nextEpisode.id
+        },
+        season: {
+          id: `season_${seasonNumber}`,
+          number: seasonNumber,
+          title: currentSeason.name
+        }
       };
     }
 
     // Check for first episode of next season
-    const seasonIndex = episodeData.seasons.findIndex(s => s.number === seasonNumber);
-    if (seasonIndex < episodeData.seasons.length - 1) {
-      const nextSeason = episodeData.seasons[seasonIndex + 1];
-      if (nextSeason.episodes.length > 0) {
-        return {
-          episode: nextSeason.episodes[0],
-          season: nextSeason
-        };
-      }
+    const nextSeasonNumber = seasonNumber + 1;
+    const nextSeason = episodeData.seasons?.find(s => s.season_number === nextSeasonNumber);
+    
+    if (nextSeason && nextSeason.episodes?.length > 0) {
+      const firstEpisode = nextSeason.episodes[0];
+      return {
+        episode: {
+          id: `ep_${nextSeasonNumber}_${firstEpisode.episode_number}`,
+          number: firstEpisode.episode_number,
+          title: firstEpisode.name,
+          description: firstEpisode.overview,
+          duration: firstEpisode.runtime ? firstEpisode.runtime * 60 : 2700,
+          airDate: firstEpisode.air_date,
+          thumbnail: firstEpisode.still_path ?
+            `https://image.tmdb.org/t/p/w500${firstEpisode.still_path}` : null,
+          watchProgress: 0,
+          rating: firstEpisode.vote_average || 0,
+          seasonNumber: nextSeasonNumber,
+          tmdbId: firstEpisode.id
+        },
+        season: {
+          id: `season_${nextSeasonNumber}`,
+          number: nextSeasonNumber,
+          title: nextSeason.name
+        }
+      };
     }
 
     return null; // No next episode
@@ -221,30 +148,65 @@ const useEpisodeNavigation = ({
     const { seasonNumber, episodeNumber } = parseIds(seasonId, episodeId);
     if (!seasonNumber || !episodeNumber) return null;
 
-    const season = episodeData.seasons.find(s => s.number === seasonNumber);
-    if (!season) return null;
+    const currentSeason = episodeData.seasons?.find(s => s.season_number === seasonNumber);
+    if (!currentSeason) return null;
 
-    const currentIndex = season.episodes.findIndex(e => e.number === episodeNumber);
+    const currentIndex = currentSeason.episodes?.findIndex(e => e.episode_number === episodeNumber);
     if (currentIndex === -1) return null;
 
     // Check for previous episode in current season
     if (currentIndex > 0) {
+      const prevEpisode = currentSeason.episodes[currentIndex - 1];
       return {
-        episode: season.episodes[currentIndex - 1],
-        season: season
+        episode: {
+          id: `ep_${seasonNumber}_${prevEpisode.episode_number}`,
+          number: prevEpisode.episode_number,
+          title: prevEpisode.name,
+          description: prevEpisode.overview,
+          duration: prevEpisode.runtime ? prevEpisode.runtime * 60 : 2700,
+          airDate: prevEpisode.air_date,
+          thumbnail: prevEpisode.still_path ?
+            `https://image.tmdb.org/t/p/w500${prevEpisode.still_path}` : null,
+          watchProgress: 0,
+          rating: prevEpisode.vote_average || 0,
+          seasonNumber,
+          tmdbId: prevEpisode.id
+        },
+        season: {
+          id: `season_${seasonNumber}`,
+          number: seasonNumber,
+          title: currentSeason.name
+        }
       };
     }
 
     // Check for last episode of previous season
-    const seasonIndex = episodeData.seasons.findIndex(s => s.number === seasonNumber);
-    if (seasonIndex > 0) {
-      const prevSeason = episodeData.seasons[seasonIndex - 1];
-      if (prevSeason.episodes.length > 0) {
-        return {
-          episode: prevSeason.episodes[prevSeason.episodes.length - 1],
-          season: prevSeason
-        };
-      }
+    const prevSeasonNumber = seasonNumber - 1;
+    const prevSeason = episodeData.seasons?.find(s => s.season_number === prevSeasonNumber);
+    
+    if (prevSeason && prevSeason.episodes?.length > 0) {
+      const lastEpisode = prevSeason.episodes[prevSeason.episodes.length - 1];
+      return {
+        episode: {
+          id: `ep_${prevSeasonNumber}_${lastEpisode.episode_number}`,
+          number: lastEpisode.episode_number,
+          title: lastEpisode.name,
+          description: lastEpisode.overview,
+          duration: lastEpisode.runtime ? lastEpisode.runtime * 60 : 2700,
+          airDate: lastEpisode.air_date,
+          thumbnail: lastEpisode.still_path ?
+            `https://image.tmdb.org/t/p/w500${lastEpisode.still_path}` : null,
+          watchProgress: 0,
+          rating: lastEpisode.vote_average || 0,
+          seasonNumber: prevSeasonNumber,
+          tmdbId: lastEpisode.id
+        },
+        season: {
+          id: `season_${prevSeasonNumber}`,
+          number: prevSeasonNumber,
+          title: prevSeason.name
+        }
+      };
     }
 
     return null; // No previous episode
@@ -254,26 +216,42 @@ const useEpisodeNavigation = ({
     return findCurrentEpisode(seasonId, episodeId);
   }, [findCurrentEpisode, seasonId, episodeId]);
 
-  // Navigation actions
+  // Navigation actions - simplified since we're not managing episode data
   const goToNextEpisode = useCallback(() => {
     const next = getNextEpisode();
     if (next && onEpisodeChange) {
-      onEpisodeChange(next.season.id, next.episode.id);
+      onEpisodeChange({
+        seasonId: next.season.number,
+        episodeId: next.episode.number,
+        episodeData: next.episode,
+        crossSeason: next.season.number !== parseIds(seasonId, episodeId).seasonNumber
+      });
     }
-  }, [getNextEpisode, onEpisodeChange]);
+  }, [getNextEpisode, onEpisodeChange, seasonId, episodeId, parseIds]);
 
   const goToPreviousEpisode = useCallback(() => {
     const prev = getPreviousEpisode();
     if (prev && onEpisodeChange) {
-      onEpisodeChange(prev.season.id, prev.episode.id);
+      onEpisodeChange({
+        seasonId: prev.season.number,
+        episodeId: prev.episode.number,
+        episodeData: prev.episode,
+        crossSeason: prev.season.number !== parseIds(seasonId, episodeId).seasonNumber
+      });
     }
-  }, [getPreviousEpisode, onEpisodeChange]);
+  }, [getPreviousEpisode, onEpisodeChange, seasonId, episodeId, parseIds]);
 
   const goToEpisode = useCallback((sId, eId) => {
     if (onEpisodeChange) {
-      onEpisodeChange(sId, eId);
+      const episode = findCurrentEpisode(sId, eId);
+      onEpisodeChange({
+        seasonId: sId,
+        episodeId: eId,
+        episodeData: episode,
+        crossSeason: sId !== seasonId
+      });
     }
-  }, [onEpisodeChange]);
+  }, [onEpisodeChange, findCurrentEpisode, seasonId]);
 
   // Convenience properties
   const hasNextEpisode = useMemo(() => {
@@ -291,85 +269,51 @@ const useEpisodeNavigation = ({
     const { seasonNumber } = parseIds(seasonId, null);
     if (!seasonNumber) return [];
 
-    const season = episodeData.seasons.find(s => s.number === seasonNumber);
-    return season ? season.episodes : [];
+    const season = episodeData.seasons?.find(s => s.season_number === seasonNumber);
+    if (!season) return [];
+
+    return season.episodes?.map(episode => ({
+      id: `ep_${seasonNumber}_${episode.episode_number}`,
+      number: episode.episode_number,
+      title: episode.name,
+      description: episode.overview,
+      duration: episode.runtime ? episode.runtime * 60 : 2700,
+      airDate: episode.air_date,
+      thumbnail: episode.still_path ?
+        `https://image.tmdb.org/t/p/w500${episode.still_path}` : null,
+      watchProgress: 0,
+      rating: episode.vote_average || 0,
+      seasonNumber,
+      tmdbId: episode.id
+    })) || [];
   }, [episodeData, seasonId, parseIds]);
 
-  // Get all seasons
+  // Get all seasons data in normalized format
   const getAllSeasons = useCallback(() => {
-    return episodeData ? episodeData.seasons : [];
+    if (!episodeData) return [];
+
+    return episodeData.seasons?.map(season => ({
+      id: `season_${season.season_number}`,
+      number: season.season_number,
+      title: season.name,
+      episodeCount: season.episodes?.length || 0,
+      year: season.air_date ? new Date(season.air_date).getFullYear() : null,
+      episodes: season.episodes?.map(episode => ({
+        id: `ep_${season.season_number}_${episode.episode_number}`,
+        number: episode.episode_number,
+        title: episode.name,
+        description: episode.overview,
+        duration: episode.runtime ? episode.runtime * 60 : 2700,
+        airDate: episode.air_date,
+        thumbnail: episode.still_path ?
+          `https://image.tmdb.org/t/p/w500${episode.still_path}` : null,
+        watchProgress: 0,
+        rating: episode.vote_average || 0,
+        seasonNumber: season.season_number,
+        tmdbId: episode.id
+      })) || []
+    })) || [];
   }, [episodeData]);
-
-  // Get episode by season and episode number
-  const getEpisodeByNumber = useCallback((seasonNumber, episodeNumber) => {
-    if (!episodeData) return null;
-
-    const season = episodeData.seasons.find(s => s.number === seasonNumber);
-    if (!season) return null;
-
-    return season.episodes.find(e => e.number === episodeNumber) || null;
-  }, [episodeData]);
-
-  // Update watch progress (placeholder - would integrate with backend later)
-  const updateWatchProgress = useCallback((sId, eId, progress) => {
-    if (!episodeData) return;
-
-    // Find and update the episode progress
-    const { seasonNumber, episodeNumber } = parseIds(sId, eId);
-    if (!seasonNumber || !episodeNumber) return;
-
-    const season = episodeData.seasons.find(s => s.number === seasonNumber);
-    if (season) {
-      const episode = season.episodes.find(e => e.number === episodeNumber);
-      if (episode) {
-        episode.watchProgress = Math.max(0, Math.min(1, progress));
-        // In a real app, this would also update the backend
-        console.log(`Updated watch progress for S${seasonNumber}E${episodeNumber}: ${Math.round(progress * 100)}%`);
-      }
-    }
-  }, [episodeData, parseIds]);
-
-  // Get show statistics
-  const getShowStats = useCallback(() => {
-    if (!episodeData) return null;
-
-    const totalEpisodes = episodeData.totalEpisodes || episodeData.seasons.reduce((sum, season) => sum + season.episodeCount, 0);
-    const watchedEpisodes = episodeData.seasons.reduce((sum, season) => {
-      return sum + season.episodes.filter(ep => ep.watchProgress >= 0.9).length;
-    }, 0);
-    
-    const totalDuration = episodeData.seasons.reduce((sum, season) => {
-      return sum + season.episodes.reduce((epSum, ep) => epSum + (ep.duration || 2700), 0);
-    }, 0);
-
-    const watchedDuration = episodeData.seasons.reduce((sum, season) => {
-      return sum + season.episodes.reduce((epSum, ep) => epSum + ((ep.duration || 2700) * ep.watchProgress), 0);
-    }, 0);
-
-    const avgRating = episodeData.seasons.reduce((sum, season) => {
-      return sum + season.episodes.reduce((epSum, ep) => epSum + (ep.rating || 0), 0);
-    }, 0) / Math.max(1, totalEpisodes);
-
-    return {
-      totalSeasons: episodeData.totalSeasons || episodeData.seasons.length,
-      totalEpisodes,
-      watchedEpisodes,
-      totalDuration,
-      watchedDuration,
-      completionRate: totalEpisodes > 0 ? (watchedEpisodes / totalEpisodes) : 0,
-      averageRating: avgRating
-    };
-  }, [episodeData]);
-
-  // Initialize episode data
-  useEffect(() => {
-    if (mediaType === 'tv' && movieId) {
-      fetchEpisodeData(movieId);
-    } else {
-      setEpisodeData(null);
-      setCurrentEpisode(null);
-    }
-  }, [mediaType, movieId, fetchEpisodeData]);
 
   // Update current episode when navigation changes
   useEffect(() => {
@@ -378,12 +322,40 @@ const useEpisodeNavigation = ({
     }
   }, [episodeData, seasonId, episodeId, findCurrentEpisode]);
 
+  // Get show statistics
+  const getShowStats = useCallback(() => {
+    if (!episodeData) return null;
+
+    const allSeasons = getAllSeasons();
+    const totalEpisodes = allSeasons.reduce((sum, season) => sum + season.episodeCount, 0);
+    const watchedEpisodes = allSeasons.reduce((sum, season) => {
+      return sum + season.episodes.filter(ep => ep.watchProgress >= 0.9).length;
+    }, 0);
+    
+    const totalDuration = allSeasons.reduce((sum, season) => {
+      return sum + season.episodes.reduce((epSum, ep) => epSum + (ep.duration || 2700), 0);
+    }, 0);
+
+    const avgRating = allSeasons.reduce((sum, season) => {
+      return sum + season.episodes.reduce((epSum, ep) => epSum + (ep.rating || 0), 0);
+    }, 0) / Math.max(1, totalEpisodes);
+
+    return {
+      totalSeasons: allSeasons.length,
+      totalEpisodes,
+      watchedEpisodes,
+      totalDuration,
+      completionRate: totalEpisodes > 0 ? (watchedEpisodes / totalEpisodes) : 0,
+      averageRating: avgRating
+    };
+  }, [episodeData, getAllSeasons]);
+
   return {
-    // Data
-    episodeData,
+    // Data - now provided from parent, not fetched
+    episodeData: getAllSeasons(), // Return in normalized format
     currentEpisode,
-    loading,
-    error,
+    loading, // Always false
+    error, // Always null
 
     // Navigation state
     hasNextEpisode,
@@ -400,11 +372,7 @@ const useEpisodeNavigation = ({
     getPreviousEpisode,
     getCurrentSeasonEpisodes,
     getAllSeasons,
-    getEpisodeByNumber,
     getShowStats,
-
-    // Actions
-    updateWatchProgress,
 
     // Utilities
     isLastEpisode: !hasNextEpisode,

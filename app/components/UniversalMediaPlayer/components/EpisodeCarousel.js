@@ -1,550 +1,533 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import styles from '../FuturisticMediaPlayer.module.css';
+import WatchProgressIndicator, { EpisodeProgressOverlay } from './WatchProgressIndicator';
+import { getWatchProgress } from '../utils/watchProgressStorage';
 
 /**
- * EpisodeCarousel - Advanced episode navigation and browsing component
+ * EpisodeCarousel - Simplified version for debugging
  * 
  * Features:
- * - Smooth carousel transitions with multiple layout modes
- * - Intelligent episode preloading and thumbnail caching
- * - Advanced search and filtering with metadata analysis
- * - Auto-play queue management and recommendations
- * - Responsive design with touch/gesture support
- * - Performance-optimized rendering with virtualization
- * - Accessibility features and keyboard navigation
- * - Integration with watch history and progress tracking
+ * - Basic episode navigation and browsing
+ * - User-controlled visibility
+ * - Simplified styling to avoid CSS module issues
  */
 const EpisodeCarousel = ({
   episodes = [],
   currentEpisode = null,
   onEpisodeSelect = null,
   onEpisodePlay = null,
-  layout = 'carousel', // 'carousel', 'grid', 'list', 'timeline'
+  onClose = null,
+  layout = 'grid',
   showMetadata = true,
-  showProgress = true,
-  autoPlay = false,
-  searchEnabled = true,
-  filterEnabled = true,
-  preloadCount = 5,
-  maxVisible = 7,
-  virtualization = true,
-  gestureNavigation = true
+  searchEnabled = false,
+  filterEnabled = false,
+  showId = null, // NEW: Show ID for progress loading
+  showProgress = true // NEW: Toggle progress display
 }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [visibleRange, setVisibleRange] = useState({ start: 0, end: maxVisible });
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [dragState, setDragState] = useState({ isDragging: false, startX: 0, currentX: 0 });
-  const [hoveredEpisode, setHoveredEpisode] = useState(null);
+  const [episodeProgresses, setEpisodeProgresses] = useState({}); // NEW: Episode progress storage
+  const [selectedSeasonIndex, setSelectedSeasonIndex] = useState(0); // NEW: Current season tab
 
-  const containerRef = useRef(null);
-  const carouselRef = useRef(null);
-  const preloadedThumbnails = useRef(new Set());
-  const intersectionObserver = useRef(null);
+  // Organize episodes by season and determine current season
+  const seasonsData = useMemo(() => {
+    if (!Array.isArray(episodes)) return [];
+    
+    const seasons = episodes.map(season => ({
+      ...season,
+      episodes: season.episodes || []
+    }));
 
-  // Filter and search episodes
+    // Find current season based on currentEpisode
+    if (currentEpisode && seasons.length > 0) {
+      const currentSeasonIndex = seasons.findIndex(season =>
+        season.number === parseInt(currentEpisode.seasonId) ||
+        season.number === currentEpisode.seasonNumber
+      );
+      
+      if (currentSeasonIndex !== -1) {
+        setSelectedSeasonIndex(currentSeasonIndex);
+      }
+    }
+
+    return seasons;
+  }, [episodes, currentEpisode]);
+
+  // Get episodes for the selected season with search filter
   const filteredEpisodes = useMemo(() => {
-    let filtered = Array.isArray(episodes) ? episodes : [];
+    if (!seasonsData[selectedSeasonIndex]) return [];
+    
+    let seasonEpisodes = seasonsData[selectedSeasonIndex].episodes || [];
 
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(episode =>
+      seasonEpisodes = seasonEpisodes.filter(episode =>
         episode.title?.toLowerCase().includes(query) ||
         episode.description?.toLowerCase().includes(query) ||
-        episode.tags?.some(tag => tag.toLowerCase().includes(query)) ||
-        episode.season?.toString().includes(query) ||
-        episode.episode?.toString().includes(query)
+        episode.number?.toString().includes(query)
       );
     }
 
-    // Apply category filter
-    if (activeFilter !== 'all') {
-      switch (activeFilter) {
-        case 'unwatched':
-          filtered = filtered.filter(ep => !ep.watchProgress || ep.watchProgress < 0.1);
-          break;
-        case 'watched':
-          filtered = filtered.filter(ep => ep.watchProgress >= 0.9);
-          break;
-        case 'in-progress':
-          filtered = filtered.filter(ep => ep.watchProgress > 0.1 && ep.watchProgress < 0.9);
-          break;
-        case 'favorites':
-          filtered = filtered.filter(ep => ep.isFavorite);
-          break;
-        case 'recent':
-          filtered = filtered.sort((a, b) => new Date(b.lastWatched || 0) - new Date(a.lastWatched || 0));
-          break;
-        default:
-          break;
-      }
-    }
+    return seasonEpisodes.map(episode => ({
+      ...episode,
+      seasonTitle: seasonsData[selectedSeasonIndex].title,
+      seasonNumber: seasonsData[selectedSeasonIndex].number
+    }));
+  }, [seasonsData, selectedSeasonIndex, searchQuery]);
 
-    return filtered;
-  }, [episodes, searchQuery, activeFilter]);
-
-  // Update current index when current episode changes
-  useEffect(() => {
-    if (currentEpisode && filteredEpisodes.length > 0) {
-      const index = filteredEpisodes.findIndex(ep => ep.id === currentEpisode.id);
-      if (index !== -1) {
-        setCurrentIndex(index);
-      }
-    }
-  }, [currentEpisode, filteredEpisodes]);
-
-  // Update visible range for virtualization
-  useEffect(() => {
-    if (virtualization) {
-      const start = Math.max(0, currentIndex - Math.floor(maxVisible / 2));
-      const end = Math.min(filteredEpisodes.length, start + maxVisible);
-      setVisibleRange({ start, end });
-    } else {
-      setVisibleRange({ start: 0, end: filteredEpisodes.length });
-    }
-  }, [currentIndex, maxVisible, filteredEpisodes.length, virtualization]);
-
-  // Preload thumbnails for visible episodes
-  useEffect(() => {
-    const preloadThumbnails = async () => {
-      const toPreload = filteredEpisodes.slice(
-        Math.max(0, currentIndex - preloadCount),
-        Math.min(filteredEpisodes.length, currentIndex + preloadCount + 1)
-      );
-
-      for (const episode of toPreload) {
-        if (episode.thumbnail && !preloadedThumbnails.current.has(episode.id)) {
-          try {
-            const img = new Image();
-            img.src = episode.thumbnail;
-            await new Promise((resolve, reject) => {
-              img.onload = resolve;
-              img.onerror = reject;
-            });
-            preloadedThumbnails.current.add(episode.id);
-          } catch (error) {
-            console.warn(`Failed to preload thumbnail for episode ${episode.id}:`, error);
-          }
-        }
-      }
-    };
-
-    preloadThumbnails();
-  }, [filteredEpisodes, currentIndex, preloadCount]);
-
-  // Navigation functions
-  const navigateToEpisode = useCallback((index) => {
-    if (index >= 0 && index < filteredEpisodes.length) {
-      setCurrentIndex(index);
-      if (onEpisodeSelect) {
-        onEpisodeSelect(filteredEpisodes[index]);
-      }
-    }
-  }, [filteredEpisodes, onEpisodeSelect]);
-
-  const navigateNext = useCallback(() => {
-    navigateToEpisode(Math.min(currentIndex + 1, filteredEpisodes.length - 1));
-  }, [currentIndex, filteredEpisodes.length, navigateToEpisode]);
-
-  const navigatePrevious = useCallback(() => {
-    navigateToEpisode(Math.max(currentIndex - 1, 0));
-  }, [currentIndex, navigateToEpisode]);
-
-  // Auto-play functionality
-  useEffect(() => {
-    if (autoPlay && isAutoPlaying && currentIndex < filteredEpisodes.length - 1) {
-      const timer = setTimeout(() => {
-        navigateNext();
-      }, 5000); // Auto-advance every 5 seconds
-
-      return () => clearTimeout(timer);
-    }
-  }, [autoPlay, isAutoPlaying, currentIndex, filteredEpisodes.length, navigateNext]);
-
-  // Gesture handling
-  const handleDragStart = useCallback((event) => {
-    if (!gestureNavigation) return;
-    
-    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
-    setDragState({
-      isDragging: true,
-      startX: clientX,
-      currentX: clientX
-    });
-  }, [gestureNavigation]);
-
-  const handleDragMove = useCallback((event) => {
-    if (!dragState.isDragging || !gestureNavigation) return;
-
-    event.preventDefault();
-    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
-    setDragState(prev => ({ ...prev, currentX: clientX }));
-  }, [dragState.isDragging, gestureNavigation]);
-
-  const handleDragEnd = useCallback(() => {
-    if (!dragState.isDragging || !gestureNavigation) return;
-
-    const deltaX = dragState.currentX - dragState.startX;
-    const threshold = 100;
-
-    if (Math.abs(deltaX) > threshold) {
-      if (deltaX > 0) {
-        navigatePrevious();
-      } else {
-        navigateNext();
-      }
-    }
-
-    setDragState({ isDragging: false, startX: 0, currentX: 0 });
-  }, [dragState, gestureNavigation, navigateNext, navigatePrevious]);
-
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      switch (event.key) {
-        case 'ArrowLeft':
-          event.preventDefault();
-          navigatePrevious();
-          break;
-        case 'ArrowRight':
-          event.preventDefault();
-          navigateNext();
-          break;
-        case 'Enter':
-        case ' ':
-          event.preventDefault();
-          if (filteredEpisodes[currentIndex] && onEpisodePlay) {
-            onEpisodePlay(filteredEpisodes[currentIndex]);
-          }
-          break;
-        case 'Escape':
-          setSearchQuery('');
-          setActiveFilter('all');
-          break;
-        default:
-          break;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, filteredEpisodes, navigateNext, navigatePrevious, onEpisodePlay]);
-
-  // Episode card component
-  const EpisodeCard = ({ episode, index, isActive, layout: cardLayout }) => {
-    const cardVariants = {
-      hidden: { opacity: 0, scale: 0.8, y: 20 },
-      visible: { 
-        opacity: 1, 
-        scale: isActive ? 1.05 : 1, 
-        y: 0,
-        transition: { duration: 0.3 }
-      },
-      hover: { 
-        scale: isActive ? 1.08 : 1.03,
-        y: -5,
-        transition: { duration: 0.2 }
-      }
-    };
-
-    const progressPercentage = (episode.watchProgress || 0) * 100;
-    const duration = episode.duration || 0;
-    const watchedTime = duration * (episode.watchProgress || 0);
-
+  // Check if episode is currently playing
+  const isCurrentEpisode = useCallback((episode) => {
+    if (!currentEpisode) return false;
     return (
-      <motion.div
-        className={`${styles.episodeCard} ${styles[cardLayout]} ${isActive ? styles.active : ''}`}
-        variants={cardVariants}
-        initial="hidden"
-        animate="visible"
-        whileHover="hover"
-        whileTap={{ scale: 0.95 }}
-        onClick={() => navigateToEpisode(index)}
-        onMouseEnter={() => setHoveredEpisode(episode)}
-        onMouseLeave={() => setHoveredEpisode(null)}
-      >
-        {/* Thumbnail */}
-        <div className={styles.episodeThumbnail}>
-          {episode.thumbnail ? (
-            <img
-              src={episode.thumbnail}
-              alt={episode.title}
-              className={styles.thumbnailImage}
-              loading="lazy"
-            />
-          ) : (
-            <div className={styles.thumbnailPlaceholder}>
-              <span className={styles.placeholderIcon}>🎬</span>
-            </div>
-          )}
-          
-          {/* Progress overlay */}
-          {showProgress && episode.watchProgress > 0 && (
-            <div className={styles.progressOverlay}>
-              <div 
-                className={styles.progressBar}
-                style={{ width: `${progressPercentage}%` }}
-              />
-            </div>
-          )}
-          
-          {/* Duration badge */}
-          {duration > 0 && (
-            <div className={styles.durationBadge}>
-              {formatDuration(duration)}
-            </div>
-          )}
-          
-          {/* Status indicators */}
-          <div className={styles.statusIndicators}>
-            {episode.isNew && (
-              <span className={styles.newBadge}>NEW</span>
-            )}
-            {episode.isFavorite && (
-              <span className={styles.favoriteBadge}>❤️</span>
-            )}
-            {progressPercentage >= 90 && (
-              <span className={styles.watchedBadge}>✓</span>
-            )}
-          </div>
-        </div>
-
-        {/* Metadata */}
-        {showMetadata && (
-          <div className={styles.episodeMetadata}>
-            <div className={styles.episodeNumber}>
-              S{episode.season}E{episode.episode}
-            </div>
-            <h3 className={styles.episodeTitle}>{episode.title}</h3>
-            {episode.description && (
-              <p className={styles.episodeDescription}>
-                {episode.description.substring(0, 100)}
-                {episode.description.length > 100 ? '...' : ''}
-              </p>
-            )}
-            <div className={styles.episodeInfo}>
-              {episode.releaseDate && (
-                <span className={styles.releaseDate}>
-                  {new Date(episode.releaseDate).getFullYear()}
-                </span>
-              )}
-              {episode.rating && (
-                <span className={styles.rating}>
-                  ⭐ {episode.rating.toFixed(1)}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Hover overlay with actions */}
-        <AnimatePresence>
-          {hoveredEpisode?.id === episode.id && (
-            <motion.div
-              className={styles.episodeOverlay}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className={styles.overlayActions}>
-                <button
-                  className={styles.playButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onEpisodePlay) onEpisodePlay(episode);
-                  }}
-                >
-                  ▶️ Play
-                </button>
-                <button
-                  className={styles.favoriteButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Handle favorite toggle
-                  }}
-                >
-                  {episode.isFavorite ? '❤️' : '🤍'}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      episode.seasonNumber === (parseInt(currentEpisode.seasonId) || currentEpisode.seasonNumber) &&
+      episode.number === (parseInt(currentEpisode.episodeId) || currentEpisode.episodeNumber)
     );
-  };
+  }, [currentEpisode]);
+
+  // Load episode progress data - NEW
+  useEffect(() => {
+    if (!showProgress || !showId || !episodes.length) return;
+
+    const progresses = {};
+    
+    episodes.forEach(season => {
+      if (season.episodes && Array.isArray(season.episodes)) {
+        season.episodes.forEach(episode => {
+          const progress = getWatchProgress(
+            'tv',
+            showId,
+            episode.seasonNumber || season.number,
+            episode.number
+          );
+          
+          if (progress.isStarted) {
+            const key = `${episode.seasonNumber || season.number}_${episode.number}`;
+            progresses[key] = progress;
+          }
+        });
+      }
+    });
+    
+    setEpisodeProgresses(progresses);
+    console.log('📊 Loaded episode carousel progress:', progresses);
+  }, [episodes, showId, showProgress]);
+
+  // Helper to get episode progress
+  const getEpisodeProgress = useCallback((episode) => {
+    const key = `${episode.seasonNumber}_${episode.number}`;
+    return episodeProgresses[key] || null;
+  }, [episodeProgresses]);
 
   // Format duration helper
   const formatDuration = (seconds) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
     
     if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      return `${hours}h ${minutes}m`;
     }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    return `${minutes}m`;
   };
 
-  // Render different layouts
-  const renderCarousel = () => (
-    <div className={styles.carouselContainer}>
-      <motion.div
-        ref={carouselRef}
-        className={styles.carousel}
-        drag={gestureNavigation ? 'x' : false}
-        dragConstraints={{ left: 0, right: 0 }}
-        onDragStart={handleDragStart}
-        onDrag={handleDragMove}
-        onDragEnd={handleDragEnd}
-        animate={{
-          x: dragState.isDragging ? dragState.currentX - dragState.startX : 0
-        }}
-      >
-        {(filteredEpisodes || []).slice(visibleRange.start, visibleRange.end).map((episode, idx) => {
-          const actualIndex = visibleRange.start + idx;
-          return (
-            <EpisodeCard
-              key={episode.id}
-              episode={episode}
-              index={actualIndex}
-              isActive={actualIndex === currentIndex}
-              layout="carousel"
-            />
-          );
-        })}
-      </motion.div>
-    </div>
-  );
+  // Inline styles for debugging
+  const containerStyle = {
+    position: 'fixed',
+    bottom: '120px',
+    left: '2rem',
+    right: '2rem',
+    maxHeight: '60vh',
+    zIndex: 50,
+    background: 'rgba(0, 0, 0, 0.85)',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '16px',
+    backdropFilter: 'blur(20px)',
+    overflow: 'hidden',
+    color: 'white'
+  };
 
-  const renderGrid = () => (
-    <div className={styles.episodeGrid}>
-      {Array.isArray(filteredEpisodes) ? filteredEpisodes.slice(visibleRange.start, visibleRange.end).map((episode, idx) => {
-        const actualIndex = visibleRange.start + idx;
-        return (
-          <EpisodeCard
-            key={episode.id}
-            episode={episode}
-            index={actualIndex}
-            isActive={actualIndex === currentIndex}
-            layout="grid"
-          />
-        );
-      }) : []}
-    </div>
-  );
+  const headerStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '1rem 1.5rem',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'rgba(255, 255, 255, 0.05)'
+  };
 
-  const renderList = () => (
-    <div className={styles.episodeList}>
-      {Array.isArray(filteredEpisodes) ? filteredEpisodes.slice(visibleRange.start, visibleRange.end).map((episode, idx) => {
-        const actualIndex = visibleRange.start + idx;
-        return (
-          <EpisodeCard
-            key={episode.id}
-            episode={episode}
-            index={actualIndex}
-            isActive={actualIndex === currentIndex}
-            layout="list"
-          />
-        );
-      }) : []}
-    </div>
-  );
+  const titleStyle = {
+    fontSize: '1.1rem',
+    fontWeight: '600',
+    margin: 0
+  };
+
+  const closeButtonStyle = {
+    background: 'transparent',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '8px',
+    padding: '6px 10px',
+    color: 'rgba(255, 255, 255, 0.7)',
+    cursor: 'pointer',
+    fontSize: '14px'
+  };
+
+  const contentStyle = {
+    padding: '1rem',
+    maxHeight: '40vh',
+    overflowY: 'auto'
+  };
+
+  const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+    gap: '1rem'
+  };
+
+  const cardStyle = {
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  };
+
+  const thumbnailStyle = {
+    position: 'relative',
+    width: '100%',
+    height: '120px',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  };
+
+  const metadataStyle = {
+    padding: '1rem'
+  };
+
+  const episodeNumberStyle = {
+    fontSize: '12px',
+    color: '#00f5ff',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    marginBottom: '0.5rem'
+  };
+
+  const episodeTitleStyle = {
+    fontSize: '14px',
+    fontWeight: '600',
+    margin: '0 0 0.5rem 0',
+    lineHeight: '1.3'
+  };
+
+  const episodeDescStyle = {
+    fontSize: '12px',
+    color: 'rgba(255, 255, 255, 0.7)',
+    lineHeight: '1.4',
+    margin: '0 0 0.5rem 0'
+  };
+
+  const emptyStateStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '3rem',
+    textAlign: 'center'
+  };
+
+  // Season tab styles
+  const seasonTabsStyle = {
+    display: 'flex',
+    overflowX: 'auto',
+    padding: '0 1rem',
+    gap: '0.5rem',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'rgba(255, 255, 255, 0.02)'
+  };
+
+  const seasonTabStyle = {
+    padding: '8px 16px',
+    background: 'transparent',
+    border: 'none',
+    color: 'rgba(255, 255, 255, 0.6)',
+    borderBottom: '2px solid transparent',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    whiteSpace: 'nowrap',
+    transition: 'all 0.2s ease'
+  };
+
+  const activeSeasonTabStyle = {
+    ...seasonTabStyle,
+    color: '#00f5ff',
+    borderBottomColor: '#00f5ff'
+  };
 
   return (
-    <div className={styles.episodeCarousel} ref={containerRef}>
-      {/* Header with search and filters */}
-      <div className={styles.carouselHeader}>
-        <div className={styles.headerLeft}>
-          <h2 className={styles.carouselTitle}>
-            Episodes ({filteredEpisodes.length})
-          </h2>
-          {searchEnabled && (
-            <div className={styles.searchContainer}>
-              <input
-                type="text"
-                className={styles.searchInput}
-                placeholder="Search episodes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <span className={styles.searchIcon}>🔍</span>
-            </div>
-          )}
-        </div>
+    <div style={containerStyle}>
+      {/* Header */}
+      <div style={headerStyle}>
+        <h2 style={titleStyle}>
+          {seasonsData[selectedSeasonIndex]?.title || `Season ${selectedSeasonIndex + 1}`} Episodes ({filteredEpisodes.length})
+        </h2>
         
-        <div className={styles.headerRight}>
-          {filterEnabled && (
-            <div className={styles.filterContainer}>
-              {['all', 'unwatched', 'in-progress', 'watched', 'favorites', 'recent'].map(filter => (
-                <button
-                  key={filter}
-                  className={`${styles.filterButton} ${activeFilter === filter ? styles.active : ''}`}
-                  onClick={() => setActiveFilter(filter)}
-                >
-                  {filter.replace('-', ' ')}
-                </button>
-              ))}
-            </div>
-          )}
-          
-          {autoPlay && (
-            <button
-              className={`${styles.autoPlayButton} ${isAutoPlaying ? styles.active : ''}`}
-              onClick={() => setIsAutoPlaying(!isAutoPlaying)}
-            >
-              {isAutoPlaying ? '⏸️' : '▶️'} Auto Play
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Main content area */}
-      <div className={styles.carouselContent}>
-        {filteredEpisodes.length === 0 ? (
-          <div className={styles.emptyState}>
-            <span className={styles.emptyIcon}>📺</span>
-            <h3>No episodes found</h3>
-            <p>Try adjusting your search or filters</p>
-          </div>
-        ) : (
-          <>
-            {layout === 'carousel' && renderCarousel()}
-            {layout === 'grid' && renderGrid()}
-            {layout === 'list' && renderList()}
-          </>
+        {onClose && (
+          <button
+            style={closeButtonStyle}
+            onClick={onClose}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'rgba(255, 0, 110, 0.1)';
+              e.target.style.borderColor = '#ff006e';
+              e.target.style.color = '#ff006e';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'transparent';
+              e.target.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+              e.target.style.color = 'rgba(255, 255, 255, 0.7)';
+            }}
+            aria-label="Close episode list"
+            title="Close episode list (E key)"
+          >
+            ✕
+          </button>
         )}
       </div>
 
-      {/* Navigation controls */}
-      {layout === 'carousel' && filteredEpisodes.length > maxVisible && (
-        <div className={styles.navigationControls}>
-          <button
-            className={styles.navButton}
-            onClick={navigatePrevious}
-            disabled={currentIndex === 0}
-          >
-            ⬅️
-          </button>
-          
-          <div className={styles.pagination}>
-            <span className={styles.paginationText}>
-              {currentIndex + 1} of {filteredEpisodes.length}
-            </span>
-          </div>
-          
-          <button
-            className={styles.navButton}
-            onClick={navigateNext}
-            disabled={currentIndex === filteredEpisodes.length - 1}
-          >
-            ➡️
-          </button>
+      {/* Season Tabs */}
+      {seasonsData.length > 1 && (
+        <div style={seasonTabsStyle}>
+          {seasonsData.map((season, index) => (
+            <button
+              key={season.number || index}
+              style={index === selectedSeasonIndex ? activeSeasonTabStyle : seasonTabStyle}
+              onClick={() => setSelectedSeasonIndex(index)}
+              onMouseEnter={(e) => {
+                if (index !== selectedSeasonIndex) {
+                  e.target.style.color = 'rgba(255, 255, 255, 0.8)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (index !== selectedSeasonIndex) {
+                  e.target.style.color = 'rgba(255, 255, 255, 0.6)';
+                }
+              }}
+            >
+              {season.title || `Season ${season.number || index + 1}`}
+              <span style={{
+                marginLeft: '6px',
+                fontSize: '12px',
+                opacity: 0.7
+              }}>
+                ({season.episodes?.length || 0})
+              </span>
+            </button>
+          ))}
         </div>
       )}
+
+      {/* Content */}
+      <div style={contentStyle}>
+        {filteredEpisodes.length === 0 ? (
+          <div style={emptyStateStyle}>
+            <span style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.5 }}>📺</span>
+            <h3>No episodes found</h3>
+            <p>Loading episode data...</p>
+          </div>
+        ) : (
+          <div style={gridStyle}>
+            {filteredEpisodes.map((episode, index) => {
+              const episodeProgress = showProgress ? getEpisodeProgress(episode) : null;
+              const isCurrent = isCurrentEpisode(episode);
+              
+              // Dynamic card style based on current episode status
+              const dynamicCardStyle = {
+                ...cardStyle,
+                border: isCurrent ? '2px solid #ff006e' : '1px solid rgba(255, 255, 255, 0.1)',
+                background: isCurrent ? 'rgba(255, 0, 110, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                boxShadow: isCurrent ? '0 0 20px rgba(255, 0, 110, 0.3)' : 'none'
+              };
+              
+              return (
+                <motion.div
+                  key={episode.id || index}
+                  style={dynamicCardStyle}
+                  whileHover={{
+                    transform: 'translateY(-2px)',
+                    borderColor: isCurrent ? '#ff006e' :
+                               episodeProgress?.isCompleted ? '#00ff88' : '#00f5ff',
+                    boxShadow: isCurrent ? '0 4px 25px rgba(255, 0, 110, 0.4)' :
+                              episodeProgress?.isCompleted
+                                ? '0 4px 20px rgba(0, 255, 136, 0.2)'
+                                : '0 4px 20px rgba(0, 245, 255, 0.2)'
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    if (onEpisodeSelect) {
+                      onEpisodeSelect(episode);
+                    }
+                  }}
+                >
+                  {/* Thumbnail */}
+                  <div style={{ ...thumbnailStyle, position: 'relative' }}>
+                    {episode.thumbnail ? (
+                      <img
+                        src={episode.thumbnail}
+                        alt={episode.title}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span style={{ fontSize: '2rem', opacity: 0.5 }}>🎬</span>
+                    )}
+                    
+                    {/* Watch Progress Overlay - NEW */}
+                    {episodeProgress && (
+                      <EpisodeProgressOverlay
+                        progress={episodeProgress.progress}
+                        isCompleted={episodeProgress.isCompleted}
+                        isStarted={episodeProgress.isStarted}
+                      />
+                    )}
+                    
+                    {/* Progress Badge - NEW */}
+                    {episodeProgress && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '4px',
+                        left: '4px',
+                        zIndex: 3
+                      }}>
+                        <WatchProgressIndicator
+                          progress={episodeProgress.progress}
+                          isCompleted={episodeProgress.isCompleted}
+                          isStarted={episodeProgress.isStarted}
+                          mode="badge"
+                          size="small"
+                          animate={false}
+                          theme="dark"
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Currently Playing Indicator */}
+                    {isCurrent && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        background: '#ff006e',
+                        color: 'white',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        zIndex: 4,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        NOW PLAYING
+                      </div>
+                    )}
+                    
+                    {/* Duration badge */}
+                    {episode.duration > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '4px',
+                        right: '4px',
+                        background: 'rgba(0, 0, 0, 0.8)',
+                        color: 'white',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        zIndex: 2
+                      }}>
+                        {formatDuration(episode.duration)}
+                      </div>
+                    )}
+                  </div>
+
+                {/* Metadata */}
+                {showMetadata && (
+                  <div style={metadataStyle}>
+                    <div style={{
+                      ...episodeNumberStyle,
+                      color: isCurrent ? '#ff006e' : '#00f5ff'
+                    }}>
+                      S{episode.seasonNumber}E{episode.number}
+                      {isCurrent && <span style={{ marginLeft: '8px' }}>▶ PLAYING</span>}
+                    </div>
+                    <h3 style={{
+                      ...episodeTitleStyle,
+                      color: isCurrent ? '#ff006e' : 'white'
+                    }}>{episode.title}</h3>
+                    {episode.description && (
+                      <p style={episodeDescStyle}>
+                        {episode.description.substring(0, 100)}
+                        {episode.description.length > 100 ? '...' : ''}
+                      </p>
+                    )}
+                    
+                    {/* Progress Info - NEW */}
+                    {episodeProgress && (
+                      <div style={{
+                        marginBottom: '8px',
+                        padding: '4px 8px',
+                        backgroundColor: 'rgba(0, 245, 255, 0.1)',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        color: episodeProgress.isCompleted ? '#00ff88' : '#00f5ff',
+                        fontWeight: '600'
+                      }}>
+                        {episodeProgress.isCompleted ? '✓ Completed' :
+                          episodeProgress.canResume ? `Resume ${Math.round(episodeProgress.progress * 100)}%` :
+                          `${Math.round(episodeProgress.progress * 100)}% watched`}
+                      </div>
+                    )}
+                    
+                    <div style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      fontSize: '11px',
+                      color: 'rgba(255, 255, 255, 0.5)',
+                      alignItems: 'center',
+                      flexWrap: 'wrap'
+                    }}>
+                      {episode.airDate && (
+                        <span>
+                          {new Date(episode.airDate).getFullYear()}
+                        </span>
+                      )}
+                      {episode.rating && (
+                        <span>
+                          ⭐ {episode.rating.toFixed(1)}
+                        </span>
+                      )}
+                      {episodeProgress && (
+                        <span style={{
+                          color: episodeProgress.isCompleted ? '#00ff88' : '#00f5ff',
+                          fontSize: '10px'
+                        }}>
+                          Last watched {new Date(episodeProgress.lastWatched).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

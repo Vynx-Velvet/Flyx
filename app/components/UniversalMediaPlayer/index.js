@@ -14,49 +14,62 @@
  * - A/B testing and collaborative features
  */
 
-// Main Components
-import FuturisticMediaPlayer from './FuturisticMediaPlayer';
-export { default as FuturisticMediaPlayerDemo } from './FuturisticMediaPlayerDemo';
-export { FuturisticMediaPlayer };
+/**
+ * Universal Media Player - Complete Export System (Refactored)
+ *
+ * This is the new, fully refactored version of the Universal Media Player
+ * with improved architecture, performance, and maintainability.
+ */
 
-// UI Components
-export { default as FuturisticControls } from './components/FuturisticControls';
-export { default as EnhancedMediaControls } from './components/EnhancedMediaControls';
-export { default as SimpleMediaControls } from './components/SimpleMediaControls';
+// ===== MAIN COMPONENTS =====
+import FuturisticMediaPlayerRefactored from './FuturisticMediaPlayerRefactored';
+export { default as FuturisticMediaPlayer } from './FuturisticMediaPlayerRefactored';
+export { default as FuturisticMediaPlayerDemo } from './FuturisticMediaPlayerDemo';
+
+// Legacy component (deprecated - use FuturisticMediaPlayer instead)
+export { default as FuturisticMediaPlayerLegacy } from './FuturisticMediaPlayer';
+
+// Default export - the refactored player
+export default FuturisticMediaPlayerRefactored;
+
+
+// ===== MODULAR COMPONENTS =====
+export { default as MediaControls } from './components/MediaControls';
 export { default as IntelligentSubtitles } from './components/IntelligentSubtitles';
 export { default as AmbientLighting } from './components/AmbientLighting';
-export { default as ParticleSystem } from './components/ParticleSystem';
 export { default as VoiceInterface } from './components/VoiceInterface';
 export { default as GestureOverlay } from './components/GestureOverlay';
 export { default as AdvancedSettings } from './components/AdvancedSettings';
 export { default as PerformanceDashboard } from './components/PerformanceDashboard';
-export { default as SceneDetector } from './components/SceneDetector';
-export { default as SmartThumbnails } from './components/SmartThumbnails';
 export { default as EpisodeCarousel } from './components/EpisodeCarousel';
 export { default as NextEpisodePrompt } from './components/NextEpisodePrompt';
 export { default as PictureInPicture } from './components/PictureInPicture';
 export { default as AdaptiveLoading } from './components/AdaptiveLoading';
+export { default as WatchProgressIndicator, EpisodeProgressOverlay, ShowProgressSummary } from './components/WatchProgressIndicator';
+export { default as ResumeDialog } from './components/ResumeDialog';
 
-// Advanced Hooks
-export { default as useAdvancedPlayerState } from './hooks/useAdvancedPlayerState';
-export { default as useIntelligentStream } from './hooks/useIntelligentStream';
-export { default as useAdvancedHls } from './hooks/useAdvancedHls';
-export { default as useIntelligentSubtitles } from './hooks/useIntelligentSubtitles';
-export { default as useAmbientEffects } from './hooks/useAmbientEffects';
-export { default as useGestureControls } from './hooks/useGestureControls';
-export { default as useVoiceControls } from './hooks/useVoiceControls';
-export { default as useAdaptiveQuality } from './hooks/useAdaptiveQuality';
-export { default as useAdvancedAnalytics } from './hooks/useAdvancedAnalytics';
+// ===== CORE HOOKS =====
+export { default as useMediaPlayer } from './hooks/useMediaPlayer';
+export { default as usePlayerUI } from './hooks/usePlayerUI';
+export { default as useEnhancedErrorHandling } from './hooks/useEnhancedErrorHandling';
+export { default as usePerformanceOptimization } from './hooks/usePerformanceOptimization';
 
-// Utility Hooks
+// ===== EXISTING HOOKS =====
+export { default as useStream } from './hooks/useStream';
+export { useEnhancedSubtitles } from '../../hooks/useEnhancedSubtitles';
 export { default as useFetchMediaDetails } from './hooks/useFetchMediaDetails';
 export { default as useEpisodeNavigation } from './hooks/useEpisodeNavigation';
 export { default as useAutoAdvance } from './hooks/useAutoAdvance';
+export { default as useWatchProgress } from './hooks/useWatchProgress';
 
 // CSS Modules
 export { default as playerStyles } from './FuturisticMediaPlayer.module.css';
 
-// Type definitions and interfaces (for TypeScript projects)
+// ===== TYPE SCRIPT SUPPORT =====
+// Note: TypeScript definitions are available in ./types/index.ts for TypeScript projects
+// Import them directly: import * as Types from './types/index.js' (when using a TypeScript environment)
+
+// Constants
 export const PLAYER_THEMES = ['dark', 'light', 'auto'];
 export const MEDIA_TYPES = ['movie', 'tv'];
 export const FULLSCREEN_MODES = ['standard', 'immersive', 'cinema'];
@@ -201,15 +214,17 @@ export const quickStart = {
     tmdbId: movieId,
     seasonId: null,
     episodeId: null,
+    episodeData: null,
     ...createPlayerInstance(config)
   }),
   
-  // TV show player
-  createTVPlayer: (showId, seasonId, episodeId, config = {}) => ({
+  // TV show player - now accepts episode data
+  createTVPlayer: (showId, seasonId, episodeId, episodeData = null, config = {}) => ({
     mediaType: 'tv',
     tmdbId: showId,
     seasonId,
     episodeId,
+    episodeData, // NEW: Include episode data structure
     ...createPlayerInstance(config)
   }),
   
@@ -270,5 +285,3 @@ export const devUtils = {
     console.log('🐛 Debug mode enabled for Futuristic Media Player');
   }
 };
-
-export default FuturisticMediaPlayer;

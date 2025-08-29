@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import UniversalMediaPlayer from "./UniversalMediaPlayer"; // Import the new UniversalMediaPlayer component
 import Recommendations from "./Recommendations"; // Import the Recommendations component
+import WatchProgressIndicator, { EpisodeProgressOverlay, ShowProgressSummary } from "./UniversalMediaPlayer/components/WatchProgressIndicator";
+import { getWatchProgress, getShowProgress } from "./UniversalMediaPlayer/utils/watchProgressStorage";
 import "./ShowDetails.css"; // Custom styles for the compact design
 
 
@@ -13,6 +15,8 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
   const [selectedEpisode, setSelectedEpisode] = useState(null); // Tracks which episode is selected
   const [episodeLoading, setEpisodeLoading] = useState(false); // Track episode loading state
   const [isLaunching, setIsLaunching] = useState(false); // Track when media player is being launched
+  const [showProgress, setShowProgress] = useState(null); // Track overall show progress
+  const [episodeProgresses, setEpisodeProgresses] = useState({}); // Track individual episode progress
 
   // Show media player only when:
   // - For movies: when launching or when selected episode is set (movie object)
@@ -66,6 +70,40 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
 
     fetchMovieDetails();
   }, [movieId]);
+
+  // Load watch progress data when movie details change
+  useEffect(() => {
+    if (!movieDetails) return;
+
+    if (movieId.media_type === "tv") {
+      // Load show-level progress
+      const progress = getShowProgress(movieId.id);
+      setShowProgress(progress);
+
+      // Load individual episode progress
+      const progresses = {};
+      movieDetails.seasons?.forEach((season, seasonIndex) => {
+        season.episodes?.forEach((episode) => {
+          const episodeProgress = getWatchProgress(
+            'tv',
+            movieId.id,
+            season.season_number,
+            episode.episode_number
+          );
+          if (episodeProgress.isStarted) {
+            progresses[`${season.season_number}_${episode.episode_number}`] = episodeProgress;
+          }
+        });
+      });
+      setEpisodeProgresses(progresses);
+    } else if (movieId.media_type === "movie") {
+      // Load movie progress
+      const movieProgress = getWatchProgress('movie', movieId.id);
+      if (movieProgress.isStarted) {
+        setEpisodeProgresses({ movie: movieProgress });
+      }
+    }
+  }, [movieDetails, movieId]);
 
   const returnToHome = () => {
     // Prevent navigation back to home if media player is launching or active
@@ -174,6 +212,24 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
     }
   };
 
+  // NEW: Create structured episode data for media player
+  const createEpisodeDataForPlayer = () => {
+    if (!movieDetails?.seasons) return null;
+    
+    return {
+      showId: movieId.id,
+      showTitle: movieDetails.movie.name,
+      currentSeason: seasons[selectedSeason]?.season_number || selectedSeason + 1,
+      currentEpisode: selectedEpisode?.episode_number || 1,
+      seasons: seasons.map(season => ({
+        season_number: season.season_number,
+        name: season.name,
+        air_date: season.air_date,
+        episodes: season.episodes || []
+      }))
+    };
+  };
+
   // FIXED: Reset state when movieId changes (switching between different media)
   useEffect(() => {
     console.log('🔄 MovieId changed - resetting all state');
@@ -182,6 +238,16 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
     setSelectedSeason(0);
     setEpisodeLoading(false);
   }, [movieId.id, movieId.media_type]);
+
+  // Helper function to get episode progress
+  const getEpisodeProgress = (seasonNumber, episodeNumber) => {
+    return episodeProgresses[`${seasonNumber}_${episodeNumber}`] || null;
+  };
+
+  // Helper function to get movie progress
+  const getMovieProgress = () => {
+    return episodeProgresses.movie || null;
+  };
 
   if (loading) {
     return <div className="show-details">Loading...</div>;
@@ -224,6 +290,7 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
           movieId={movieId.id}
           seasonId={actualSeasonNumber} // Use actual season number (0 for Specials, 1+ for regular seasons)
           episodeId={selectedEpisode.episode_number}
+          episodeData={createEpisodeDataForPlayer()} // NEW: Pass structured episode data
           onBackToShowDetails={handleBackFromMediaPlayer}
           onEpisodeChange={handleEpisodeChange}
         />
@@ -252,13 +319,52 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
       </div>
 
       {movieId.media_type === "movie" && (
-        <button className="play-movie-button" onClick={() => handlePlayMovie(movie)}>
-          Play Movie
-        </button>
+        <div className="movie-actions">
+          <button className="play-movie-button" onClick={() => handlePlayMovie(movie)}>
+            {getMovieProgress()?.canResume ? 'Resume Movie' : 'Play Movie'}
+          </button>
+          {getMovieProgress()?.isStarted && (
+            <div className="movie-progress-container" style={{ marginTop: '16px' }}>
+              <WatchProgressIndicator
+                progress={getMovieProgress().progress}
+                isCompleted={getMovieProgress().isCompleted}
+                isStarted={getMovieProgress().isStarted}
+                mode="bar"
+                size="large"
+                showPercentage={true}
+                showTimeRemaining={true}
+                timeRemaining={getMovieProgress().timeRemaining}
+                animate={true}
+                theme="dark"
+              />
+              <div style={{
+                marginTop: '8px',
+                fontSize: '14px',
+                color: 'rgba(255, 255, 255, 0.7)',
+                textAlign: 'center'
+              }}>
+                {getMovieProgress().isCompleted ? 'Completed' :
+                  `${Math.round(getMovieProgress().progress * 100)}% watched`}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {movieId.media_type === "tv" && seasons && (
         <>
+          {/* Show Progress Summary */}
+          {showProgress && showProgress.totalEpisodes > 0 && (
+            <div className="show-progress-section" style={{ margin: '24px 0' }}>
+              <ShowProgressSummary
+                totalEpisodes={showProgress.totalEpisodes}
+                watchedEpisodes={showProgress.watchedEpisodes}
+                completionRate={showProgress.completionRate}
+                size="large"
+              />
+            </div>
+          )}
+
           <div className="season-selector-container">
             <h2>Seasons</h2>
             <div className="season-buttons">
@@ -285,23 +391,69 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
                 </div>
               ) : (
                 <div className="episodes-grid">
-                  {seasons[selectedSeason].episodes.map((episode) =>
-                    episode.still_path ? (
+                  {seasons[selectedSeason].episodes.map((episode) => {
+                    const seasonNumber = seasons[selectedSeason].season_number;
+                    const episodeProgress = getEpisodeProgress(seasonNumber, episode.episode_number);
+                    
+                    return episode.still_path ? (
                       <div
                         key={episode.id}
                         className="episode-card"
                         onClick={() => handlePlayEpisode(episode)}
+                        style={{ position: 'relative' }}
                       >
-                        <img
-                          className="episode-thumbnail"
-                          src={`https://image.tmdb.org/t/p/w300${episode.still_path}`}
-                          alt={`${episode.name} thumbnail`}
-                        />
+                        <div style={{ position: 'relative' }}>
+                          <img
+                            className="episode-thumbnail"
+                            src={`https://image.tmdb.org/t/p/w300${episode.still_path}`}
+                            alt={`${episode.name} thumbnail`}
+                          />
+                          {/* Episode Progress Overlay */}
+                          {episodeProgress && (
+                            <EpisodeProgressOverlay
+                              progress={episodeProgress.progress}
+                              isCompleted={episodeProgress.isCompleted}
+                              isStarted={episodeProgress.isStarted}
+                            />
+                          )}
+                          {/* Resume/Completed Badge */}
+                          {episodeProgress && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '8px',
+                              right: '8px',
+                              zIndex: 3
+                            }}>
+                              <WatchProgressIndicator
+                                progress={episodeProgress.progress}
+                                isCompleted={episodeProgress.isCompleted}
+                                isStarted={episodeProgress.isStarted}
+                                mode="badge"
+                                size="small"
+                                animate={false}
+                                theme="dark"
+                              />
+                            </div>
+                          )}
+                        </div>
                         <div className="episode-info">
                           <h4>Episode {episode.episode_number}</h4>
                           <p>{episode.name}</p>
                           <p>{episode.overview}</p>
-                          <p>{episode.air_date}</p>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                            <p style={{ margin: 0, fontSize: '12px', opacity: 0.7 }}>{episode.air_date}</p>
+                            {episodeProgress && (
+                              <span style={{
+                                fontSize: '11px',
+                                color: episodeProgress.isCompleted ? '#00ff88' : '#00f5ff',
+                                fontWeight: 'bold'
+                              }}>
+                                {episodeProgress.isCompleted ? 'Completed' :
+                                  episodeProgress.canResume ? 'Resume' :
+                                  `${Math.round(episodeProgress.progress * 100)}%`}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -309,21 +461,64 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
                         key={episode.id}
                         className="episode-card"
                         onClick={() => handlePlayEpisode(episode)}
+                        style={{ position: 'relative' }}
                       >
-                        <img
-                          className="episode-thumbnail"
-                          src={`/imgs/TBA.webp`}
-                          alt={`${episode.name} thumbnail`}
-                        />
+                        <div style={{ position: 'relative' }}>
+                          <img
+                            className="episode-thumbnail"
+                            src={`/imgs/TBA.webp`}
+                            alt={`${episode.name} thumbnail`}
+                          />
+                          {/* Episode Progress Overlay */}
+                          {episodeProgress && (
+                            <EpisodeProgressOverlay
+                              progress={episodeProgress.progress}
+                              isCompleted={episodeProgress.isCompleted}
+                              isStarted={episodeProgress.isStarted}
+                            />
+                          )}
+                          {/* Resume/Completed Badge */}
+                          {episodeProgress && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '8px',
+                              right: '8px',
+                              zIndex: 3
+                            }}>
+                              <WatchProgressIndicator
+                                progress={episodeProgress.progress}
+                                isCompleted={episodeProgress.isCompleted}
+                                isStarted={episodeProgress.isStarted}
+                                mode="badge"
+                                size="small"
+                                animate={false}
+                                theme="dark"
+                              />
+                            </div>
+                          )}
+                        </div>
                         <div className="episode-info">
                           <h4>Episode {episode.episode_number}</h4>
                           <p>{episode.name}</p>
                           <p>{episode.overview}</p>
-                          <p>{episode.air_date}</p>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                            <p style={{ margin: 0, fontSize: '12px', opacity: 0.7 }}>{episode.air_date}</p>
+                            {episodeProgress && (
+                              <span style={{
+                                fontSize: '11px',
+                                color: episodeProgress.isCompleted ? '#00ff88' : '#00f5ff',
+                                fontWeight: 'bold'
+                              }}>
+                                {episodeProgress.isCompleted ? 'Completed' :
+                                  episodeProgress.canResume ? 'Resume' :
+                                  `${Math.round(episodeProgress.progress * 100)}%`}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    )
-                  )}
+                    );
+                  })}
                 </div>
               )}
             </div>

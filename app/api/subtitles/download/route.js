@@ -84,11 +84,24 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const { download_link } = await request.json();
-    
+    const body = await request.json();
+    const { download_link } = body;
+
     if (!download_link) {
+      console.error('❌ Missing download_link parameter:', {
+        receivedBody: body,
+        hasDownloadLink: !!body.download_link,
+        bodyKeys: Object.keys(body)
+      });
       return NextResponse.json(
-        { success: false, error: 'Download link is required' },
+        {
+          success: false,
+          error: 'Download link is required',
+          debug: {
+            receivedBody: body,
+            expectedParameter: 'download_link'
+          }
+        },
         { status: 400 }
       );
     }

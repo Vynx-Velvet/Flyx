@@ -576,6 +576,28 @@
   color: var(--neon-cyan);
 }
 
+/* Episode Carousel Toggle Button Active State */
+.glassButton.active {
+  background: rgba(0, 245, 255, 0.15);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  box-shadow:
+    var(--glass-shadow),
+    0 0 15px rgba(0, 245, 255, 0.3);
+}
+
+.glassButton.active::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  background: var(--neon-cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 4px currentColor;
+}
+
 .checkmark {
   position: absolute;
   right: 12px;
@@ -689,7 +711,7 @@
   gap: 1rem;
 }
 
-.volumeSlider {
+.volumeSliderContainer {
   position: relative;
   width: 120px;
   height: 6px;
@@ -697,11 +719,66 @@
   border-radius: 3px;
   cursor: pointer;
   transition: all var(--animation-normal);
+  overflow: visible;
 }
 
-.volumeSlider:hover {
+.volumeSliderContainer:hover {
   height: 8px;
   background: rgba(255, 255, 255, 0.15);
+}
+
+.volumeSlider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all var(--animation-normal);
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  z-index: 3;
+}
+
+.volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--neon-green);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 2px solid white;
+  transition: all 0.2s ease;
+  z-index: 4;
+}
+
+.volumeSlider::-webkit-slider-thumb:hover {
+  background: #00ff88;
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 255, 136, 0.4);
+}
+
+.volumeSlider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--neon-green);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 2px solid white;
+  transition: all 0.2s ease;
+  z-index: 4;
+}
+
+.volumeSlider::-moz-range-thumb:hover {
+  background: #00ff88;
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 255, 136, 0.4);
 }
 
 .volumeFill {
@@ -713,16 +790,17 @@
   border-radius: 3px;
   transition: all var(--animation-fast);
   box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+  z-index: 1;
+  pointer-events: none;
 }
 
-.volumeSlider:hover .volumeFill {
+.volumeSliderContainer:hover .volumeFill {
   box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
 }
 
 .volumeThumb {
   position: absolute;
   top: 50%;
-  right: -6px;
   width: 12px;
   height: 12px;
   background: var(--neon-green);
@@ -730,12 +808,14 @@
   border-radius: 50%;
   transform: translateY(-50%) scale(0);
   transition: all var(--animation-normal);
-  box-shadow: 
+  box-shadow:
     0 0 15px rgba(0, 255, 136, 0.6),
     0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+  pointer-events: none;
 }
 
-.volumeSlider:hover .volumeThumb {
+.volumeSliderContainer:hover .volumeThumb {
   transform: translateY(-50%) scale(1);
 }
 

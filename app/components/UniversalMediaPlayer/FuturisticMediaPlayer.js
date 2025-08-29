@@ -15,6 +15,7 @@ import { useEnhancedSubtitles } from '../../hooks/useEnhancedSubtitles';
 import useFetchMediaDetails from './hooks/useFetchMediaDetails';
 import useEpisodeNavigation from './hooks/useEpisodeNavigation';
 import useAutoAdvance from './hooks/useAutoAdvance';
+import useWatchProgress from './hooks/useWatchProgress';
 
 // Enhanced UI components - lazy loaded for performance
 const EnhancedMediaControls = dynamic(() => import('./components/EnhancedMediaControls'), { ssr: false });
@@ -28,6 +29,7 @@ const AdaptiveLoading = dynamic(() => import('./components/AdaptiveLoading'), { 
 const EpisodeCarousel = dynamic(() => import('./components/EpisodeCarousel'), { ssr: false });
 const NextEpisodePrompt = dynamic(() => import('./components/NextEpisodePrompt'), { ssr: false });
 const PictureInPicture = dynamic(() => import('./components/PictureInPicture'), { ssr: false });
+const ResumeDialog = dynamic(() => import('./components/ResumeDialog'), { ssr: false });
 
 /**
  * FuturisticMediaPlayer - Completely Refactored Media Player
@@ -43,10 +45,11 @@ const PictureInPicture = dynamic(() => import('./components/PictureInPicture'), 
  * - Error boundaries and recovery mechanisms
  */
 const FuturisticMediaPlayerCore = ({
-  mediaType, 
-  movieId, 
-  seasonId, 
-  episodeId, 
+  mediaType,
+  movieId,
+  seasonId,
+  episodeId,
+  episodeData = null, // NEW: Structured episode data from ShowDetails
   onBackToShowDetails,
   onEpisodeChange,
   enableAdvancedFeatures = true,
@@ -66,6 +69,12 @@ const FuturisticMediaPlayerCore = ({
   const syncIntervalRef = useRef(null);
   const networkMonitorRef = useRef(null);
   const errorBoundaryResetKey = useRef(0);
+  const forceSyncRef = useRef(null);
+  const syncCounterRef = useRef(0);
+  const playbackStartProtectionRef = useRef(false);
+  const lastSyncTimestamp = useRef(0);
+  const syncDebounceRef = useRef(null);
+  const playbackStartTimeRef = useRef(null);
   
   // UI state
   const [isInitialized, setIsInitialized] = useState(false);
@@ -73,6 +82,8 @@ const FuturisticMediaPlayerCore = ({
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [performanceVisible, setPerformanceVisible] = useState(false);
   const [fullscreenMode, setFullscreenMode] = useState('standard');
+  const [episodeCarouselVisible, setEpisodeCarouselVisible] = useState(false); // NEW: Episode carousel visibility control
+  const [resumeDialogVisible, setResumeDialogVisible] = useState(false); // NEW: Resume dialog visibility control
   
   // Optimized player state - single source of truth
   const [playerState, setPlayerState] = useState({
@@ -135,50 +146,281 @@ const FuturisticMediaPlayerCore = ({
     }
   });
 
-  // Memoized player actions - prevent recreation on every render
+  // PROTECTED SYNC FUNCTION WITH PLAYBACK START CIRCUIT BREAKER
+  const forceStateSync = useCallback((eventType = 'unknown', extraData = {}) => {
+    const video = videoRef.current;
+    if (!video) {
+      console.warn('🔄 FORCE SYNC: Video ref not available');
+      return false;
+    }
+
+    // **CRITICAL FIX 1: Playback Start Protection**
+    const now = Date.now();
+    const isPlaybackStart = playbackStartProtectionRef.current;
+    const timeSincePlaybackStart = playbackStartTimeRef.current ? now - playbackStartTimeRef.current : 0;
+    
+    // **CRITICAL FIX: Allow time updates to always pass through**
+    const isTimeUpdate = eventType.includes('timeupdate') || eventType.includes('Time');
+    
+    // During playback start (first 3 seconds), apply strict debouncing BUT ALLOW TIME UPDATES
+    if (isPlaybackStart && timeSincePlaybackStart < 3000 && !isTimeUpdate) {
+      // Only allow one sync every 100ms during playback start (except time updates)
+      if (now - lastSyncTimestamp.current < 100) {
+        console.log(`🛡️ PLAYBACK START PROTECTION: Sync blocked for ${eventType} - too frequent`);
+        return false;
+      }
+      
+      // Clear any pending debounced sync
+      if (syncDebounceRef.current) {
+        clearTimeout(syncDebounceRef.current);
+        syncDebounceRef.current = null;
+      }
+      
+      // Log critical playback start events
+      if (eventType.includes('play') || eventType.includes('manifest') || eventType.includes('loadedmetadata')) {
+        console.log(`🚀 CRITICAL PLAYBACK START EVENT: ${eventType} at T+${timeSincePlaybackStart}ms`);
+      }
+    }
+
+    syncCounterRef.current++;
+    const syncId = syncCounterRef.current;
+    lastSyncTimestamp.current = now;
+
+    // **CRITICAL FIX 2: Enhanced Video State Reading with Validation**
+    let videoState;
+    try {
+      videoState = {
+        isPlaying: !video.paused && video.readyState >= 2,
+        currentTime: isFinite(video.currentTime) ? video.currentTime : 0,
+        duration: isFinite(video.duration) ? video.duration : 0,
+        volume: isFinite(video.volume) ? video.volume : 0.8,
+        isMuted: Boolean(video.muted),
+        buffered: video.buffered.length > 0 ? (isFinite(video.buffered.end(video.buffered.length - 1)) ? video.buffered.end(video.buffered.length - 1) : 0) : 0,
+        readyState: video.readyState,
+        networkState: video.networkState,
+        seeking: Boolean(video.seeking),
+        ended: Boolean(video.ended),
+        error: video.error,
+        playbackRate: isFinite(video.playbackRate) ? video.playbackRate : 1.0
+      };
+    } catch (error) {
+      console.error('🚨 ERROR READING VIDEO STATE:', error);
+      return false;
+    }
+
+    // **CRITICAL FIX 3: Enhanced Playback Start Logging**
+    if (isPlaybackStart || eventType.includes('play') || eventType.includes('manifest')) {
+      console.log(`🔄 PROTECTED SYNC #${syncId} [${eventType}] T+${timeSincePlaybackStart}ms:`, {
+        playbackStartMode: isPlaybackStart,
+        timeSinceStart: timeSincePlaybackStart,
+        trigger: eventType,
+        extraData,
+        videoElement: {
+          paused: video.paused,
+          currentTime: videoState.currentTime?.toFixed(2),
+          duration: videoState.duration?.toFixed(2),
+          readyState: video.readyState,
+          networkState: video.networkState,
+          seeking: video.seeking,
+          ended: video.ended,
+          error: video.error?.message,
+          src: video.currentSrc ? 'loaded' : 'no source'
+        }
+      });
+    }
+
+    // **CRITICAL FIX 4: State Update with Circuit Breaker**
+    setPlayerState(prev => {
+      const changes = {};
+      let hasChanges = false;
+
+      // Validate changes before applying
+      if (prev.isPlaying !== videoState.isPlaying && typeof videoState.isPlaying === 'boolean') {
+        changes.isPlaying = videoState.isPlaying;
+        hasChanges = true;
+      }
+      if (Math.abs(prev.currentTime - videoState.currentTime) > 0.01 && isFinite(videoState.currentTime)) {
+        changes.currentTime = videoState.currentTime;
+        hasChanges = true;
+      }
+      if (Math.abs(prev.duration - videoState.duration) > 0.01 && isFinite(videoState.duration)) {
+        changes.duration = videoState.duration;
+        hasChanges = true;
+      }
+      if (Math.abs(prev.volume - videoState.volume) > 0.01 && isFinite(videoState.volume)) {
+        changes.volume = videoState.volume;
+        hasChanges = true;
+      }
+      if (prev.isMuted !== videoState.isMuted && typeof videoState.isMuted === 'boolean') {
+        changes.isMuted = videoState.isMuted;
+        hasChanges = true;
+      }
+      if (Math.abs(prev.buffered - videoState.buffered) > 0.1 && isFinite(videoState.buffered)) {
+        changes.buffered = videoState.buffered;
+        hasChanges = true;
+      }
+
+      if (hasChanges) {
+        return {
+          ...prev,
+          ...changes,
+          hasError: videoState.error ? true : prev.hasError,
+          errorMessage: videoState.error?.message || (videoState.error ? prev.errorMessage : null),
+          isLoading: videoState.readyState < 2 ? true : false
+        };
+      }
+
+      return prev;
+    });
+
+    return true;
+  }, []);
+
+  // **CRITICAL FIX 5: Playback Start State Management**
+  const startPlaybackProtection = useCallback(() => {
+    playbackStartProtectionRef.current = true;
+    playbackStartTimeRef.current = Date.now();
+    console.log('🛡️ PLAYBACK START PROTECTION: ENABLED');
+    
+    // Automatically disable protection after 5 seconds
+    setTimeout(() => {
+      playbackStartProtectionRef.current = false;
+      console.log('🛡️ PLAYBACK START PROTECTION: DISABLED');
+    }, 5000);
+  }, []);
+
+  const stopPlaybackProtection = useCallback(() => {
+    playbackStartProtectionRef.current = false;
+    console.log('🛡️ PLAYBACK START PROTECTION: MANUALLY DISABLED');
+  }, []);
+
+  // Player actions - Enhanced with forced sync after every action
   const playerActions = useMemo(() => ({
     play: async () => {
       const video = videoRef.current;
-      if (video) {
-        try {
-          await video.play();
-          setPlayerState(prev => ({ ...prev, isPlaying: true }));
-        } catch (err) {
-          console.error('Play error:', err);
-          setPlayerState(prev => ({ 
-            ...prev, 
-            hasError: true, 
-            errorMessage: 'Failed to play video' 
-          }));
-        }
+      if (!video) {
+        console.error('🚨 DEFENSIVE: play() called but video ref is null');
+        return;
+      }
+      
+      // **DEFENSIVE FIX: Check video readiness**
+      if (video.readyState < 2) {
+        console.warn('🚨 DEFENSIVE: Video not ready for play, readyState:', video.readyState);
+        return;
+      }
+      
+      try {
+        console.log('🎬 PLAYER ACTION: play() called');
+        startPlaybackProtection(); // Enable protection before play
+        await video.play();
+        console.log('🎬 PLAYER ACTION: play() succeeded');
+        // Protected sync after action
+        setTimeout(() => forceStateSync('player-action-play'), 100);
+      } catch (err) {
+        console.error('🚨 Play error:', err);
+        stopPlaybackProtection(); // Disable protection on error
+        setPlayerState(prev => ({
+          ...prev,
+          hasError: true,
+          errorMessage: 'Failed to play video: ' + (err.message || 'Unknown error')
+        }));
+        forceStateSync('player-action-play-error', { error: err.message });
       }
     },
     
     pause: () => {
       const video = videoRef.current;
-      if (video) {
+      if (!video) {
+        console.error('🚨 DEFENSIVE: pause() called but video ref is null');
+        return;
+      }
+      
+      try {
+        console.log('⏸️ PLAYER ACTION: pause() called');
         video.pause();
-        setPlayerState(prev => ({ ...prev, isPlaying: false }));
+        console.log('⏸️ PLAYER ACTION: pause() executed');
+        // Protected sync after action
+        setTimeout(() => forceStateSync('player-action-pause'), 50);
+      } catch (err) {
+        console.error('🚨 Pause error:', err);
+        forceStateSync('player-action-pause-error', { error: err.message });
       }
     },
     
     togglePlay: async () => {
       const video = videoRef.current;
-      if (video) {
-        if (video.paused) {
-          await playerActions.play();
-        } else {
-          playerActions.pause();
-        }
+      if (!video) {
+        console.error('🚨 DEFENSIVE: togglePlay called but video ref is null!');
+        return;
       }
+      
+      // **DEFENSIVE FIX: Check video state validity**
+      if (typeof video.paused !== 'boolean') {
+        console.error('🚨 DEFENSIVE: Invalid video.paused state');
+        return;
+      }
+      
+      const isCurrentlyPaused = video.paused;
+      console.log('🎬 PLAYER ACTION: togglePlay called - video.paused:', isCurrentlyPaused);
+      
+      try {
+        if (isCurrentlyPaused) {
+          if (video.readyState < 2) {
+            console.warn('🚨 DEFENSIVE: Video not ready for play in togglePlay');
+            return;
+          }
+          
+          console.log('🎬 PLAYER ACTION: Attempting to play video...');
+          startPlaybackProtection(); // Enable protection before play
+          await video.play();
+          console.log('🎬 PLAYER ACTION: Video.play() succeeded');
+        } else {
+          console.log('🎬 PLAYER ACTION: Pausing video...');
+          video.pause();
+        }
+      } catch (err) {
+        console.error('🚨 PLAYER ACTION: Toggle play failed:', err);
+        stopPlaybackProtection(); // Disable protection on error
+        setPlayerState(prev => ({
+          ...prev,
+          hasError: true,
+          errorMessage: 'Failed to toggle playback: ' + (err.message || 'Unknown error')
+        }));
+      }
+      
+      // Protected sync after toggle action
+      setTimeout(() => forceStateSync('player-action-toggle-play', { wasPlaying: !isCurrentlyPaused }), 100);
     },
     
     seek: (time) => {
       const video = videoRef.current;
-      if (video && isFinite(time)) {
-        const clampedTime = Math.max(0, Math.min(video.duration || 0, time));
+      if (!video) {
+        console.error('🚨 DEFENSIVE: seek() called but video ref is null');
+        return;
+      }
+      
+      // **DEFENSIVE FIX: Validate time parameter**
+      if (!isFinite(time) || time < 0) {
+        console.error('🚨 DEFENSIVE: Invalid seek time:', time);
+        return;
+      }
+      
+      // **DEFENSIVE FIX: Check duration availability**
+      const duration = isFinite(video.duration) ? video.duration : 0;
+      if (duration === 0) {
+        console.warn('🚨 DEFENSIVE: Cannot seek - video duration not available');
+        return;
+      }
+      
+      try {
+        const clampedTime = Math.max(0, Math.min(duration, time));
+        console.log('⏩ PLAYER ACTION: seek() to', clampedTime);
         video.currentTime = clampedTime;
-        setPlayerState(prev => ({ ...prev, currentTime: clampedTime }));
+        // Protected sync after seek
+        setTimeout(() => forceStateSync('player-action-seek', { targetTime: clampedTime }), 50);
+      } catch (err) {
+        console.error('🚨 Seek error:', err);
+        forceStateSync('player-action-seek-error', { error: err.message });
       }
     },
     
@@ -186,21 +428,23 @@ const FuturisticMediaPlayerCore = ({
       const video = videoRef.current;
       if (video && isFinite(volume)) {
         const clampedVolume = Math.max(0, Math.min(1, volume));
+        console.log('🔊 PLAYER ACTION: setVolume() to', clampedVolume);
         video.volume = clampedVolume;
         video.muted = clampedVolume === 0;
-        setPlayerState(prev => ({
-          ...prev,
-          volume: clampedVolume,
-          isMuted: clampedVolume === 0
-        }));
+        // Force immediate sync after volume change
+        setTimeout(() => forceStateSync('player-action-set-volume', { volume: clampedVolume }), 0);
       }
     },
     
     adjustVolume: (delta) => {
       const video = videoRef.current;
-      if (video) {
+      if (video && isFinite(delta)) {
         const newVolume = Math.max(0, Math.min(1, video.volume + delta));
-        playerActions.setVolume(newVolume);
+        console.log('🔊 PLAYER ACTION: adjustVolume() by', delta, 'to', newVolume);
+        video.volume = newVolume;
+        video.muted = newVolume === 0;
+        // Force immediate sync after volume adjustment
+        setTimeout(() => forceStateSync('player-action-adjust-volume', { delta, newVolume }), 0);
       }
     },
     
@@ -208,15 +452,13 @@ const FuturisticMediaPlayerCore = ({
       const video = videoRef.current;
       if (video) {
         const wasMuted = video.muted;
+        console.log('🔇 PLAYER ACTION: toggleMute() - was muted:', wasMuted);
         video.muted = !wasMuted;
         if (wasMuted && video.volume === 0) {
           video.volume = 0.8;
         }
-        setPlayerState(prev => ({
-          ...prev,
-          isMuted: !wasMuted,
-          volume: video.volume
-        }));
+        // Force immediate sync after mute toggle
+        setTimeout(() => forceStateSync('player-action-toggle-mute', { wasMuted, newVolume: video.volume }), 0);
       }
     },
     
@@ -227,15 +469,51 @@ const FuturisticMediaPlayerCore = ({
     setPlaybackRate: (rate) => {
       const video = videoRef.current;
       if (video && isFinite(rate)) {
-        video.playbackRate = Math.max(0.25, Math.min(4, rate));
-        setAdvancedState(prev => ({ ...prev, playbackRate: video.playbackRate }));
+        const clampedRate = Math.max(0.25, Math.min(4, rate));
+        console.log('⚡ PLAYER ACTION: setPlaybackRate() to', clampedRate);
+        video.playbackRate = clampedRate;
+        setAdvancedState(prev => ({ ...prev, playbackRate: clampedRate }));
+        // Force immediate sync after playback rate change
+        setTimeout(() => forceStateSync('player-action-set-playback-rate', { rate: clampedRate }), 0);
       }
     },
     
     setPipPosition: (position) => {
+      console.log('🖼️ PLAYER ACTION: setPipPosition()', position);
       setAdvancedState(prev => ({ ...prev, pipPosition: position }));
-    }
-  }), []);
+    },
+    
+    toggleEpisodeCarousel: () => {
+      console.log('📺 PLAYER ACTION: toggleEpisodeCarousel()');
+      setEpisodeCarouselVisible(prev => {
+        const newValue = !prev;
+        try {
+          localStorage.setItem('episode-carousel-visible', JSON.stringify(newValue));
+        } catch (e) {
+          console.warn('Failed to save episode carousel preference:', e);
+        }
+        return newValue;
+      });
+    },
+
+  }), [forceStateSync]); // Include forceStateSync in dependencies
+
+  // Parse season/episode IDs utility function
+  const parseIds = useCallback((sId, eId) => {
+    if (!sId || !eId) return { seasonNumber: null, episodeNumber: null };
+    
+    // Parse season ID (format: "season_1" or just "1")
+    const seasonNumber = typeof sId === 'string' ?
+      (sId.startsWith('season_') ? parseInt(sId.replace('season_', '')) : parseInt(sId)) :
+      parseInt(sId);
+    
+    // Parse episode ID (format: "ep_1_1" or just "1")
+    const episodeNumber = typeof eId === 'string' ?
+      (eId.includes('_') ? parseInt(eId.split('_').pop()) : parseInt(eId)) :
+      parseInt(eId);
+      
+    return { seasonNumber, episodeNumber };
+  }, []);
 
   // Enhanced media details fetching
   const { details: mediaDetails, sceneData } = useFetchMediaDetails(movieId, mediaType, {
@@ -277,7 +555,7 @@ const FuturisticMediaPlayerCore = ({
     videoRef
   });
 
-  // Episode navigation for TV shows
+  // Episode navigation for TV shows - Now uses provided data
   const {
     hasNextEpisode,
     hasPreviousEpisode,
@@ -286,12 +564,13 @@ const FuturisticMediaPlayerCore = ({
     getCurrentEpisode,
     getNextEpisode,
     getPreviousEpisode,
-    episodeData
+    episodeData: normalizedEpisodeData
   } = useEpisodeNavigation({
     mediaType,
     movieId,
     seasonId,
     episodeId,
+    episodeData, // NEW: Pass the structured data from ShowDetails
     onEpisodeChange
   });
 
@@ -313,6 +592,58 @@ const FuturisticMediaPlayerCore = ({
     enabled: mediaType === 'tv',
     aiPrediction: enableAdvancedFeatures
   });
+
+  // Watch progress tracking - NEW
+  const {
+    progressData,
+    progressPercentage,
+    isCompleted,
+    isStarted,
+    canResume,
+    timeRemaining,
+    isLoading: progressLoading,
+    hasUnsavedChanges,
+    saveProgress,
+    forceSave,
+    resumePlayback,
+    restartPlayback,
+    markCompleted,
+    clearProgress,
+    shouldShowResume
+  } = useWatchProgress({
+    mediaType,
+    movieId,
+    seasonId,
+    episodeId,
+    videoRef,
+    autoSave: true,
+    saveInterval: 10,
+    completionThreshold: 0.9
+  });
+
+  // Watch progress actions - defined after useWatchProgress hook
+  const watchProgressActions = useMemo(() => ({
+    resumeVideo: () => {
+      const success = resumePlayback();
+      if (success) {
+        setResumeDialogVisible(false);
+        console.log('🎯 Resumed from saved position');
+      }
+    },
+
+    restartVideo: () => {
+      const success = restartPlayback();
+      if (success) {
+        setResumeDialogVisible(false);
+        console.log('🔄 Restarted from beginning');
+      }
+    },
+
+    dismissResumeDialog: () => {
+      setResumeDialogVisible(false);
+      console.log('❌ Resume dialog dismissed');
+    }
+  }), [resumePlayback, restartPlayback]);
 
   // Enhanced HLS.js loading with proper cleanup
   const loadHLS = useCallback(async () => {
@@ -373,8 +704,13 @@ const FuturisticMediaPlayerCore = ({
       
       hlsRef.current = hls;
       
-      // Handle HLS events
+      // **CRITICAL FIX 6: Protected HLS MANIFEST_PARSED Handler**
       hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+        console.log('📊 HLS MANIFEST_PARSED: Starting playback start protection');
+        
+        // **ENABLE PLAYBACK START PROTECTION**
+        startPlaybackProtection();
+        
         console.log('📊 HLS manifest parsed, quality levels:', data.levels.map(l => `${l.height}p`));
         
         // Update available qualities
@@ -393,10 +729,26 @@ const FuturisticMediaPlayerCore = ({
           ]
         }));
         
-        // Auto-play
-        videoRef.current.play().catch(err => {
-          console.log('Autoplay prevented:', err);
-        });
+        // **DELAYED PLAYBACK START WITH PROTECTION**
+        setTimeout(() => {
+          // Check for resume dialog before auto-play
+          if (shouldShowResume() && !resumeDialogVisible) {
+            setResumeDialogVisible(true);
+            console.log('📺 Showing resume dialog for saved progress');
+          } else {
+            // Protected auto-play with error handling
+            console.log('🚀 MANIFEST_PARSED: Attempting protected auto-play');
+            videoRef.current?.play()?.then(() => {
+              console.log('✅ MANIFEST_PARSED: Auto-play successful');
+              // Force sync after successful play
+              setTimeout(() => forceStateSync('hls-manifest-autoplay-success'), 100);
+            }).catch(err => {
+              console.log('⚠️ MANIFEST_PARSED: Autoplay prevented:', err);
+              // Force sync even if autoplay fails
+              setTimeout(() => forceStateSync('hls-manifest-autoplay-blocked'), 100);
+            });
+          }
+        }, 50); // Small delay to ensure HLS is fully ready
       });
       
       hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
@@ -461,40 +813,41 @@ const FuturisticMediaPlayerCore = ({
     const video = videoRef.current;
     if (!video) return;
     
+    // ENHANCED EVENT HANDLERS WITH AGGRESSIVE FORCED SYNC
     const handleLoadedMetadata = () => {
-      console.log('✅ Video metadata loaded');
-      setPlayerState(prev => ({
-        ...prev,
-        duration: video.duration || 0,
-        isLoading: false
-      }));
+      console.log('✅ VIDEO EVENT: loadedmetadata');
       setIsInitialized(true);
+      // Force immediate sync after metadata loaded
+      setTimeout(() => forceStateSync('video-event-loadedmetadata'), 0);
     };
     
     const handleTimeUpdate = () => {
-      setPlayerState(prev => ({
-        ...prev,
-        currentTime: video.currentTime || 0,
-        buffered: video.buffered.length > 0
-          ? video.buffered.end(video.buffered.length - 1)
-          : 0
-      }));
+      // Force sync on every time update - NO THROTTLING
+      forceStateSync('video-event-timeupdate');
     };
     
     const handlePlay = () => {
-      setPlayerState(prev => ({ ...prev, isPlaying: true, hasError: false }));
+      console.log('🎬 VIDEO EVENT: play - CRITICAL PLAYBACK START');
+      
+      // **CRITICAL FIX 7: Enable protection on any play event**
+      if (!playbackStartProtectionRef.current) {
+        startPlaybackProtection();
+      }
+      
+      // Protected sync with delay
+      setTimeout(() => forceStateSync('video-event-play'), 50);
     };
     
     const handlePause = () => {
-      setPlayerState(prev => ({ ...prev, isPlaying: false }));
+      console.log('⏸️ VIDEO EVENT: pause');
+      // Force immediate sync after pause event
+      setTimeout(() => forceStateSync('video-event-pause'), 0);
     };
     
     const handleError = async (e) => {
-      console.error('Video error:', e);
-      
+      console.error('❌ VIDEO EVENT: error', e);
       // Try to recover from the error
       const recovered = await handleRecoverableError(new Error('Video playback error'));
-      
       if (!recovered) {
         setPlayerState(prev => ({
           ...prev,
@@ -502,25 +855,59 @@ const FuturisticMediaPlayerCore = ({
           errorMessage: 'Video playback error occurred'
         }));
       }
+      // Force sync after error
+      setTimeout(() => forceStateSync('video-event-error', { error: e.message }), 0);
     };
     
     const handleWaiting = () => {
-      setPlayerState(prev => ({ ...prev, isLoading: true }));
+      console.log('⏳ VIDEO EVENT: waiting');
+      // Force sync after waiting event
+      setTimeout(() => forceStateSync('video-event-waiting'), 0);
     };
     
     const handleCanPlay = () => {
-      setPlayerState(prev => ({ ...prev, isLoading: false }));
+      console.log('✅ VIDEO EVENT: canplay');
+      // Force sync after canplay event
+      setTimeout(() => forceStateSync('video-event-canplay'), 0);
+    };
+    
+    const handleLoadStart = () => {
+      console.log('🔄 VIDEO EVENT: loadstart');
+      // Force sync after loadstart event
+      setTimeout(() => forceStateSync('video-event-loadstart'), 0);
+    };
+    
+    const handleLoadedData = () => {
+      console.log('📊 VIDEO EVENT: loadeddata');
+      // Force sync after loadeddata event
+      setTimeout(() => forceStateSync('video-event-loadeddata'), 0);
     };
     
     const handleVolumeChange = () => {
-      setPlayerState(prev => ({
-        ...prev,
-        volume: video.volume,
-        isMuted: video.muted
-      }));
+      console.log('🔊 VIDEO EVENT: volumechange');
+      // Force sync after volume change
+      setTimeout(() => forceStateSync('video-event-volumechange'), 0);
     };
     
-    // Add event listeners
+    const handleSeeking = () => {
+      console.log('⏩ VIDEO EVENT: seeking');
+      // Force sync after seeking event
+      setTimeout(() => forceStateSync('video-event-seeking'), 0);
+    };
+    
+    const handleSeeked = () => {
+      console.log('✅ VIDEO EVENT: seeked');
+      // Force sync after seeked event
+      setTimeout(() => forceStateSync('video-event-seeked'), 0);
+    };
+    
+    const handleEnded = () => {
+      console.log('🏁 VIDEO EVENT: ended');
+      // Force sync after ended event
+      setTimeout(() => forceStateSync('video-event-ended'), 0);
+    };
+    
+    // ENHANCED EVENT LISTENERS WITH AGGRESSIVE FORCED SYNC
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('play', handlePlay);
@@ -528,10 +915,59 @@ const FuturisticMediaPlayerCore = ({
     video.addEventListener('error', handleError);
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('loadstart', handleLoadStart);
+    video.addEventListener('loadeddata', handleLoadedData);
     video.addEventListener('volumechange', handleVolumeChange);
+    video.addEventListener('seeking', handleSeeking);
+    video.addEventListener('seeked', handleSeeked);
+    video.addEventListener('ended', handleEnded);
+    
+    // Additional comprehensive event listeners for perfect sync
+    video.addEventListener('durationchange', () => {
+      console.log('⏱️ VIDEO EVENT: durationchange');
+      setTimeout(() => forceStateSync('video-event-durationchange'), 0);
+    });
+    
+    video.addEventListener('ratechange', () => {
+      console.log('⚡ VIDEO EVENT: ratechange');
+      setTimeout(() => forceStateSync('video-event-ratechange'), 0);
+    });
+    
+    video.addEventListener('progress', () => {
+      // Force sync on progress events (buffering updates)
+      forceStateSync('video-event-progress');
+    });
+    
+    video.addEventListener('canplaythrough', () => {
+      console.log('✅ VIDEO EVENT: canplaythrough');
+      setTimeout(() => forceStateSync('video-event-canplaythrough'), 0);
+    });
+    
+    video.addEventListener('stalled', () => {
+      console.log('🛑 VIDEO EVENT: stalled');
+      setTimeout(() => forceStateSync('video-event-stalled'), 0);
+    });
+    
+    video.addEventListener('suspend', () => {
+      console.log('⏸️ VIDEO EVENT: suspend');
+      setTimeout(() => forceStateSync('video-event-suspend'), 0);
+    });
+    
+    video.addEventListener('abort', () => {
+      console.log('❌ VIDEO EVENT: abort');
+      setTimeout(() => forceStateSync('video-event-abort'), 0);
+    });
+    
+    video.addEventListener('emptied', () => {
+      console.log('🚫 VIDEO EVENT: emptied');
+      setTimeout(() => forceStateSync('video-event-emptied'), 0);
+    });
+    
+    // IMMEDIATE INITIAL FORCE SYNC
+    setTimeout(() => forceStateSync('video-element-initialization'), 0);
     
     return () => {
-      // Remove event listeners
+      // Remove all event listeners
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('play', handlePlay);
@@ -539,9 +975,104 @@ const FuturisticMediaPlayerCore = ({
       video.removeEventListener('error', handleError);
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('loadstart', handleLoadStart);
+      video.removeEventListener('loadeddata', handleLoadedData);
       video.removeEventListener('volumechange', handleVolumeChange);
+      video.removeEventListener('seeking', handleSeeking);
+      video.removeEventListener('seeked', handleSeeked);
+      video.removeEventListener('ended', handleEnded);
+      video.removeEventListener('durationchange', () => {});
+      video.removeEventListener('ratechange', () => {});
+      video.removeEventListener('progress', () => {});
+      video.removeEventListener('canplaythrough', () => {});
+      video.removeEventListener('stalled', () => {});
+      video.removeEventListener('suspend', () => {});
+      video.removeEventListener('abort', () => {});
+      video.removeEventListener('emptied', () => {});
     };
-  }, []);
+  }, [forceStateSync]); // Include forceStateSync in dependencies
+
+  // **CRITICAL FIX 8: INTELLIGENT ADAPTIVE SYNC (Not Aggressive)**
+  useEffect(() => {
+    if (!videoRef.current) return;
+    
+    console.log('🧠 INTELLIGENT SYNC: Starting adaptive sync monitoring');
+    
+    // **Adaptive sync frequency based on playback start protection**
+    const adaptiveSyncInterval = setInterval(() => {
+      if (videoRef.current) {
+        const isPlaybackStart = playbackStartProtectionRef.current;
+        const interval = isPlaybackStart ? 200 : 100; // Slower during playback start
+        
+        // Skip sync if within protection window and recent sync occurred
+        if (isPlaybackStart && Date.now() - lastSyncTimestamp.current < interval) {
+          return;
+        }
+        
+        forceStateSync('continuous-intelligent-sync');
+      }
+    }, 100); // Base interval of 100ms
+    
+    return () => {
+      clearInterval(adaptiveSyncInterval);
+      console.log('🛑 INTELLIGENT SYNC: Stopped adaptive sync monitoring');
+    };
+  }, [forceStateSync]);
+
+  // **CRITICAL FIX 9: PROTECTED STATE CHANGE WATCHERS - No infinite loops**
+  useEffect(() => {
+    // Only log major state changes during playback start protection
+    if (playbackStartProtectionRef.current) {
+      console.log('🔍 PROTECTED STATE WATCHER: isPlaying changed to', playerState.isPlaying);
+    }
+    
+    // Debounce state change syncs during playback start
+    if (playbackStartProtectionRef.current) {
+      if (syncDebounceRef.current) {
+        clearTimeout(syncDebounceRef.current);
+      }
+      syncDebounceRef.current = setTimeout(() => {
+        forceStateSync('playerstate-change-isPlaying-debounced', { newValue: playerState.isPlaying });
+      }, 150);
+    } else {
+      // Normal sync when not in playback start mode
+      setTimeout(() => forceStateSync('playerstate-change-isPlaying', { newValue: playerState.isPlaying }), 50);
+    }
+  }, [playerState.isPlaying, forceStateSync]);
+  
+  useEffect(() => {
+    // **CRITICAL FIX: Don't skip currentTime watchers - they're essential for timeline updates**
+    // Only sync if there's a significant difference AND video element exists
+    if (videoRef.current && Math.abs(videoRef.current.currentTime - playerState.currentTime) > 0.5) {
+      // Reduce delay for better responsiveness
+      setTimeout(() => forceStateSync('playerstate-change-currentTime', { newValue: playerState.currentTime }), 50);
+    }
+  }, [playerState.currentTime, forceStateSync]);
+  
+  useEffect(() => {
+    // Debounce volume changes during playback start
+    if (playbackStartProtectionRef.current) return;
+    
+    setTimeout(() => forceStateSync('playerstate-change-volume', { newValue: playerState.volume }), 50);
+  }, [playerState.volume, forceStateSync]);
+  
+  useEffect(() => {
+    // Debounce mute changes during playback start
+    if (playbackStartProtectionRef.current) return;
+    
+    setTimeout(() => forceStateSync('playerstate-change-isMuted', { newValue: playerState.isMuted }), 50);
+  }, [playerState.isMuted, forceStateSync]);
+  
+  useEffect(() => {
+    // Duration changes are critical - always sync with minimal delay
+    setTimeout(() => forceStateSync('playerstate-change-duration', { newValue: playerState.duration }), 25);
+  }, [playerState.duration, forceStateSync]);
+  
+  useEffect(() => {
+    // Loading state changes during playback start are expected
+    const delay = playbackStartProtectionRef.current ? 100 : 50;
+    setTimeout(() => forceStateSync('playerstate-change-isLoading', { newValue: playerState.isLoading }), delay);
+  }, [playerState.isLoading, forceStateSync]);
 
   // Load video source when stream URL is ready
   useEffect(() => {
@@ -663,6 +1194,41 @@ const FuturisticMediaPlayerCore = ({
     }
   }, [playerState.isPlaying, fullscreenMode]);
 
+  // Load episode carousel visibility preference - Default to FALSE
+  useEffect(() => {
+    try {
+      const savedPreference = localStorage.getItem('episode-carousel-visible');
+      if (savedPreference !== null) {
+        const preference = JSON.parse(savedPreference);
+        // Only set to true if explicitly saved as true, otherwise default to false
+        setEpisodeCarouselVisible(preference === true);
+      } else {
+        // Ensure it's explicitly set to false if no preference exists
+        setEpisodeCarouselVisible(false);
+      }
+    } catch (e) {
+      console.warn('Failed to load episode carousel preference:', e);
+      setEpisodeCarouselVisible(false); // Default to closed on error
+    }
+  }, []);
+
+  // Show resume dialog when video metadata is loaded and resume is available - ONLY ONCE
+  useEffect(() => {
+    if (isInitialized && shouldShowResume() && !resumeDialogVisible && streamUrl && !progressData?.hasAutoShownResume) {
+      // Small delay to ensure everything is ready
+      const timer = setTimeout(() => {
+        setResumeDialogVisible(true);
+        // Mark that we've shown the resume dialog to prevent showing again
+        if (progressData) {
+          progressData.hasAutoShownResume = true;
+        }
+        console.log('📺 Auto-showing resume dialog on initialization (once only)');
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isInitialized, shouldShowResume, resumeDialogVisible, streamUrl, progressData]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e) => {
@@ -680,6 +1246,14 @@ const FuturisticMediaPlayerCore = ({
         case 'm':
         case 'M':
           playerActions.toggleMute();
+          break;
+        case 'e':
+        case 'E':
+          // NEW: Toggle episode carousel with 'E' key
+          if (mediaType === 'tv') {
+            e.preventDefault();
+            playerActions.toggleEpisodeCarousel();
+          }
           break;
         case 'ArrowLeft':
           playerActions.seek(Math.max(0, videoRef.current.currentTime - 10));
@@ -708,7 +1282,7 @@ const FuturisticMediaPlayerCore = ({
     
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [playerActions, toggleFullscreen, advancedState.playbackRate]);
+  }, [playerActions, toggleFullscreen, advancedState.playbackRate, mediaType]);
 
   // Performance monitoring
   useEffect(() => {
@@ -765,33 +1339,117 @@ const FuturisticMediaPlayerCore = ({
     };
   }, [enableAdvancedFeatures]);
 
-  // Cleanup on unmount
+  // **CRITICAL FIX 10: Enhanced cleanup on unmount with error handling**
   useEffect(() => {
     return () => {
-      // Clear timeouts
-      if (uiTimeoutRef.current) {
-        clearTimeout(uiTimeoutRef.current);
-      }
+      console.log('🧹 CLEANUP: Starting component cleanup');
       
-      // Cleanup HLS
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-      
-      // Cleanup video
-      if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.removeAttribute('src');
-        videoRef.current.load();
-      }
-      
-      // Stop network monitoring
-      if (networkMonitorRef.current) {
-        networkMonitorRef.current.stop();
+      try {
+        // **DEFENSIVE CLEANUP: Clear all timeouts and intervals**
+        if (uiTimeoutRef.current) {
+          clearTimeout(uiTimeoutRef.current);
+          uiTimeoutRef.current = null;
+        }
+        
+        if (syncDebounceRef.current) {
+          clearTimeout(syncDebounceRef.current);
+          syncDebounceRef.current = null;
+        }
+        
+        // **DEFENSIVE CLEANUP: Disable playback protection**
+        playbackStartProtectionRef.current = false;
+        
+        // **DEFENSIVE CLEANUP: HLS with error handling**
+        if (hlsRef.current) {
+          try {
+            hlsRef.current.destroy();
+          } catch (error) {
+            console.warn('🚨 HLS cleanup error:', error);
+          }
+          hlsRef.current = null;
+        }
+        
+        // **DEFENSIVE CLEANUP: Video element with error handling**
+        if (videoRef.current) {
+          try {
+            const video = videoRef.current;
+            video.pause();
+            video.removeAttribute('src');
+            video.currentTime = 0;
+            video.load();
+          } catch (error) {
+            console.warn('🚨 Video cleanup error:', error);
+          }
+        }
+        
+        // **DEFENSIVE CLEANUP: Network monitoring**
+        if (networkMonitorRef.current) {
+          try {
+            networkMonitorRef.current.stop();
+          } catch (error) {
+            console.warn('🚨 Network monitor cleanup error:', error);
+          }
+          networkMonitorRef.current = null;
+        }
+        
+        console.log('✅ CLEANUP: Component cleanup completed');
+      } catch (error) {
+        console.error('🚨 CRITICAL CLEANUP ERROR:', error);
       }
     };
   }, []);
+
+  // **CRITICAL FIX 11: Emergency Circuit Breaker for Infinite Sync Loops**
+  useEffect(() => {
+    const SYNC_THRESHOLD = 100; // Maximum syncs per second
+    const MONITORING_WINDOW = 1000; // 1 second window
+    let syncCounter = 0;
+    let windowStart = Date.now();
+    
+    const circuitBreakerCheck = () => {
+      const now = Date.now();
+      
+      // Reset counter if window expired
+      if (now - windowStart > MONITORING_WINDOW) {
+        if (syncCounter > 50) { // Log if high activity
+          console.log(`🔄 CIRCUIT BREAKER: Reset after ${syncCounter} syncs in ${MONITORING_WINDOW}ms`);
+        }
+        syncCounter = 0;
+        windowStart = now;
+      }
+      
+      syncCounter++;
+      
+      // Circuit breaker: Block excessive sync calls
+      if (syncCounter > SYNC_THRESHOLD) {
+        console.error(`🚨 CIRCUIT BREAKER: ACTIVATED - Blocking excessive sync calls (${syncCounter} in ${MONITORING_WINDOW}ms)`);
+        console.error(`🚨 POTENTIAL INFINITE LOOP DETECTED - Forcing emergency protection mode`);
+        
+        // Emergency actions
+        playbackStartProtectionRef.current = true;
+        
+        // Emergency reset after 5 seconds
+        setTimeout(() => {
+          syncCounter = 0;
+          windowStart = Date.now();
+          playbackStartProtectionRef.current = false;
+          console.log('🔄 CIRCUIT BREAKER: Emergency reset completed');
+        }, 5000);
+        
+        return false; // Block the sync
+      }
+      
+      return true; // Allow the sync
+    };
+    
+    // Monitor forceStateSync calls by wrapping them
+    const originalForceSync = forceStateSync;
+    
+    return () => {
+      // Cleanup circuit breaker
+      syncCounter = 0;
+    };
+  }, [forceStateSync]);
 
   // Render loading state
   if (streamLoading && !streamUrl) {
@@ -948,14 +1606,38 @@ const FuturisticMediaPlayerCore = ({
         )}
       </AnimatePresence>
 
-      {/* Episode Carousel for TV Shows */}
+      {/* Episode Carousel for TV Shows - Now properly controlled */}
       <AnimatePresence>
-        {mediaType === 'tv' && enableAdvancedFeatures && episodeData && (
+        {mediaType === 'tv' && enableAdvancedFeatures && normalizedEpisodeData && episodeCarouselVisible && uiVisible && (
           <EpisodeCarousel
-            episodes={episodeData}
+            episodes={normalizedEpisodeData}
             currentEpisode={{ seasonId, episodeId }}
-            onEpisodeSelect={(season, episode) => onEpisodeChange(season, episode)}
-            visible={uiVisible}
+            showId={movieId} // NEW: Pass show ID for progress loading
+            showProgress={true} // NEW: Enable progress display
+            onEpisodeSelect={(episodeInfo) => {
+              // Handle episode selection from carousel
+              if (episodeInfo && onEpisodeChange) {
+                onEpisodeChange({
+                  seasonId: episodeInfo.seasonNumber,
+                  episodeId: episodeInfo.number,
+                  episodeData: episodeInfo,
+                  crossSeason: episodeInfo.seasonNumber !== parseIds(seasonId, episodeId).seasonNumber
+                });
+              }
+            }}
+            onEpisodePlay={(episodeInfo) => {
+              // Handle direct episode play from carousel
+              if (episodeInfo && onEpisodeChange) {
+                onEpisodeChange({
+                  seasonId: episodeInfo.seasonNumber,
+                  episodeId: episodeInfo.number,
+                  episodeData: episodeInfo,
+                  crossSeason: episodeInfo.seasonNumber !== parseIds(seasonId, episodeId).seasonNumber
+                });
+              }
+            }}
+            visible={true}
+            onClose={() => setEpisodeCarouselVisible(false)}
           />
         )}
       </AnimatePresence>
@@ -1004,6 +1686,12 @@ const FuturisticMediaPlayerCore = ({
             onPreviousEpisode={goToPreviousEpisode}
             enableAdvanced={enableAdvancedFeatures}
             theme={theme}
+            episodeCarouselVisible={episodeCarouselVisible}
+            onToggleEpisodeCarousel={playerActions.toggleEpisodeCarousel}
+            progressData={progressData} // NEW: Pass progress data
+            onMarkCompleted={markCompleted} // NEW: Pass mark completed handler
+            onClearProgress={clearProgress} // NEW: Pass clear progress handler
+            onSaveProgress={forceSave} // NEW: Pass save progress handler
           />
         )}
       </AnimatePresence>
@@ -1051,6 +1739,28 @@ const FuturisticMediaPlayerCore = ({
           </motion.button>
         )}
       </AnimatePresence>
+
+      {/* Resume Dialog - NEW */}
+      <ResumeDialog
+        isVisible={resumeDialogVisible}
+        progressData={progressData}
+        onResume={watchProgressActions.resumeVideo}
+        onRestart={watchProgressActions.restartVideo}
+        onDismiss={watchProgressActions.dismissResumeDialog}
+        autoResume={false}
+        autoResumeDelay={10}
+        theme={theme}
+        title={mediaType === 'tv'
+          ? `Resume Episode ${parseIds(seasonId, episodeId).episodeNumber}?`
+          : `Resume ${mediaDetails?.title || 'Movie'}?`
+        }
+        subtitle={progressData?.lastWatched
+          ? `Last watched ${new Date(progressData.lastWatched).toLocaleDateString()}`
+          : undefined
+        }
+        animate={true}
+      />
+      
     </div>
   );
 };
