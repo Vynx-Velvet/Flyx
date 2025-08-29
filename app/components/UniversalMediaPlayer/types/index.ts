@@ -175,7 +175,7 @@ export interface UIActions {
   handleKeyPress: (e: KeyboardEvent, playerActions: PlayerActions) => void;
 }
 
-export type UsePlayerUIReturn = {
+export interface UsePlayerUIReturn {
   containerRef: React.RefObject<HTMLDivElement>;
   uiState: UIState;
   fullscreenState: FullscreenState;
@@ -206,7 +206,7 @@ export interface ErrorActions {
   };
 }
 
-export type UseEnhancedErrorHandlingReturn = {
+export interface UseEnhancedErrorHandlingReturn {
   currentError: ErrorReport | null;
   isRecovering: boolean;
   recoveryProgress: number;

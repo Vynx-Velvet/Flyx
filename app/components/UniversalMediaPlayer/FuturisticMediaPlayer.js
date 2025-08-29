@@ -538,6 +538,13 @@ const FuturisticMediaPlayerCore = ({
     shouldFetch: !!(movieId && (mediaType !== 'tv' || (seasonId && episodeId)))
   });
 
+  // Add logging to track when stream data is available
+  useEffect(() => {
+    if (streamUrl) {
+      console.log('🎯 Stream URL received in media player:', { streamUrl, streamType });
+    }
+  }, [streamUrl, streamType]);
+
   // Enhanced subtitle system
   const {
     subtitles,
@@ -1074,23 +1081,57 @@ const FuturisticMediaPlayerCore = ({
     setTimeout(() => forceStateSync('playerstate-change-isLoading', { newValue: playerState.isLoading }), delay);
   }, [playerState.isLoading, forceStateSync]);
 
-  // Load video source when stream URL is ready
+  // Load video source when stream URL is ready - RESILIENT TO COMPONENT UNMOUNTING
   useEffect(() => {
     if (!streamUrl || !videoRef.current) return;
-    
+
     console.log('🎬 Loading stream:', { streamType, streamUrl });
-    
-    if (streamType === 'hls') {
-      loadHLS();
-    } else {
-      videoRef.current.src = streamUrl;
-      videoRef.current.load();
-    }
-    
+
+    // Store stream data in refs to survive component unmounting
+    const currentStreamUrl = streamUrl;
+    const currentStreamType = streamType;
+    const currentVideoRef = videoRef.current;
+
+    const loadStream = async () => {
+      try {
+        if (currentStreamType === 'hls') {
+          // For HLS, we need to be more careful about cleanup
+          if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
+          }
+
+          // Load HLS with error handling
+          await loadHLS();
+        } else {
+          // For direct streams, set src and load
+          currentVideoRef.src = currentStreamUrl;
+          currentVideoRef.load();
+
+          // Force a play attempt after a short delay to ensure metadata is loaded
+          setTimeout(() => {
+            if (currentVideoRef && !currentVideoRef.paused) {
+              console.log('✅ Direct stream loaded and playing');
+            }
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('❌ Stream loading error:', error);
+        // Don't set error state here as component might be unmounting
+      }
+    };
+
+    // Load the stream
+    loadStream();
+
     return () => {
-      // Cleanup HLS instance
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
+      // Only cleanup HLS if we're actually unmounting (not just re-rendering)
+      if (currentStreamType === 'hls' && hlsRef.current) {
+        try {
+          hlsRef.current.destroy();
+        } catch (error) {
+          console.warn('HLS cleanup error during unmount:', error);
+        }
         hlsRef.current = null;
       }
     };

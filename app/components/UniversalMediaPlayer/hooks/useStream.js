@@ -51,6 +51,7 @@ export const useStream = ({
   const isMountedRef = useRef(true);
   const currentRequestRef = useRef(null);
   const extractionDebounceRef = useRef(null);
+  const extractStreamRef = useRef(null);
   
   // Error classification
   const classifyError = useCallback((error, response) => {
@@ -192,37 +193,6 @@ export const useStream = ({
     };
   }, []);
   
-  // Main extraction function
-  const extractStream = useCallback(async (attemptNumber = 1, server = null) => {
-    if (!isMountedRef.current) {
-      console.log('🚫 Extraction cancelled - component unmounted');
-      return;
-    }
-
-    // Debounce rapid successive calls
-    if (extractionDebounceRef.current) {
-      clearTimeout(extractionDebounceRef.current);
-    }
-
-    extractionDebounceRef.current = setTimeout(async () => {
-      if (!isMountedRef.current) {
-        console.log('🚫 Extraction cancelled during debounce - component unmounted');
-        return;
-      }
-
-      // Prevent duplicate requests
-      const requestId = Date.now();
-      if (currentRequestRef.current && currentRequestRef.current > requestId - 1000) {
-        console.log('🚫 Duplicate request prevented');
-        return;
-      }
-      currentRequestRef.current = requestId;
-
-      // Continue with the rest of the extraction logic here
-      await performExtraction(attemptNumber, server, requestId);
-    }, 100); // 100ms debounce
-  }, [performExtraction]);
-
   // Separate function for the actual extraction logic
   const performExtraction = useCallback(async (attemptNumber, server, requestId) => {
     
@@ -276,11 +246,10 @@ export const useStream = ({
 
       // Check if component was unmounted during the request
       if (!isMountedRef.current) {
-        console.log('🔇 Component unmounted during request, ignoring response');
-        return;
+        console.log('🔇 Component unmounted during request, but continuing with extraction...');
+        // Don't return here - let the extraction complete even if component unmounted
+        // This prevents the stream from being lost due to rapid re-mounts
       }
-      
-      if (!isMountedRef.current) return;
       
       updateProgress(60, 'Processing response');
       
@@ -293,8 +262,8 @@ export const useStream = ({
           console.log(`⏳ Retrying in ${delay}ms...`);
           
           retryTimeoutRef.current = setTimeout(() => {
-            if (isMountedRef.current) {
-              extractStream(attemptNumber + 1, currentServer);
+            if (isMountedRef.current && extractStreamRef.current) {
+              extractStreamRef.current(attemptNumber + 1, currentServer);
             }
           }, delay);
           return;
@@ -305,8 +274,11 @@ export const useStream = ({
       
       // Parse response
       const data = await response.json();
-      
-      if (!isMountedRef.current) return;
+
+      if (!isMountedRef.current) {
+        console.log('🔇 Component unmounted during JSON parsing, but continuing...');
+        // Continue processing even if unmounted
+      }
       
       updateProgress(80, 'Finalizing');
       
@@ -315,18 +287,21 @@ export const useStream = ({
       
       // Success!
       updateProgress(100, 'Complete');
-      
-      setState(prev => ({
-        ...prev,
-        streamUrl: result.streamUrl,
-        streamType: result.streamType,
-        loading: false,
-        error: null,
-        serverHealth: 'healthy',
-        loadingProgress: 100,
-        loadingPhase: 'complete'
-      }));
-      
+
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setState(prev => ({
+          ...prev,
+          streamUrl: result.streamUrl,
+          streamType: result.streamType,
+          loading: false,
+          error: null,
+          serverHealth: 'healthy',
+          loadingProgress: 100,
+          loadingPhase: 'complete'
+        }));
+      }
+
       console.log('✅ Stream extraction successful:', result.serverInfo);
       
     } catch (error) {
@@ -346,8 +321,8 @@ export const useStream = ({
         if (attemptNumber < config.maxRetries) {
           console.log('⏱️ Request timeout, retrying...');
           retryTimeoutRef.current = setTimeout(() => {
-            if (isMountedRef.current) {
-              extractStream(attemptNumber + 1, currentServer);
+            if (isMountedRef.current && extractStreamRef.current) {
+              extractStreamRef.current(attemptNumber + 1, currentServer);
             }
           }, config.retryDelays[attemptNumber - 1]);
           return;
@@ -362,7 +337,9 @@ export const useStream = ({
             const nextServer = attemptNumber === config.maxRetries - 1 && currentServer === 'Vidsrc.xyz'
               ? 'embed.su'
               : currentServer;
-            extractStream(attemptNumber + 1, nextServer);
+            if (extractStreamRef.current) {
+              extractStreamRef.current(attemptNumber + 1, nextServer);
+            }
           }
         }, delay);
         return;
@@ -387,10 +364,43 @@ export const useStream = ({
     config.maxRetries,
     config.retryDelays,
     config.timeout,
-    state.server,
-    extractStream
+    state.server
   ]);
-  
+
+  // Main extraction function
+  const extractStream = useCallback(async (attemptNumber = 1, server = null) => {
+    if (!isMountedRef.current) {
+      console.log('🚫 Extraction cancelled - component unmounted');
+      return;
+    }
+
+    // Debounce rapid successive calls
+    if (extractionDebounceRef.current) {
+      clearTimeout(extractionDebounceRef.current);
+    }
+
+    extractionDebounceRef.current = setTimeout(async () => {
+      if (!isMountedRef.current) {
+        console.log('🚫 Extraction cancelled during debounce - component unmounted');
+        return;
+      }
+
+      // Prevent duplicate requests
+      const requestId = Date.now();
+      if (currentRequestRef.current && currentRequestRef.current > requestId - 1000) {
+        console.log('🚫 Duplicate request prevented');
+        return;
+      }
+      currentRequestRef.current = requestId;
+
+      // Continue with the rest of the extraction logic here
+      await performExtraction(attemptNumber, server, requestId);
+    }, 100); // 100ms debounce
+  }, [performExtraction]);
+
+  // Update ref with current function
+  extractStreamRef.current = extractStream;
+
   // Effect to trigger extraction
   useEffect(() => {
     isMountedRef.current = true;
