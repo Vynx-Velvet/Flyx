@@ -2,6 +2,7 @@
  * TypeScript definitions for Futuristic Media Player v3.0
  * Provides comprehensive type safety for the refactored architecture
  */
+import React from 'react';
 
 // ===== BASIC TYPES =====
 
@@ -175,11 +176,11 @@ export interface UIActions {
   handleKeyPress: (e: KeyboardEvent, playerActions: PlayerActions) => void;
 }
 
-export interface UsePlayerUIReturn {
+export interface UsePlayerUIReturn extends UIActions {
   containerRef: React.RefObject<HTMLDivElement>;
   uiState: UIState;
   fullscreenState: FullscreenState;
-} & UIActions;
+}
 
 // useEnhancedErrorHandling hook
 export interface ErrorHandlingConfig {
@@ -206,7 +207,7 @@ export interface ErrorActions {
   };
 }
 
-export interface UseEnhancedErrorHandlingReturn {
+export interface UseEnhancedErrorHandlingReturn extends ErrorActions {
   currentError: ErrorReport | null;
   isRecovering: boolean;
   recoveryProgress: number;
@@ -214,7 +215,7 @@ export interface UseEnhancedErrorHandlingReturn {
   showErrorDialog: boolean;
   retryCount: number;
   errorHistory: ErrorReport[];
-} & ErrorActions;
+}
 
 // usePerformanceOptimization hook
 export interface PerformanceMetrics {
