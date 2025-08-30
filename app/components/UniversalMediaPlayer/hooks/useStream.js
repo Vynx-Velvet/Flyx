@@ -40,8 +40,8 @@ export const useStream = ({
     retryDelays: [2000, 5000, 10000], // Exponential backoff
     timeout: 45000, // Increased timeout to 45 seconds
     servers: [
-      { name: 'Vidsrc.xyz', endpoint: '/api/extract-shadowlands', priority: 1 },
-      { name: 'embed.su', endpoint: '/api/extract-stream-progress', priority: 2 }
+      { name: 'Vidsrc.xyz', endpoint: '/api/extract-stream', priority: 1 },
+      { name: 'embed.su', endpoint: '/api/extract-stream', priority: 2 }
     ]
   };
   
@@ -130,28 +130,34 @@ export const useStream = ({
   const buildExtractionUrl = useCallback((server) => {
     const serverConfig = config.servers.find(s => s.name === server) || config.servers[0];
     
-    if (server === 'Vidsrc.xyz') {
-      const params = new URLSearchParams({
-        tmdbId: movieId.toString(),
-        ...(mediaType === 'tv' && {
-          season: seasonId.toString(),
-          episode: episodeId.toString()
-        }),
-      });
-      return `${serverConfig.endpoint}?${params.toString()}`;
-    } else {
-      const params = new URLSearchParams({
-        mediaType,
-        movieId: movieId.toString(),
-        server: 'embed.su',
-        ...(mediaType === 'tv' && {
-          seasonId: seasonId.toString(),
-          episodeId: episodeId.toString()
-        }),
-      });
-      const baseUrl = process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || serverConfig.endpoint;
-      return `${baseUrl}?${params.toString()}`;
-    }
+    console.log('🔧 STREAM DEBUG: Building extraction URL', {
+      server,
+      serverConfig,
+      mediaType,
+      movieId,
+      seasonId,
+      episodeId
+    });
+    
+    // All servers now use the same /api/extract-stream endpoint but with different server parameters
+    const params = new URLSearchParams({
+      mediaType,
+      movieId: movieId.toString(),
+      ...(mediaType === 'tv' && {
+        seasonId: seasonId.toString(),
+        episodeId: episodeId.toString()
+      }),
+      server: server === 'Vidsrc.xyz' ? 'vidsrc.xyz' : 'embed.su'
+    });
+    
+    const url = `${serverConfig.endpoint}?${params.toString()}`;
+    console.log('🎯 STREAM DEBUG: Built unified extraction URL:', {
+      server,
+      endpoint: serverConfig.endpoint,
+      params: Object.fromEntries(params),
+      finalUrl: url
+    });
+    return url;
   }, [mediaType, movieId, seasonId, episodeId, config.servers]);
   
   // Process extraction response
@@ -274,6 +280,15 @@ export const useStream = ({
       
       // Parse response
       const data = await response.json();
+      
+      console.log('📦 STREAM DEBUG: Raw extraction response:', {
+        success: data.success,
+        streamUrl: data.streamUrl,
+        streamType: data.streamType,
+        server: data.server,
+        error: data.error,
+        fullResponse: data
+      });
 
       if (!isMountedRef.current) {
         console.log('🔇 Component unmounted during JSON parsing, but continuing...');
@@ -284,6 +299,12 @@ export const useStream = ({
       
       // Process extraction result
       const result = processExtractionResponse(data, currentServer);
+      
+      console.log('✅ STREAM DEBUG: Processed result:', {
+        streamUrl: result.streamUrl,
+        streamType: result.streamType,
+        serverInfo: result.serverInfo
+      });
       
       // Success!
       updateProgress(100, 'Complete');
