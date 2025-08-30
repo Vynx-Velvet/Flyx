@@ -201,13 +201,19 @@ export const useStream = ({
   
   // Separate function for the actual extraction logic
   const performExtraction = useCallback(async (attemptNumber, server, requestId) => {
-    
+    console.log('🔧 STREAM DEBUG: performExtraction called', {
+      attemptNumber,
+      server,
+      requestId,
+      isMounted: isMountedRef.current
+    });
+
     // Cleanup previous attempt
     cleanup();
-    
+
     // Create new abort controller
     abortControllerRef.current = new AbortController();
-    
+
     // Update state
     setState(prev => ({
       ...prev,
@@ -216,13 +222,13 @@ export const useStream = ({
       retryAttempt: attemptNumber,
       server: server || prev.server
     }));
-    
+
     // Progress tracking
     updateProgress(10, attemptNumber > 1 ? `Retry ${attemptNumber}/${config.maxRetries}` : 'Connecting');
-    
+
     const currentServer = server || state.server;
     console.log(`🎯 Extraction attempt ${attemptNumber}/${config.maxRetries} using ${currentServer}`);
-    
+
     try {
       // Build URL
       const extractionUrl = buildExtractionUrl(currentServer);
@@ -424,9 +430,19 @@ export const useStream = ({
 
   // Effect to trigger extraction
   useEffect(() => {
+    console.log('🎬 STREAM DEBUG: useStream effect triggered', {
+      shouldFetch,
+      movieId,
+      mediaType,
+      seasonId,
+      episodeId,
+      isMounted: isMountedRef.current
+    });
+
     isMountedRef.current = true;
-    
+
     if (!shouldFetch) {
+      console.log('🚫 STREAM DEBUG: shouldFetch is false, skipping extraction');
       setState(prev => ({
         ...prev,
         loading: false,
@@ -435,8 +451,14 @@ export const useStream = ({
       }));
       return;
     }
-    
+
     if (!movieId || (mediaType === 'tv' && (!seasonId || !episodeId))) {
+      console.log('🚫 STREAM DEBUG: Missing required parameters', {
+        movieId,
+        mediaType,
+        seasonId,
+        episodeId
+      });
       setState(prev => ({
         ...prev,
         loading: false,
@@ -444,12 +466,21 @@ export const useStream = ({
       }));
       return;
     }
-    
+
+    console.log('🚀 STREAM DEBUG: Starting extraction with parameters', {
+      movieId,
+      mediaType,
+      seasonId,
+      episodeId,
+      server: state.server
+    });
+
     // Start extraction
     extractStream(1, state.server);
-    
+
     // Cleanup on unmount
     return () => {
+      console.log('🧹 STREAM DEBUG: useStream effect cleanup');
       isMountedRef.current = false;
       cleanup();
     };

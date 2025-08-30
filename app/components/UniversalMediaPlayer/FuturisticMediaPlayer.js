@@ -522,6 +522,17 @@ const FuturisticMediaPlayerCore = ({
   });
   
   // Stream extraction and management
+  const shouldFetch = !!(movieId && (mediaType !== 'tv' || (seasonId && episodeId)));
+
+  console.log('🎬 MEDIA PLAYER DEBUG: useStream parameters', {
+    mediaType,
+    movieId,
+    seasonId,
+    episodeId,
+    shouldFetch,
+    componentProps: { mediaType, movieId, seasonId, episodeId }
+  });
+
   const {
     streamUrl,
     streamType,
@@ -535,7 +546,7 @@ const FuturisticMediaPlayerCore = ({
     movieId,
     seasonId,
     episodeId,
-    shouldFetch: !!(movieId && (mediaType !== 'tv' || (seasonId && episodeId)))
+    shouldFetch
   });
 
   // Add logging to track when stream data is available
