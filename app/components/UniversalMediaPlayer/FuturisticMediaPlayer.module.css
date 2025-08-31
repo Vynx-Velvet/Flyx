@@ -626,6 +626,77 @@
   justify-content: center;
 }
 
+/* Enhanced Simplified Controls */
+.primaryControls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.secondaryControls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.episodeControls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settingsContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settingsSelect {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: all var(--animation-fast);
+  min-width: 120px;
+}
+
+.settingsSelect:hover {
+  border-color: var(--neon-cyan);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.settingsSelect:focus {
+  outline: none;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 245, 255, 0.2);
+}
+
+.primaryButton {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 16px 20px;
+  min-width: 70px;
+  min-height: 70px;
+}
+
+.secondaryButton {
+  font-size: 14px;
+  padding: 10px 14px;
+  min-width: 50px;
+  min-height: 50px;
+}
+
+.volumeButton {
+  font-size: 16px;
+  padding: 10px 12px;
+  min-width: 50px;
+  min-height: 50px;
+}
+
 /* ==========================================
    GLASS MORPHISM BUTTONS
    ========================================== */
@@ -1678,19 +1749,29 @@
   .controlsContainer {
     padding: 1rem;
   }
-  
+
   .controlsRow {
     flex-direction: column;
     gap: 1rem;
     align-items: stretch;
   }
-  
+
   .leftControls,
   .centerControls,
-  .rightControls {
+  .rightControls,
+  .primaryControls,
+  .secondaryControls {
     justify-content: center;
     flex-wrap: wrap;
     gap: 0.75rem;
+  }
+
+  .episodeControls {
+    gap: 0.5rem;
+  }
+
+  .settingsContainer {
+    gap: 0.5rem;
   }
   
   .timeline {
@@ -1701,6 +1782,24 @@
     min-width: 50px;
     min-height: 50px;
     font-size: 20px;
+  }
+
+  .primaryButton {
+    min-width: 55px;
+    min-height: 55px;
+    font-size: 22px;
+  }
+
+  .secondaryButton {
+    min-width: 45px;
+    min-height: 45px;
+    font-size: 16px;
+  }
+
+  .volumeButton {
+    min-width: 45px;
+    min-height: 45px;
+    font-size: 16px;
   }
   
   .volumeSlider {
@@ -1766,6 +1865,24 @@
     min-width: 44px;
     min-height: 44px;
     font-size: 18px;
+  }
+
+  .primaryButton {
+    min-width: 50px;
+    min-height: 50px;
+    font-size: 20px;
+  }
+
+  .secondaryButton {
+    min-width: 40px;
+    min-height: 40px;
+    font-size: 14px;
+  }
+
+  .volumeButton {
+    min-width: 40px;
+    min-height: 40px;
+    font-size: 14px;
   }
   
   .volumeSlider {

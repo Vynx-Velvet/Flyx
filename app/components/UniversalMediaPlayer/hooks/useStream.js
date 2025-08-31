@@ -94,13 +94,10 @@ export const useStream = ({
   
   // Cleanup function
   const cleanup = useCallback(() => {
-    console.log('🧹 Stream hook cleanup initiated');
-
     // Mark component as unmounting to prevent error handling
     isMountedRef.current = false;
 
     if (abortControllerRef.current) {
-      console.log('🛑 Aborting active request due to cleanup');
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
@@ -129,16 +126,7 @@ export const useStream = ({
   // Build extraction URL based on server
   const buildExtractionUrl = useCallback((server) => {
     const serverConfig = config.servers.find(s => s.name === server) || config.servers[0];
-    
-    console.log('🔧 STREAM DEBUG: Building extraction URL', {
-      server,
-      serverConfig,
-      mediaType,
-      movieId,
-      seasonId,
-      episodeId
-    });
-    
+
     // Use extract-shadowlands endpoint with correct parameter names
     const params = new URLSearchParams({
       tmdbId: movieId.toString(), // extract-shadowlands expects tmdbId
@@ -153,15 +141,6 @@ export const useStream = ({
     const baseUrl = isDevelopment ? '' : (process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || '');
     const url = `${baseUrl}${serverConfig.endpoint}?${params.toString()}`;
 
-    console.log('🎯 STREAM DEBUG: Built shadowlands extraction URL:', {
-      server,
-      endpoint: serverConfig.endpoint,
-      baseUrl,
-      isDevelopment,
-      hostname: typeof window !== 'undefined' ? window.location.hostname : 'server',
-      params: Object.fromEntries(params),
-      finalUrl: url
-    });
     return url;
   }, [mediaType, movieId, seasonId, episodeId, config.servers]);
   
@@ -175,10 +154,8 @@ export const useStream = ({
     let finalStreamUrl;
     if (data.server === 'shadowlands' || data.requiresProxy) {
       finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(data.streamUrl)}&source=shadowlands`;
-      console.log('🌑 Using shadowlands proxy for extracted URL');
     } else {
       finalStreamUrl = data.streamUrl;
-      console.log('✅ Using direct stream URL');
     }
 
     return {
@@ -195,13 +172,6 @@ export const useStream = ({
   
   // Separate function for the actual extraction logic
   const performExtraction = useCallback(async (attemptNumber, server, requestId) => {
-    console.log('🔧 STREAM DEBUG: performExtraction called', {
-      attemptNumber,
-      server,
-      requestId,
-      isMounted: isMountedRef.current
-    });
-
     // Cleanup previous attempt
     cleanup();
 
@@ -221,19 +191,16 @@ export const useStream = ({
     updateProgress(10, attemptNumber > 1 ? `Retry ${attemptNumber}/${config.maxRetries}` : 'Connecting');
 
     const currentServer = server || state.server;
-    console.log(`🎯 Extraction attempt ${attemptNumber}/${config.maxRetries} using ${currentServer} (Shadowlands method)`);
 
     try {
       // Build URL
       const extractionUrl = buildExtractionUrl(currentServer);
-      console.log('📡 Extraction URL:', extractionUrl);
       
       updateProgress(30, 'Fetching stream');
       
       // Set timeout with better error handling
       const timeoutId = setTimeout(() => {
         if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
-          console.log('⏰ Request timeout reached, aborting...');
           abortControllerRef.current.abort();
         }
       }, config.timeout);
@@ -252,7 +219,6 @@ export const useStream = ({
 
       // Check if component was unmounted during the request
       if (!isMountedRef.current) {
-        console.log('🔇 Component unmounted during request, but continuing with extraction...');
         // Don't return here - let the extraction complete even if component unmounted
         // This prevents the stream from being lost due to rapid re-mounts
       }
@@ -265,8 +231,7 @@ export const useStream = ({
         
         if (errorClass.retryable && attemptNumber < config.maxRetries) {
           const delay = errorClass.delay || config.retryDelays[attemptNumber - 1];
-          console.log(`⏳ Retrying in ${delay}ms...`);
-          
+
           retryTimeoutRef.current = setTimeout(() => {
             if (isMountedRef.current && extractStreamRef.current) {
               extractStreamRef.current(attemptNumber + 1, currentServer);
@@ -280,18 +245,8 @@ export const useStream = ({
       
       // Parse response
       const data = await response.json();
-      
-      console.log('📦 STREAM DEBUG: Raw extraction response:', {
-        success: data.success,
-        streamUrl: data.streamUrl,
-        streamType: data.streamType,
-        server: data.server,
-        error: data.error,
-        fullResponse: data
-      });
 
       if (!isMountedRef.current) {
-        console.log('🔇 Component unmounted during JSON parsing, but continuing...');
         // Continue processing even if unmounted
       }
       
@@ -299,43 +254,13 @@ export const useStream = ({
       
       // Process extraction result
       const result = processExtractionResponse(data, currentServer);
-      
-      console.log('✅ STREAM DEBUG: Processed result:', {
-        streamUrl: result.streamUrl,
-        streamType: result.streamType,
-        serverInfo: result.serverInfo
-      });
-      
+
       // Success!
       updateProgress(100, 'Complete');
-
-      // EMERGENCY FIX: Update state even if component is unmounted
-      // This prevents the stream URL from being lost due to rapid remounting
-      console.log('🎬 USESTREAM: About to update state with successful result', {
-        streamUrl: result.streamUrl ? result.streamUrl.substring(0, 100) + '...' : null,
-        streamType: result.streamType,
-        loading: false,
-        isMounted: isMountedRef.current
-      });
 
       // Always update state - don't skip even if component unmounted
       // The state will be available when component remounts
       setState(prev => {
-        console.log('🎬 USESTREAM: State update function called (EMERGENCY MODE)', {
-          prevState: {
-            streamUrl: prev.streamUrl,
-            loading: prev.loading,
-            error: prev.error
-          },
-          newState: {
-            streamUrl: result.streamUrl,
-            streamType: result.streamType,
-            loading: false,
-            error: null
-          },
-          isMounted: isMountedRef.current
-        });
-
         return {
           ...prev,
           streamUrl: result.streamUrl,
@@ -347,19 +272,14 @@ export const useStream = ({
           loadingPhase: 'complete'
         };
       });
-
-      console.log('🎬 USESTREAM: State update completed (EMERGENCY MODE)');
-
-      console.log('✅ Shadowlands stream extraction successful:', result.serverInfo);
       
     } catch (error) {
       // Always check if component is still mounted first
       if (!isMountedRef.current) {
-        console.log('🔇 Component unmounted during request, ignoring error');
         return;
       }
 
-      console.error(`❌ Extraction error on attempt ${attemptNumber}:`, error);
+      console.error(`Extraction error on attempt ${attemptNumber}:`, error);
 
       // Check if we should retry
       const errorClass = classifyError(error.message, null);
@@ -367,7 +287,6 @@ export const useStream = ({
       if (error.name === 'AbortError') {
         // AbortError during mounted component - this is a timeout
         if (attemptNumber < config.maxRetries) {
-          console.log('⏱️ Request timeout, retrying...');
           retryTimeoutRef.current = setTimeout(() => {
             if (isMountedRef.current && extractStreamRef.current) {
               extractStreamRef.current(attemptNumber + 1, currentServer);
@@ -377,8 +296,7 @@ export const useStream = ({
         }
       } else if (errorClass.retryable && attemptNumber < config.maxRetries) {
         const delay = config.retryDelays[attemptNumber - 1];
-        console.log(`🔄 Retrying in ${delay}ms (${errorClass.type})...`);
-        
+
         retryTimeoutRef.current = setTimeout(() => {
           if (isMountedRef.current) {
             // Try alternative server on last retry
@@ -418,7 +336,6 @@ export const useStream = ({
   // Main extraction function
   const extractStream = useCallback(async (attemptNumber = 1, server = null) => {
     if (!isMountedRef.current) {
-      console.log('🚫 Extraction cancelled - component unmounted');
       return;
     }
 
@@ -429,14 +346,12 @@ export const useStream = ({
 
     extractionDebounceRef.current = setTimeout(async () => {
       if (!isMountedRef.current) {
-        console.log('🚫 Extraction cancelled during debounce - component unmounted');
         return;
       }
 
       // Prevent duplicate requests
       const requestId = Date.now();
       if (currentRequestRef.current && currentRequestRef.current > requestId - 1000) {
-        console.log('🚫 Duplicate request prevented');
         return;
       }
       currentRequestRef.current = requestId;
@@ -451,19 +366,9 @@ export const useStream = ({
 
   // Effect to trigger extraction
   useEffect(() => {
-    console.log('🎬 STREAM DEBUG: useStream effect triggered', {
-      shouldFetch,
-      movieId,
-      mediaType,
-      seasonId,
-      episodeId,
-      isMounted: isMountedRef.current
-    });
-
     isMountedRef.current = true;
 
     if (!shouldFetch) {
-      console.log('🚫 STREAM DEBUG: shouldFetch is false, skipping extraction');
       setState(prev => ({
         ...prev,
         loading: false,
@@ -474,12 +379,6 @@ export const useStream = ({
     }
 
     if (!movieId || (mediaType === 'tv' && (!seasonId || !episodeId))) {
-      console.log('🚫 STREAM DEBUG: Missing required parameters', {
-        movieId,
-        mediaType,
-        seasonId,
-        episodeId
-      });
       setState(prev => ({
         ...prev,
         loading: false,
@@ -488,20 +387,11 @@ export const useStream = ({
       return;
     }
 
-    console.log('🚀 STREAM DEBUG: Starting extraction with parameters', {
-      movieId,
-      mediaType,
-      seasonId,
-      episodeId,
-      server: state.server
-    });
-
     // Start extraction
     extractStream(1, state.server);
 
     // Cleanup on unmount
     return () => {
-      console.log('🧹 STREAM DEBUG: useStream effect cleanup');
       isMountedRef.current = false;
       cleanup();
     };
@@ -510,15 +400,13 @@ export const useStream = ({
   // Manual retry function
   const retryExtraction = useCallback(() => {
     if (!state.loading) {
-      console.log('🔄 Manual retry triggered');
       extractStream(1, state.server);
     }
   }, [state.loading, state.server, extractStream]);
-  
+
   // Server switch function
   const switchServer = useCallback((newServer) => {
     if (newServer !== state.server) {
-      console.log(`🔀 Switching server to ${newServer}`);
       setState(prev => ({ ...prev, server: newServer }));
       extractStream(1, newServer);
     }

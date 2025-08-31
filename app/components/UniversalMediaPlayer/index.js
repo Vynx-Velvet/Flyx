@@ -246,25 +246,6 @@ export const quickStart = {
 
 // Development utilities
 export const devUtils = {
-  logPlayerState: (playerState) => {
-    console.group('🎮 Player State');
-    console.log('Current Time:', playerState.currentTime);
-    console.log('Duration:', playerState.duration);
-    console.log('Playing:', playerState.isPlaying);
-    console.log('Volume:', playerState.volume);
-    console.log('Quality:', playerState.currentQuality);
-    console.groupEnd();
-  },
-  
-  logAnalytics: (analytics) => {
-    console.group('📊 Analytics Data');
-    console.log('Session ID:', analytics.sessionId);
-    console.log('User Behavior:', analytics.userBehavior);
-    console.log('Performance:', analytics.performanceMetrics);
-    console.log('Insights:', analytics.insights);
-    console.groupEnd();
-  },
-  
   // Note: mockMediaDetails removed - use real TMDB API data
   // For testing, use actual TMDB movie/TV IDs with the media player
   testMovieIds: [
@@ -278,10 +259,5 @@ export const devUtils = {
     1396, // Breaking Bad
     94605, // Arcane
     85271, // WandaVision
-  ],
-  
-  enableDebugMode: () => {
-    window.FUTURISTIC_PLAYER_DEBUG = true;
-    console.log('🐛 Debug mode enabled for Futuristic Media Player');
-  }
+  ]
 };

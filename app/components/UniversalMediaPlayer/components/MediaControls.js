@@ -166,192 +166,170 @@ const MediaControls = ({
           </div>
         </div>
 
-        {/* Main Controls Row */}
+        {/* Main Controls Row - Simplified and Intuitive Layout */}
         <div className={styles.controlsRow}>
-          {/* Left Controls */}
-          <div className={styles.leftControls}>
-            {/* Play/Pause */}
+          {/* Primary Controls - Most Used */}
+          <div className={styles.primaryControls}>
+            {/* Play/Pause - Largest and Most Prominent */}
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={playerActions.togglePlay}
-              className={`${styles.glassButton} ${styles.playButton}`}
+              className={`${styles.glassButton} ${styles.playButton} ${styles.primaryButton}`}
               disabled={playerState.isLoading}
+              aria-label={playerState.isPlaying ? 'Pause' : 'Play'}
             >
               {playerState.isPlaying ? '⏸️' : '▶️'}
             </motion.button>
 
-            {/* Previous Episode (TV only) */}
-            {mediaType === 'tv' && hasPreviousEpisode && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={onPreviousEpisode}
-                className={styles.glassButton}
-                title="Previous Episode"
-              >
-                ⏮️
-              </motion.button>
-            )}
+            {/* Episode Navigation - TV Only, Simplified */}
+            {mediaType === 'tv' && (hasPreviousEpisode || hasNextEpisode) && (
+              <div className={styles.episodeControls}>
+                {hasPreviousEpisode && (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={onPreviousEpisode}
+                    className={`${styles.glassButton} ${styles.secondaryButton}`}
+                    aria-label="Previous Episode"
+                  >
+                    ⏮️
+                  </motion.button>
+                )}
 
-            {/* Next Episode (TV only) */}
-            {mediaType === 'tv' && hasNextEpisode && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={onNextEpisode}
-                className={styles.glassButton}
-                title="Next Episode"
-              >
-                ⏭️
-              </motion.button>
+                {hasNextEpisode && (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={onNextEpisode}
+                    className={`${styles.glassButton} ${styles.secondaryButton}`}
+                    aria-label="Next Episode"
+                  >
+                    ⏭️
+                  </motion.button>
+                )}
+              </div>
             )}
+          </div>
 
-            {/* Episode Carousel Toggle (TV only) */}
-            {mediaType === 'tv' && enableAdvanced && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={onToggleEpisodeCarousel}
-                className={`${styles.glassButton} ${episodeCarouselVisible ? styles.active : ''}`}
-                title="Episode Carousel"
-              >
-                📺
-              </motion.button>
-            )}
-
-            {/* Volume Controls */}
+          {/* Secondary Controls - Less Frequently Used */}
+          <div className={styles.secondaryControls}>
+            {/* Volume Controls - Simplified */}
             <div className={styles.volumeContainer}>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={playerActions.toggleMute}
-                className={styles.glassButton}
-                title={playerState.isMuted ? 'Unmute' : 'Mute'}
+                className={`${styles.glassButton} ${styles.volumeButton}`}
+                aria-label={playerState.isMuted ? 'Unmute' : 'Mute'}
               >
-                {playerState.isMuted || playerState.volume === 0 ? '🔇' : '🔊'}
+                {playerState.isMuted || playerState.volume === 0 ? '🔇' : playerState.volume > 0.5 ? '🔊' : '🔉'}
               </motion.button>
 
-              {/* Volume Slider Container */}
+              {/* Compact Volume Slider */}
               <div className={styles.volumeSliderContainer}>
                 <input
                   type="range"
                   min="0"
                   max="1"
-                  step="0.01"
+                  step="0.1"
                   value={playerState.volume}
                   onChange={handleVolumeChange}
                   className={styles.volumeSlider}
-                  title={`Volume: ${Math.round(playerState.volume * 100)}%`}
-                />
-                {/* Volume Fill Overlay */}
-                <div
-                  className={styles.volumeFill}
-                  style={{
-                    width: `${playerState.volume * 100}%`,
-                    opacity: playerState.isMuted ? 0.5 : 1
-                  }}
-                />
-                {/* Volume Thumb */}
-                <div
-                  className={styles.volumeThumb}
-                  style={{
-                    left: `${playerState.volume * 100}%`,
-                    opacity: playerState.isMuted ? 0.5 : 1
-                  }}
+                  aria-label={`Volume: ${Math.round(playerState.volume * 100)}%`}
                 />
               </div>
             </div>
-          </div>
 
-          {/* Center Controls */}
-          <div className={styles.centerControls}>
-            {/* Progress Actions */}
-            {progressData && enableAdvanced && (
-              <div className={styles.progressActions}>
+            {/* Settings - Collapsed into single menu */}
+            <div className={styles.settingsContainer}>
+              {/* Quality & Subtitles in single dropdown */}
+              {(qualities.length > 1 || subtitles.length > 0) && (
+                <select
+                  className={`${styles.controlSelect} ${styles.settingsSelect}`}
+                  title="Settings"
+                  defaultValue=""
+                >
+                  <option value="" disabled>⚙️ Settings</option>
+                  {qualities.length > 1 && (
+                    <optgroup label="Quality">
+                      {qualities.map(quality => (
+                        <option
+                          key={quality.id}
+                          value={`quality-${quality.id}`}
+                          onClick={() => onSelectQuality?.(quality.id)}
+                        >
+                          {quality.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {subtitles.length > 0 && (
+                    <optgroup label="Subtitles">
+                      <option
+                        value="subtitles-off"
+                        onClick={() => onSelectSubtitle?.(null)}
+                      >
+                        No Subtitles
+                      </option>
+                      {subtitles.map((subtitle, index) => {
+                        const value = typeof subtitle === 'object' ? subtitle.language || subtitle.langcode || subtitle.label || `Subtitle ${index + 1}` : subtitle;
+                        const display = typeof subtitle === 'object' ? subtitle.language || subtitle.label || `Subtitle ${index + 1}` : subtitle;
+                        return (
+                          <option
+                            key={index}
+                            value={`subtitle-${index}`}
+                            onClick={() => onSelectSubtitle?.(subtitle)}
+                          >
+                            {display}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+                </select>
+              )}
+
+              {/* Episode Carousel Toggle - TV Only */}
+              {mediaType === 'tv' && enableAdvanced && (
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={onSaveProgress}
+                  onClick={onToggleEpisodeCarousel}
+                  className={`${styles.glassButton} ${episodeCarouselVisible ? styles.active : ''}`}
+                  aria-label="Episode List"
+                >
+                  📺
+                </motion.button>
+              )}
+
+              {/* Progress Actions - Collapsed */}
+              {progressData && enableAdvanced && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    // Could open a mini menu or use a dropdown
+                    onSaveProgress?.();
+                  }}
                   className={styles.glassButton}
-                  title="Save Progress"
+                  aria-label="Progress Options"
                 >
                   💾
                 </motion.button>
+              )}
 
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={onMarkCompleted}
-                  className={styles.glassButton}
-                  title="Mark Completed"
-                >
-                  ✅
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={onClearProgress}
-                  className={styles.glassButton}
-                  title="Clear Progress"
-                >
-                  🗑️
-                </motion.button>
-              </div>
-            )}
-          </div>
-
-          {/* Right Controls */}
-          <div className={styles.rightControls}>
-            {/* Quality Selector */}
-            {qualities.length > 1 && (
-              <select
-                value={currentQuality}
-                onChange={handleQualityChange}
-                className={styles.controlSelect}
-                title="Video Quality"
+              {/* Fullscreen Toggle */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onToggleFullscreen}
+                className={`${styles.glassButton} ${styles.fullscreenButton}`}
+                aria-label={playerState.isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
               >
-                {qualities.map(quality => (
-                  <option key={quality.id} value={quality.id}>
-                    {quality.label}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            {/* Subtitle Selector */}
-            {subtitles.length > 0 && (
-              <select
-                value={activeSubtitle || ''}
-                onChange={handleSubtitleChange}
-                className={styles.controlSelect}
-                title="Subtitles"
-              >
-                <option value="">No Subtitles</option>
-                {subtitles.map((subtitle, index) => {
-                  // Handle both string and object subtitle formats
-                  const value = typeof subtitle === 'object' ? subtitle.language || subtitle.langcode || subtitle.label || `Subtitle ${index + 1}` : subtitle;
-                  const display = typeof subtitle === 'object' ? subtitle.language || subtitle.label || `Subtitle ${index + 1}` : subtitle;
-                  return (
-                    <option key={index} value={value}>
-                      {display}
-                    </option>
-                  );
-                })}
-              </select>
-            )}
-
-            {/* Fullscreen Toggle */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onToggleFullscreen}
-              className={`${styles.glassButton} ${styles.fullscreenButton}`}
-              title={playerState.isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            >
-              {playerState.isFullscreen ? '🗗' : '🗖'}
-            </motion.button>
+                {playerState.isFullscreen ? '🗗' : '🗖'}
+              </motion.button>
+            </div>
           </div>
         </div>
       </motion.div>
