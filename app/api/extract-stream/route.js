@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 
 // VM extractor configuration
-const VM_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || 'http://35.188.123.210:3001';
+const VM_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || 'http://localhost:3001';
 // VidSrc.cc extractor configuration
 const VIDSRCCC_EXTRACTOR_URL = process.env.VIDSRCCC_EXTRACTION_URL || 'http://localhost:3002';
 // Bulletproof extractor configuration
-const BULLETPROOF_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || 'http://35.188.123.210:3001';
+const BULLETPROOF_EXTRACTOR_URL = process.env.VM_EXTRACTION_URL || process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || 'http://localhost:3001';
+
+// Development mode detection
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 // Utility function for structured logging
 function createLogger(requestId) {
@@ -118,18 +121,23 @@ function buildBulletproofUrl(searchParams, logger) {
 function getExtractorType(searchParams) {
   const server = searchParams.get('server');
   const mediaType = searchParams.get('mediaType');
-  
+
+  // For development, always return mock response
+  if (isDevelopment) {
+    return 'mock';
+  }
+
   // Use Bulletproof extractor for vidsrc.xyz server
   if (server === 'vidsrc.xyz') {
     return 'bulletproof';
   }
-  
+
   // Use VidSrc.cc extractor for vidsrc.cc content
   if ((server && server.includes('vidsrc')) ||
       (mediaType && (mediaType === 'movie' || mediaType === 'tv'))) {
     return 'vidsrccc';
   }
-  
+
   // Default to VM extractor
   return 'vm';
 }
@@ -155,6 +163,38 @@ export async function GET(request) {
     
     // Use the correct extractor based on the determined type
     switch (extractorType) {
+      case 'mock':
+        // Return mock response for development
+        logger.info('Using mock extractor for development', {
+          mediaType: searchParams.get('mediaType'),
+          movieId: searchParams.get('movieId'),
+          seasonId: searchParams.get('seasonId'),
+          episodeId: searchParams.get('episodeId')
+        });
+
+        const mockResponse = {
+          success: true,
+          streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+          streamType: 'mp4',
+          server: 'mock',
+          extractionMethod: 'development_mock',
+          requiresProxy: false,
+          totalFound: 1,
+          m3u8Count: 0,
+          subtitles: [],
+          requestId,
+          debug: {
+            extractorType: 'mock',
+            extractorResponseTime: 0,
+            message: 'Development mock response - replace with real extractor service',
+            isDevelopment,
+            timestamp: new Date().toISOString()
+          }
+        };
+
+        logger.info('Returning mock response', { requestId });
+        return NextResponse.json(mockResponse);
+        break;
       case 'bulletproof':
         extractorUrl = buildBulletproofUrl(searchParams, logger);
         logger.info('Using Bulletproof extractor', { extractorUrl });

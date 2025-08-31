@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import ShowDetails from '../../components/ShowDetails';
 import NavBar from '../../components/NavBar';
@@ -71,10 +71,23 @@ export default function DetailsPage() {
   }, [params.id, searchParams]);
 
   // FIXED: Clear media player state when navigating between different media items
+  // Only clear if we're actually navigating to a different media item
+  const prevIdRef = useRef(params.id);
+
   useEffect(() => {
-    console.log('🔄 Details page: ID changed, clearing media player states');
-    setIsMediaPlayerActive(false);
-    setPreventNavigation(false);
+    const currentId = params.id;
+
+    if (prevIdRef.current !== currentId) {
+      console.log('🔄 Details page: ID changed, clearing media player states', {
+        from: prevIdRef.current,
+        to: currentId
+      });
+      setIsMediaPlayerActive(false);
+      setPreventNavigation(false);
+
+      // Update ref
+      prevIdRef.current = currentId;
+    }
   }, [params.id]); // Trigger when the route ID changes
 
   const handleClearMovie = () => {

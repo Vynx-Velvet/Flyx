@@ -26,12 +26,17 @@ export const usePlayerUI = ({
     mode: 'standard' // 'standard', 'immersive', 'cinema'
   });
 
+  // Log initial state
+  console.log('🎛️ UI: Initial UI state:', uiState);
+  console.log('🎛️ UI: Initial fullscreen state:', fullscreenState);
+
   // Refs for UI management
   const uiTimeoutRef = useRef(null);
   const containerRef = useRef(null);
 
   // UI visibility management
   const showUI = useCallback(() => {
+    console.log('🎛️ UI: Showing UI');
     setUiState(prev => ({ ...prev, isVisible: true }));
 
     // Clear existing timeout
@@ -41,15 +46,21 @@ export const usePlayerUI = ({
 
     // Hide after 3 seconds of inactivity (only in immersive mode)
     if (fullscreenState.mode === 'immersive') {
+      console.log('🎛️ UI: Setting timeout to hide UI in immersive mode');
       uiTimeoutRef.current = setTimeout(() => {
+        console.log('🎛️ UI: Hiding UI due to timeout');
         setUiState(prev => ({ ...prev, isVisible: false }));
       }, 3000);
     }
   }, [fullscreenState.mode]);
 
   const hideUI = useCallback(() => {
+    console.log('🎛️ UI: hideUI called, mode:', fullscreenState.mode);
     if (fullscreenState.mode === 'immersive') {
+      console.log('🎛️ UI: Hiding UI in immersive mode');
       setUiState(prev => ({ ...prev, isVisible: false }));
+    } else {
+      console.log('🎛️ UI: Not hiding UI (not in immersive mode)');
     }
   }, [fullscreenState.mode]);
 

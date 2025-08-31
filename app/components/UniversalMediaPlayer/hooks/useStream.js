@@ -40,8 +40,8 @@ export const useStream = ({
     retryDelays: [2000, 5000, 10000], // Exponential backoff
     timeout: 45000, // Increased timeout to 45 seconds
     servers: [
-      { name: 'Vidsrc.xyz', endpoint: '/api/extract-stream', priority: 1 },
-      { name: 'embed.su', endpoint: '/api/extract-stream', priority: 2 }
+      { name: 'Vidsrc.xyz', endpoint: '/api/extract-shadowlands', priority: 1 },
+      { name: 'embed.su', endpoint: '/api/extract-shadowlands', priority: 2 }
     ]
   };
   
@@ -139,21 +139,26 @@ export const useStream = ({
       episodeId
     });
     
-    // All servers now use the same /api/extract-stream endpoint but with different server parameters
+    // Use extract-shadowlands endpoint with correct parameter names
     const params = new URLSearchParams({
-      mediaType,
-      movieId: movieId.toString(),
+      tmdbId: movieId.toString(), // extract-shadowlands expects tmdbId
       ...(mediaType === 'tv' && {
-        seasonId: seasonId.toString(),
-        episodeId: episodeId.toString()
-      }),
-      server: server === 'Vidsrc.xyz' ? 'vidsrc.xyz' : 'embed.su'
+        season: seasonId.toString(), // extract-shadowlands expects season
+        episode: episodeId.toString() // extract-shadowlands expects episode
+      })
     });
-    
-    const url = `${serverConfig.endpoint}?${params.toString()}`;
-    console.log('🎯 STREAM DEBUG: Built unified extraction URL:', {
+
+    // Always use local endpoint for development - environment variables can be unreliable in client-side code
+    const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    const baseUrl = isDevelopment ? '' : (process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || '');
+    const url = `${baseUrl}${serverConfig.endpoint}?${params.toString()}`;
+
+    console.log('🎯 STREAM DEBUG: Built shadowlands extraction URL:', {
       server,
       endpoint: serverConfig.endpoint,
+      baseUrl,
+      isDevelopment,
+      hostname: typeof window !== 'undefined' ? window.location.hostname : 'server',
       params: Object.fromEntries(params),
       finalUrl: url
     });
@@ -165,36 +170,25 @@ export const useStream = ({
     if (!data.success || !data.streamUrl) {
       throw new Error(data.error || 'Stream extraction failed');
     }
-    
-    // Determine if proxy is needed
-    const isShadowlands = 
-      data.server === 'shadowlands' ||
-      data.streamType === 'shadowlands' ||
-      data.streamUrl.includes('shadowlands') ||
-      data.streamUrl.includes('shadowlandschronicles.com') ||
-      data.streamUrl.includes('tmstr');
-    
+
+    // Shadowlands extraction always requires proxy
     let finalStreamUrl;
-    
-    if (isShadowlands) {
-      finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(data.streamUrl)}&source=vidsrc`;
-      console.log('🌑 Using vidsrc.xyz proxy for shadowlands URL');
-    } else if (data.requiresProxy) {
-      const sourceParam = data.debug?.selectedStream?.source || server.toLowerCase();
-      finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(data.streamUrl)}&source=${sourceParam}`;
-      console.log(`🔄 Using proxy for ${server} URL`);
+    if (data.server === 'shadowlands' || data.requiresProxy) {
+      finalStreamUrl = `/api/stream-proxy?url=${encodeURIComponent(data.streamUrl)}&source=shadowlands`;
+      console.log('🌑 Using shadowlands proxy for extracted URL');
     } else {
       finalStreamUrl = data.streamUrl;
       console.log('✅ Using direct stream URL');
     }
-    
+
     return {
       streamUrl: finalStreamUrl,
       streamType: data.streamType || 'hls',
       serverInfo: {
         server: data.server || server,
-        extractionMethod: data.extractionMethod,
-        chain: data.chain
+        extractionMethod: data.extractionMethod || 'shadowlands_direct',
+        chain: data.chain,
+        metadata: data.metadata
       }
     };
   }, []);
@@ -227,7 +221,7 @@ export const useStream = ({
     updateProgress(10, attemptNumber > 1 ? `Retry ${attemptNumber}/${config.maxRetries}` : 'Connecting');
 
     const currentServer = server || state.server;
-    console.log(`🎯 Extraction attempt ${attemptNumber}/${config.maxRetries} using ${currentServer}`);
+    console.log(`🎯 Extraction attempt ${attemptNumber}/${config.maxRetries} using ${currentServer} (Shadowlands method)`);
 
     try {
       // Build URL
@@ -315,9 +309,34 @@ export const useStream = ({
       // Success!
       updateProgress(100, 'Complete');
 
-      // Only update state if component is still mounted
-      if (isMountedRef.current) {
-        setState(prev => ({
+      // EMERGENCY FIX: Update state even if component is unmounted
+      // This prevents the stream URL from being lost due to rapid remounting
+      console.log('🎬 USESTREAM: About to update state with successful result', {
+        streamUrl: result.streamUrl ? result.streamUrl.substring(0, 100) + '...' : null,
+        streamType: result.streamType,
+        loading: false,
+        isMounted: isMountedRef.current
+      });
+
+      // Always update state - don't skip even if component unmounted
+      // The state will be available when component remounts
+      setState(prev => {
+        console.log('🎬 USESTREAM: State update function called (EMERGENCY MODE)', {
+          prevState: {
+            streamUrl: prev.streamUrl,
+            loading: prev.loading,
+            error: prev.error
+          },
+          newState: {
+            streamUrl: result.streamUrl,
+            streamType: result.streamType,
+            loading: false,
+            error: null
+          },
+          isMounted: isMountedRef.current
+        });
+
+        return {
           ...prev,
           streamUrl: result.streamUrl,
           streamType: result.streamType,
@@ -326,10 +345,12 @@ export const useStream = ({
           serverHealth: 'healthy',
           loadingProgress: 100,
           loadingPhase: 'complete'
-        }));
-      }
+        };
+      });
 
-      console.log('✅ Stream extraction successful:', result.serverInfo);
+      console.log('🎬 USESTREAM: State update completed (EMERGENCY MODE)');
+
+      console.log('✅ Shadowlands stream extraction successful:', result.serverInfo);
       
     } catch (error) {
       // Always check if component is still mounted first

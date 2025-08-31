@@ -664,19 +664,25 @@ const FuturisticMediaPlayerCore = ({
   }), [resumePlayback, restartPlayback]);
 
   // Enhanced HLS.js loading with proper cleanup
-  const loadHLS = useCallback(async () => {
-    if (!streamUrl || streamType !== 'hls' || !videoRef.current) return;
-    
-    // Check for native HLS support (Safari)
-    if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-      videoRef.current.src = streamUrl;
+  const loadHLS = useCallback(async (currentStreamUrl = streamUrl, currentStreamType = streamType) => {
+    if (!currentStreamUrl || currentStreamType !== 'hls' || !videoRef.current) {
+      console.log('🎬 HLS load skipped:', { currentStreamUrl: !!currentStreamUrl, currentStreamType, videoReady: !!videoRef.current });
       return;
     }
-    
+
+    console.log('🎬 Loading HLS stream:', { currentStreamUrl: currentStreamUrl.substring(0, 80) + '...', currentStreamType });
+
+    // Check for native HLS support (Safari)
+    if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+      console.log('🎬 Using native HLS support');
+      videoRef.current.src = currentStreamUrl;
+      return;
+    }
+
     try {
       // Use global HLS.js if available, otherwise load from CDN
       let Hls;
-      
+
       if (window.Hls) {
         Hls = window.Hls;
         console.log('✅ Using global HLS.js');
@@ -692,19 +698,20 @@ const FuturisticMediaPlayerCore = ({
         });
         Hls = window.Hls;
       }
-      
+
       if (!Hls.isSupported()) {
         console.warn('HLS.js not supported, falling back to native playback');
-        videoRef.current.src = streamUrl;
+        videoRef.current.src = currentStreamUrl;
         return;
       }
-      
+
       // Clean up existing instance
       if (hlsRef.current) {
+        console.log('🧹 Cleaning up existing HLS instance');
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
-      
+
       // Create optimized HLS instance
       const hls = new Hls({
         debug: false,
@@ -719,18 +726,18 @@ const FuturisticMediaPlayerCore = ({
           xhr.withCredentials = false;
         }
       });
-      
+
       hlsRef.current = hls;
-      
+
       // **CRITICAL FIX 6: Protected HLS MANIFEST_PARSED Handler**
       hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         console.log('📊 HLS MANIFEST_PARSED: Starting playback start protection');
-        
+
         // **ENABLE PLAYBACK START PROTECTION**
         startPlaybackProtection();
-        
+
         console.log('📊 HLS manifest parsed, quality levels:', data.levels.map(l => `${l.height}p`));
-        
+
         // Update available qualities
         const hlsQualities = data.levels.map((level, index) => ({
           id: index.toString(),
@@ -738,7 +745,7 @@ const FuturisticMediaPlayerCore = ({
           height: level.height,
           bitrate: level.bitrate
         }));
-        
+
         setAdvancedState(prev => ({
           ...prev,
           qualities: [
@@ -746,7 +753,7 @@ const FuturisticMediaPlayerCore = ({
             ...hlsQualities
           ]
         }));
-        
+
         // **DELAYED PLAYBACK START WITH PROTECTION**
         setTimeout(() => {
           // Check for resume dialog before auto-play
@@ -768,14 +775,14 @@ const FuturisticMediaPlayerCore = ({
           }
         }, 50); // Small delay to ensure HLS is fully ready
       });
-      
+
       hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
         console.log(`📺 Quality switched to: ${hls.levels[data.level].height}p`);
       });
-      
+
       hls.on(Hls.Events.ERROR, (event, data) => {
         console.error('HLS Error:', data);
-        
+
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
@@ -791,22 +798,23 @@ const FuturisticMediaPlayerCore = ({
               hls.destroy();
               hlsRef.current = null;
               // Fallback to native playback
-              videoRef.current.src = streamUrl;
+              videoRef.current.src = currentStreamUrl;
               break;
           }
         }
       });
-      
+
       // Load source and attach to video
-      hls.loadSource(streamUrl);
+      console.log('🎬 HLS: Loading source and attaching to video');
+      hls.loadSource(currentStreamUrl);
       hls.attachMedia(videoRef.current);
-      
+
     } catch (error) {
       console.error('HLS.js loading error:', error);
       // Fallback to native playback
-      videoRef.current.src = streamUrl;
+      videoRef.current.src = currentStreamUrl;
     }
-  }, [streamUrl, streamType]);
+  }, [streamUrl, streamType, startPlaybackProtection, shouldShowResume, resumeDialogVisible, setAdvancedState, forceStateSync]);
 
   // Set quality handler
   const setQuality = useCallback((qualityId) => {
@@ -1108,14 +1116,17 @@ const FuturisticMediaPlayerCore = ({
         if (currentStreamType === 'hls') {
           // For HLS, we need to be more careful about cleanup
           if (hlsRef.current) {
+            console.log('🧹 Cleaning up existing HLS instance before loading new stream');
             hlsRef.current.destroy();
             hlsRef.current = null;
           }
 
-          // Load HLS with error handling
-          await loadHLS();
+          // Load HLS with current stream parameters
+          console.log('🎬 Calling loadHLS with current parameters');
+          await loadHLS(currentStreamUrl, currentStreamType);
         } else {
           // For direct streams, set src and load
+          console.log('🎬 Loading direct stream:', currentStreamUrl.substring(0, 80) + '...');
           currentVideoRef.src = currentStreamUrl;
           currentVideoRef.load();
 
@@ -1123,6 +1134,8 @@ const FuturisticMediaPlayerCore = ({
           setTimeout(() => {
             if (currentVideoRef && !currentVideoRef.paused) {
               console.log('✅ Direct stream loaded and playing');
+            } else if (currentVideoRef) {
+              console.log('⏸️ Direct stream loaded but not playing (autoplay prevented)');
             }
           }, 1000);
         }

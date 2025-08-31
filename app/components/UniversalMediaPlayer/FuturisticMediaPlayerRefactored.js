@@ -55,6 +55,113 @@ const FuturisticMediaPlayerRefactored = ({
   adaptiveQuality = true,
   collaborativeMode = false
 }) => {
+  console.log('🎬 FUTURISTIC PLAYER: Component rendered with props:', {
+    mediaType,
+    movieId,
+    seasonId,
+    episodeId,
+    episodeData: !!episodeData
+  });
+
+  // EMERGENCY DEBUG: Add element BEFORE hooks - no variables yet
+  if (typeof window !== 'undefined' && !document.getElementById('emergency-debug-pre-hooks')) {
+    const emergencyDiv = document.createElement('div');
+    emergencyDiv.id = 'emergency-debug-pre-hooks';
+    emergencyDiv.style.cssText = `
+      position: fixed;
+      top: 100px;
+      left: 10px;
+      background: orange;
+      color: black;
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      z-index: 10001;
+      border: 4px solid red;
+      max-width: 300px;
+    `;
+    emergencyDiv.innerHTML = `
+      🚨 EMERGENCY DEBUG<br>
+      Component STARTED<br>
+      Time: ${new Date().toLocaleTimeString()}<br>
+      Hooks not called yet
+    `;
+    document.body.appendChild(emergencyDiv);
+  }
+
+  // FORCE VISUAL DEBUG - Add to document body if component mounts
+  React.useEffect(() => {
+    console.log('🎬 FUTURISTIC PLAYER: Component mounted successfully');
+    const debugDiv = document.createElement('div');
+    debugDiv.id = 'force-debug-component-mounted';
+    debugDiv.style.cssText = `
+      position: fixed;
+      top: 5px;
+      right: 5px;
+      background: magenta;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 14px;
+      font-weight: bold;
+      z-index: 10000;
+      border: 3px solid cyan;
+    `;
+    debugDiv.textContent = '🎬 COMPONENT MOUNTED';
+    document.body.appendChild(debugDiv);
+
+    return () => {
+      console.log('🎬 FUTURISTIC PLAYER: Component unmounting');
+      const existing = document.getElementById('force-debug-component-mounted');
+      if (existing) {
+        document.body.removeChild(existing);
+      }
+    };
+  }, []);
+
+  // Add global debug function for console access
+  if (typeof window !== 'undefined') {
+    window.debugVideoPlayer = () => {
+      console.log('🎬 GLOBAL DEBUG: Video Player State');
+      console.log('Stream URL:', streamUrl);
+      console.log('Stream Loading:', streamLoading);
+      console.log('Stream Error:', streamError);
+      console.log('Player State:', playerState);
+      console.log('Video Element:', videoRef.current);
+
+      if (videoRef.current) {
+        console.log('Video Element Details:', {
+          src: videoRef.current.src,
+          currentSrc: videoRef.current.currentSrc,
+          readyState: videoRef.current.readyState,
+          networkState: videoRef.current.networkState,
+          error: videoRef.current.error,
+          computedStyle: {
+            display: window.getComputedStyle(videoRef.current).display,
+            visibility: window.getComputedStyle(videoRef.current).visibility,
+            opacity: window.getComputedStyle(videoRef.current).opacity,
+            zIndex: window.getComputedStyle(videoRef.current).zIndex
+          }
+        });
+      }
+      return 'Debug info logged to console';
+    };
+
+    // FORCE STREAM URL UPDATE - Emergency fix
+    window.forceStreamUpdate = () => {
+      console.log('🎬 FORCE UPDATE: Manually setting stream URL');
+      // This will be called from the useEffect when streamUrl becomes available
+      if (streamUrl && !streamLoading) {
+        console.log('🎬 FORCE UPDATE: Stream URL is available, forcing re-render');
+        // Force a state update to trigger re-render
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+      }
+      return 'Force update attempted';
+    };
+  }
   // Parse season/episode IDs
   const parseIds = useMemo(() => {
     if (!seasonId || !episodeId) return { seasonNumber: null, episodeNumber: null };
@@ -71,6 +178,19 @@ const FuturisticMediaPlayerRefactored = ({
   }, [seasonId, episodeId]);
 
   // Stream extraction and management
+  const shouldFetchStream = !!(movieId && (mediaType !== 'tv' || (seasonId && episodeId)));
+
+  console.log('🎬 FUTURISTIC PLAYER: useStream parameters', {
+    mediaType,
+    movieId,
+    seasonId,
+    episodeId,
+    shouldFetchStream,
+    movieIdType: typeof movieId,
+    seasonIdType: typeof seasonId,
+    episodeIdType: typeof episodeId
+  });
+
   const {
     streamUrl,
     streamType,
@@ -84,21 +204,68 @@ const FuturisticMediaPlayerRefactored = ({
     movieId,
     seasonId,
     episodeId,
-    shouldFetch: !!(movieId && (mediaType !== 'tv' || (seasonId && episodeId)))
+    shouldFetch: shouldFetchStream
   });
 
-  // Media player core functionality
-  const {
-    videoRef,
-    playerState,
-    playerActions,
-    isRecovering,
-    retryCount,
-    resetErrorRecovery,
-    forceStateSync
-  } = useMediaPlayer({
-    streamUrl,
-    streamType,
+  // Log stream extraction results - only when streamUrl changes to avoid spam
+  React.useEffect(() => {
+    if (streamUrl) {
+      console.log('🎬 FUTURISTIC PLAYER: Stream URL received', {
+        streamUrl: streamUrl.substring(0, 100) + '...',
+        streamType,
+        streamLoading,
+        streamError
+      });
+    }
+  }, [streamUrl, streamType, streamLoading, streamError]);
+
+  // EMERGENCY DEBUG: Add element AFTER hooks - with actual values
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && !document.getElementById('emergency-debug-post-hooks')) {
+      const emergencyDiv = document.createElement('div');
+      emergencyDiv.id = 'emergency-debug-post-hooks';
+      emergencyDiv.style.cssText = `
+        position: fixed;
+        top: 200px;
+        left: 10px;
+        background: purple;
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        z-index: 10001;
+        border: 4px solid yellow;
+        max-width: 300px;
+      `;
+      emergencyDiv.innerHTML = `
+        🚨 POST-HOOKS DEBUG<br>
+        Hooks executed<br>
+        Stream URL: ${streamUrl ? 'YES' : 'NO'}<br>
+        Loading: ${streamLoading ? 'YES' : 'NO'}<br>
+        Error: ${streamError ? 'YES' : 'NO'}<br>
+        URL Length: ${streamUrl ? streamUrl.length : 0}
+      `;
+      document.body.appendChild(emergencyDiv);
+    }
+
+    // Update existing element
+    const existing = document.getElementById('emergency-debug-post-hooks');
+    if (existing) {
+      existing.innerHTML = `
+        🚨 POST-HOOKS DEBUG<br>
+        Hooks executed<br>
+        Stream URL: ${streamUrl ? 'YES' : 'NO'}<br>
+        Loading: ${streamLoading ? 'YES' : 'NO'}<br>
+        Error: ${streamError ? 'YES' : 'NO'}<br>
+        URL Length: ${streamUrl ? streamUrl.length : 0}<br>
+        Time: ${new Date().toLocaleTimeString()}
+      `;
+    }
+  }, [streamUrl, streamLoading, streamError]);
+
+  // Media player callback functions - wrapped in useCallback to prevent re-renders
+  const mediaPlayerCallbacks = useMemo(() => ({
     onError: (error) => {
       console.error('Media player error:', error);
     },
@@ -132,6 +299,21 @@ const FuturisticMediaPlayerRefactored = ({
     onLoadProgress: () => {
       console.log('Media player: load progress');
     }
+  }), []); // Empty dependency array - these callbacks never change
+
+  // Media player core functionality
+  const {
+    videoRef,
+    playerState,
+    playerActions,
+    isRecovering,
+    retryCount,
+    resetErrorRecovery,
+    forceStateSync
+  } = useMediaPlayer({
+    streamUrl,
+    streamType,
+    ...mediaPlayerCallbacks
   });
 
   // UI state management
@@ -368,8 +550,21 @@ const FuturisticMediaPlayerRefactored = ({
     }
   }, [playerState.duration, shouldShowResume, uiState.resumeDialogVisible, showResumeDialog]);
 
-  // Render loading state
-  if (streamLoading && !streamUrl) {
+  // EMERGENCY FIX: Force main render if we have any stream data or if loading is complete
+  const shouldShowMainRender = streamUrl || !streamLoading || streamError;
+
+  console.log('🎬 FUTURISTIC PLAYER: Conditional rendering check', {
+    streamUrl: streamUrl,
+    streamUrlType: typeof streamUrl,
+    streamUrlLength: streamUrl?.length,
+    streamLoading,
+    streamError,
+    shouldShowMainRender,
+    forceMainRender: shouldShowMainRender
+  });
+
+  if (!shouldShowMainRender) {
+    console.log('🎬 FUTURISTIC PLAYER: RETURNING LOADING STATE (EMERGENCY FIX ACTIVE)');
     return (
       <div className={styles.playerContainer}>
         <AdaptiveLoading
@@ -378,9 +573,24 @@ const FuturisticMediaPlayerRefactored = ({
           enableParticles={enableAdvancedFeatures}
           theme={theme}
         />
+        {/* Emergency debug info */}
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '20px',
+          background: 'red',
+          color: 'white',
+          padding: '10px',
+          borderRadius: '5px',
+          fontSize: '12px'
+        }}>
+          EMERGENCY: Stream URL: {streamUrl ? 'YES' : 'NO'} | Loading: {streamLoading ? 'YES' : 'NO'}
+        </div>
       </div>
     );
   }
+
+  console.log('🎬 FUTURISTIC PLAYER: PROCEEDING TO MAIN RENDER (EMERGENCY FIX SUCCESSFUL)');
 
   // Render error state
   if (streamError || playerState.hasError) {
@@ -407,6 +617,26 @@ const FuturisticMediaPlayerRefactored = ({
   }
 
   // Main render
+  console.log('🎬 FUTURISTIC PLAYER: Main render starting', {
+    streamUrl: streamUrl ? streamUrl.substring(0, 100) + '...' : null,
+    streamLoading,
+    streamError,
+    playerState,
+    isRecovering,
+    shouldRenderVideo: !streamLoading || streamUrl,
+    timestamp: new Date().toISOString()
+  });
+
+  // FORCE RENDER DEBUG - Add visible debug overlay
+  const debugInfo = {
+    streamUrl: !!streamUrl,
+    streamLoading,
+    streamError: !!streamError,
+    renderTime: new Date().toLocaleTimeString(),
+    componentId: Math.random().toString(36).substr(2, 9),
+    videoElementReady: !!videoRef.current
+  };
+
   return (
     <div
       ref={containerRef}
@@ -416,6 +646,32 @@ const FuturisticMediaPlayerRefactored = ({
       onMouseMove={showUI}
       onMouseLeave={hideUI}
     >
+      {/* FORCE DEBUG OVERLAY - Always visible */}
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        left: '10px',
+        background: 'rgba(255, 0, 0, 0.9)',
+        color: 'white',
+        padding: '10px',
+        borderRadius: '8px',
+        fontSize: '12px',
+        fontFamily: 'monospace',
+        zIndex: 9999,
+        maxWidth: '400px',
+        border: '2px solid yellow'
+      }}>
+        <div><strong>🎬 DEBUG OVERLAY</strong></div>
+        <div>Stream URL: {streamUrl ? '✅ YES' : '❌ NO'}</div>
+        <div>Stream Loading: {streamLoading ? '⏳ YES' : '✅ NO'}</div>
+        <div>Stream Error: {streamError ? '❌ YES' : '✅ NO'}</div>
+        <div>Render Time: {new Date().toLocaleTimeString()}</div>
+        <div>Component ID: {debugInfo.componentId}</div>
+        <div>Video Ready: {debugInfo.videoElementReady ? '✅ YES' : '❌ NO'}</div>
+        <div>Player State: {playerState.isPlaying ? '▶️ PLAYING' : '⏸️ PAUSED'}</div>
+        <div>Video SRC: {videoRef.current?.src ? '✅ HAS URL' : '❌ NO URL'}</div>
+        <div>SRC Length: {videoRef.current?.src?.length || 0}</div>
+      </div>
       {/* Ambient Lighting System */}
       <AnimatePresence>
         {ambientLighting && enableAdvancedFeatures && (
@@ -429,8 +685,72 @@ const FuturisticMediaPlayerRefactored = ({
       </AnimatePresence>
 
       {/* Main Video Element */}
+      {console.log('🎬 FUTURISTIC PLAYER: About to render video element')}
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        background: 'lime',
+        color: 'black',
+        padding: '20px',
+        borderRadius: '10px',
+        fontSize: '24px',
+        fontWeight: 'bold',
+        zIndex: 9998,
+        border: '4px solid black'
+      }}>
+        🎬 VIDEO ELEMENT SHOULD BE HERE
+        <br />
+        <small>Stream URL: {streamUrl ? '✅ Available' : '❌ Missing'}</small>
+        <br />
+        <small>Loading: {streamLoading ? '⏳ Active' : '✅ Complete'}</small>
+      </div>
       <video
-        ref={videoRef}
+        ref={(el) => {
+          console.log('🎬 VIDEO ELEMENT: ref callback called', {
+            element: el,
+            elementExists: !!el,
+            elementInDOM: el ? document.contains(el) : false,
+            parentElement: el?.parentElement?.tagName,
+            videoRef: videoRef.current
+          });
+          if (videoRef.current !== el) {
+            console.log('🎬 VIDEO ELEMENT: ref changed', {
+              from: videoRef.current,
+              to: el
+            });
+          }
+          videoRef.current = el;
+
+          // Debug the video element immediately after ref is set
+          if (el) {
+            setTimeout(() => {
+              console.log('🎬 VIDEO ELEMENT: Post-render debug', {
+                src: el.src,
+                currentSrc: el.currentSrc,
+                readyState: el.readyState,
+                networkState: el.networkState,
+                error: el.error,
+                videoWidth: el.videoWidth,
+                videoHeight: el.videoHeight,
+                duration: el.duration,
+                paused: el.paused,
+                ended: el.ended,
+                muted: el.muted,
+                volume: el.volume,
+                computedStyle: {
+                  display: window.getComputedStyle(el).display,
+                  visibility: window.getComputedStyle(el).visibility,
+                  opacity: window.getComputedStyle(el).opacity,
+                  width: window.getComputedStyle(el).width,
+                  height: window.getComputedStyle(el).height,
+                  zIndex: window.getComputedStyle(el).zIndex
+                }
+              });
+            }, 100);
+          }
+        }}
         className={styles.videoElement}
         autoPlay
         playsInline
@@ -438,6 +758,27 @@ const FuturisticMediaPlayerRefactored = ({
         crossOrigin="anonymous"
         controls={false}
         data-testid="futuristic-video-player"
+        style={{
+          width: '100%',
+          height: '100%',
+          background: 'red', // Make it visible for debugging
+          border: '2px solid yellow',
+          opacity: 1, // Ensure it's visible
+          visibility: 'visible',
+          display: 'block',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          zIndex: 100
+        }}
+        onLoadStart={() => console.log('🎬 VIDEO ELEMENT: loadstart fired')}
+        onLoadedMetadata={() => console.log('🎬 VIDEO ELEMENT: loadedmetadata fired')}
+        onError={(e) => console.log('🎬 VIDEO ELEMENT: error fired', e)}
+        onCanPlay={() => console.log('🎬 VIDEO ELEMENT: canplay fired')}
+        onPlay={() => console.log('🎬 VIDEO ELEMENT: play event fired')}
+        onPause={() => console.log('🎬 VIDEO ELEMENT: pause event fired')}
+        onWaiting={() => console.log('🎬 VIDEO ELEMENT: waiting event fired')}
+        onStalled={() => console.log('🎬 VIDEO ELEMENT: stalled event fired')}
       />
 
       {/* Intelligent Subtitles */}
@@ -646,6 +987,144 @@ const FuturisticMediaPlayerRefactored = ({
           </motion.button>
         )}
       </AnimatePresence>
+
+      {/* Debug Test Button - Always visible for debugging */}
+      <motion.button
+        initial={{ opacity: 0, x: 50 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 50 }}
+        onClick={() => {
+          console.log('🎬 DEBUG: Manual test button clicked');
+          console.log('🎬 DEBUG: Current UI state:', uiState);
+          console.log('🎬 DEBUG: Current player state:', playerState);
+          if (videoRef.current) {
+            console.log('🎬 DEBUG: Video element exists, current state:', {
+              src: videoRef.current.src,
+              currentSrc: videoRef.current.currentSrc,
+              readyState: videoRef.current.readyState,
+              networkState: videoRef.current.networkState,
+              currentTime: videoRef.current.currentTime,
+              duration: videoRef.current.duration,
+              paused: videoRef.current.paused,
+              error: videoRef.current.error,
+              videoWidth: videoRef.current.videoWidth,
+              videoHeight: videoRef.current.videoHeight
+            });
+
+            // Test 1: Try to set a simple test video
+            console.log('🎬 DEBUG: Setting test video source...');
+            videoRef.current.src = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+            videoRef.current.load();
+
+            // Test 2: Try to manually trigger play after a delay
+            setTimeout(() => {
+              videoRef.current.play().then(() => {
+                console.log('🎬 DEBUG: Test video play successful');
+              }).catch((error) => {
+                console.error('🎬 DEBUG: Test video play failed:', error);
+              });
+            }, 2000);
+          } else {
+            console.error('🎬 DEBUG: Video element does not exist');
+          }
+        }}
+        style={{
+          position: 'fixed',
+          top: '5rem',
+          right: '2rem',
+          zIndex: 1000, // Higher z-index
+          background: 'red',
+          border: '2px solid white',
+          borderRadius: '12px',
+          padding: '8px 12px',
+          color: 'white',
+          fontSize: '12px',
+          cursor: 'pointer',
+          fontWeight: 'bold'
+        }}
+      >
+        TEST VIDEO
+      </motion.button>
+
+      {/* Second Debug Button - Force Stream Load */}
+      <motion.button
+        initial={{ opacity: 0, x: 50 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 50 }}
+        onClick={() => {
+          console.log('🎬 DEBUG: Force stream load clicked');
+          if (videoRef.current && streamUrl) {
+            console.log('🎬 DEBUG: Forcing stream URL:', streamUrl.substring(0, 100) + '...');
+            videoRef.current.src = streamUrl;
+            videoRef.current.load();
+            setTimeout(() => {
+              videoRef.current.play().catch(e => console.error('Force play failed:', e));
+            }, 1000);
+          } else {
+            console.error('🎬 DEBUG: No video element or stream URL', { hasVideo: !!videoRef.current, hasStream: !!streamUrl });
+          }
+        }}
+        style={{
+          position: 'fixed',
+          top: '8rem',
+          right: '2rem',
+          zIndex: 1000,
+          background: 'blue',
+          border: '2px solid white',
+          borderRadius: '12px',
+          padding: '8px 12px',
+          color: 'white',
+          fontSize: '12px',
+          cursor: 'pointer',
+          fontWeight: 'bold'
+        }}
+      >
+        FORCE STREAM
+      </motion.button>
+
+      {/* Third Debug Button - Manual Stream Extraction */}
+      <motion.button
+        initial={{ opacity: 0, x: 50 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 50 }}
+        onClick={() => {
+          console.log('🎬 DEBUG: Manual stream extraction clicked');
+          console.log('🎬 DEBUG: Current parameters:', {
+            mediaType,
+            movieId,
+            seasonId,
+            episodeId,
+            shouldFetchStream
+          });
+
+          // Try to manually trigger extraction
+          if (window.debugVideoPlayer) {
+            window.debugVideoPlayer();
+          }
+
+          // Force retry extraction
+          if (retryExtraction) {
+            console.log('🎬 DEBUG: Calling retryExtraction');
+            retryExtraction();
+          }
+        }}
+        style={{
+          position: 'fixed',
+          top: '10rem',
+          right: '2rem',
+          zIndex: 1000,
+          background: 'green',
+          border: '2px solid white',
+          borderRadius: '12px',
+          padding: '8px 12px',
+          color: 'white',
+          fontSize: '12px',
+          cursor: 'pointer',
+          fontWeight: 'bold'
+        }}
+      >
+        EXTRACT STREAM
+      </motion.button>
 
       {/* Resume Dialog */}
       <ResumeDialog

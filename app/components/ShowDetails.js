@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useEffect, useState } from "react";
-import UniversalMediaPlayer from "./UniversalMediaPlayer"; // Import the new UniversalMediaPlayer component
+import React, { useEffect, useState, useRef } from "react";
+import SimpleVideoPlayer from "./SimpleVideoPlayer"; // Import the simple video player
 import Recommendations from "./Recommendations"; // Import the Recommendations component
 import WatchProgressIndicator, { EpisodeProgressOverlay, ShowProgressSummary } from "./UniversalMediaPlayer/components/WatchProgressIndicator";
 import { getWatchProgress, getShowProgress } from "./UniversalMediaPlayer/utils/watchProgressStorage";
@@ -33,7 +33,11 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
   // Notify parent when media player state changes
   useEffect(() => {
     if (onMediaPlayerStateChange) {
-      onMediaPlayerStateChange(shouldShowPlayer());
+      // Calculate player state directly instead of using shouldShowPlayer function
+      const isPlayerActive = movieId.media_type === "movie"
+        ? selectedEpisode || isLaunching
+        : selectedEpisode !== null;
+      onMediaPlayerStateChange(isPlayerActive);
     }
   }, [selectedEpisode, isLaunching, movieId.media_type, onMediaPlayerStateChange]);
 
@@ -230,14 +234,32 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
     };
   };
 
+  // Use refs to track previous values and prevent unnecessary resets
+  const prevMovieIdRef = useRef(movieId?.id);
+  const prevMediaTypeRef = useRef(movieId?.media_type);
+
   // FIXED: Reset state when movieId changes (switching between different media)
+  // Only reset if we're actually switching to a different media item
   useEffect(() => {
-    console.log('🔄 MovieId changed - resetting all state');
-    setSelectedEpisode(null);
-    setIsLaunching(false);
-    setSelectedSeason(0);
-    setEpisodeLoading(false);
-  }, [movieId.id, movieId.media_type]);
+    const currentId = movieId?.id;
+    const currentType = movieId?.media_type;
+
+    if (prevMovieIdRef.current !== currentId || prevMediaTypeRef.current !== currentType) {
+      console.log('🔄 MovieId changed - resetting all state', {
+        from: { id: prevMovieIdRef.current, type: prevMediaTypeRef.current },
+        to: { id: currentId, type: currentType }
+      });
+
+      setSelectedEpisode(null);
+      setIsLaunching(false);
+      setSelectedSeason(0);
+      setEpisodeLoading(false);
+
+      // Update refs
+      prevMovieIdRef.current = currentId;
+      prevMediaTypeRef.current = currentType;
+    }
+  }, [movieId?.id, movieId?.media_type]);
 
   // Helper function to get episode progress
   const getEpisodeProgress = (seasonNumber, episodeNumber) => {
@@ -263,13 +285,12 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
     if (movieId.media_type === "movie") {
       // For movies, we don't need season/episode info
       return (
-        <UniversalMediaPlayer
+        <SimpleVideoPlayer
           mediaType="movie"
           movieId={movieId.id}
           seasonId={null}
           episodeId={null}
           onBackToShowDetails={handleBackFromMediaPlayer}
-          onEpisodeChange={handleEpisodeChange}
         />
       );
     } else if (movieId.media_type === "tv") {
@@ -285,14 +306,12 @@ const ShowDetails = ({ movieId, clearMovie, onMediaPlayerStateChange }) => {
       });
       
       return (
-        <UniversalMediaPlayer
+        <SimpleVideoPlayer
           mediaType={movieId.media_type}
           movieId={movieId.id}
           seasonId={actualSeasonNumber} // Use actual season number (0 for Specials, 1+ for regular seasons)
           episodeId={selectedEpisode.episode_number}
-          episodeData={createEpisodeDataForPlayer()} // NEW: Pass structured episode data
           onBackToShowDetails={handleBackFromMediaPlayer}
-          onEpisodeChange={handleEpisodeChange}
         />
       );
     }
