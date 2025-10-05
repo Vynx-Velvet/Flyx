@@ -2,6 +2,8 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSimpleSubtitles } from './SimpleVideoPlayer/hooks/useSimpleSubtitles';
+import SubtitleControls from './SimpleVideoPlayer/components/SubtitleControls';
 
 /**
  * Enhanced SimpleVideoPlayer - Fixed Core + Modern UI
@@ -35,6 +37,7 @@ const SimpleVideoPlayer = ({
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mediaDetails, setMediaDetails] = useState(null);
   
   // Enhanced features
   const [showEpisodeCarousel, setShowEpisodeCarousel] = useState(false);
@@ -47,10 +50,45 @@ const SimpleVideoPlayer = ({
   const [currentSeasonId, setCurrentSeasonId] = useState(seasonId);
   const [currentEpisodeId, setCurrentEpisodeId] = useState(episodeId);
 
+  // Subtitle functionality
+  const subtitleHook = useSimpleSubtitles({
+    imdbId: mediaDetails?.imdb_id,
+    season: mediaType === 'tv' ? currentSeasonId : null,
+    episode: mediaType === 'tv' ? currentEpisodeId : null,
+    videoRef,
+    enabled: true
+  });
+
   // Update current episode ID when props change
   useEffect(() => {
     setCurrentEpisodeId(episodeId);
   }, [episodeId]);
+
+  // Fetch media details for subtitle functionality
+  useEffect(() => {
+    const fetchMediaDetails = async () => {
+      if (!movieId) return;
+
+      try {
+        const action = mediaType === 'tv' ? 'getShowDetails' : 'getMovieDetails';
+        const response = await fetch(`/api/tmdb?action=${action}&movieId=${movieId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setMediaDetails(data);
+          console.log('📺 Media details loaded for subtitles:', {
+            title: data.title || data.name,
+            imdbId: data.imdb_id,
+            mediaType
+          });
+        }
+      } catch (err) {
+        console.warn('⚠️ Failed to fetch media details for subtitles:', err);
+      }
+    };
+
+    fetchMediaDetails();
+  }, [movieId, mediaType]);
 
   // CORE FUNCTIONALITY - Keep original working stream extraction
   useEffect(() => {
@@ -1279,6 +1317,23 @@ const SimpleVideoPlayer = ({
 
               {/* Right Controls */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                {/* Subtitle Controls */}
+                <SubtitleControls
+                  subtitles={subtitleHook.subtitles}
+                  availableLanguages={subtitleHook.availableLanguages}
+                  activeSubtitle={subtitleHook.activeSubtitle}
+                  subtitlesVisible={subtitleHook.subtitlesVisible}
+                  fontSize={subtitleHook.fontSize}
+                  fontColor={subtitleHook.fontColor}
+                  backgroundColor={subtitleHook.backgroundColor}
+                  position={subtitleHook.position}
+                  onSelectSubtitle={subtitleHook.selectSubtitle}
+                  onToggleSubtitles={subtitleHook.toggleSubtitles}
+                  onUpdateStyle={subtitleHook.updateSubtitleStyle}
+                  loading={subtitleHook.loading}
+                  hasSubtitles={subtitleHook.hasSubtitles}
+                />
+
                 {/* Episode List Button */}
                 {(mediaType === 'tv' || episodes.length > 0) && (
                   <motion.button
@@ -1346,7 +1401,7 @@ const SimpleVideoPlayer = ({
         )}
       </AnimatePresence>
 
-      {/* Add CSS for volume slider styling */}
+      {/* Add CSS for volume slider and subtitle styling */}
       <style jsx>{`
         /* Volume slider debugging - Check if these styles are being applied */
         input[type="range"] {
@@ -1393,6 +1448,48 @@ const SimpleVideoPlayer = ({
           height: 6px !important;
           border-radius: 3px !important;
           border: 1px solid rgba(0, 245, 255, 0.2) !important;
+        }
+
+        /* Custom subtitle styling */
+        video::cue {
+          font-family: 'Arial', sans-serif !important;
+          font-size: ${subtitleHook.fontSize}px !important;
+          color: ${subtitleHook.fontColor} !important;
+          background-color: ${subtitleHook.backgroundColor} !important;
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8) !important;
+          padding: 4px 8px !important;
+          border-radius: 4px !important;
+          line-height: 1.4 !important;
+          text-align: center !important;
+        }
+
+        video::cue(.bottom) {
+          position: absolute !important;
+          bottom: 10% !important;
+        }
+
+        video::cue(.top) {
+          position: absolute !important;
+          top: 10% !important;
+        }
+
+        video::cue(.center) {
+          position: absolute !important;
+          top: 50% !important;
+          transform: translateY(-50%) !important;
+        }
+
+        /* WebKit specific subtitle styling */
+        video::-webkit-media-text-track-display {
+          font-family: 'Arial', sans-serif !important;
+          font-size: ${subtitleHook.fontSize}px !important;
+          color: ${subtitleHook.fontColor} !important;
+          background-color: ${subtitleHook.backgroundColor} !important;
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8) !important;
+          padding: 4px 8px !important;
+          border-radius: 4px !important;
+          line-height: 1.4 !important;
+          text-align: center !important;
         }
       `}</style>
     </div>
