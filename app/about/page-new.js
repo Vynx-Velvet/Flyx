@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
-import styles from './page.module.css';
+import styles from './page-new.module.css';
 
 const AboutPage = () => {
   const [activeSection, setActiveSection] = useState('hero');

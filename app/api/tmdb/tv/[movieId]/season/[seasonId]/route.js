@@ -13,7 +13,7 @@ export async function GET(request, { params }) {
   const { movieId, seasonId } = params;
 
   try {
-    console.log('📺 Fetching season details for episode navigation:', { movieId, seasonId });
+    // Silent operation - only log errors
     
     const seasonResponse = await fetch(
       `https://api.themoviedb.org/3/tv/${movieId}/season/${seasonId}?language=en-US`, 
@@ -30,9 +30,8 @@ export async function GET(request, { params }) {
     return NextResponse.json(seasonData);
     
   } catch (error) {
-    console.error('❌ Error fetching season details:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch season details' }, 
+      { error: 'Failed to fetch season details' },
       { status: 500 }
     );
   }

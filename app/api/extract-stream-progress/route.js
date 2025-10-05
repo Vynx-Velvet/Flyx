@@ -38,14 +38,14 @@ function generateRequestId() {
 // Build bulletproof extractor URL with query parameters
 function buildBulletproofUrl(searchParams, logger) {
   const bulletproofUrl = new URL(`${BULLETPROOF_EXTRACTOR_URL}/api/extract/bulletproof`);
-  
+
   // Map parameters to Bulletproof extractor format
   const movieId = searchParams.get('movieId');
   const mediaType = searchParams.get('mediaType');
   const seasonId = searchParams.get('seasonId');
   const episodeId = searchParams.get('episodeId');
   const server = searchParams.get('server');
-  
+
   if (movieId) bulletproofUrl.searchParams.set('tmdbId', movieId);
   if (mediaType) bulletproofUrl.searchParams.set('mediaType', mediaType);
   if (mediaType === 'tv' && seasonId) bulletproofUrl.searchParams.set('season', seasonId);
@@ -75,14 +75,14 @@ export async function GET(request) {
     nextPublicVmUrl: process.env.NEXT_PUBLIC_VM_EXTRACTION_URL || 'NOT_SET',
     bulletproofUrl: BULLETPROOF_EXTRACTOR_URL
   });
-  
+
   // Force console output to appear in Vercel logs
   console.log(`🔥 [${requestId}] EXTRACTION REQUEST STARTING - VM_URL: ${BULLETPROOF_EXTRACTOR_URL}`);
 
   try {
     // Parse parameters
     const { searchParams } = new URL(request.url);
-    
+
     // Use bulletproof extractor for all requests
     return await callBulletproofExtractor(request, searchParams, logger, requestId);
   } catch (error) {
@@ -149,7 +149,7 @@ async function callBulletproofExtractor(request, searchParams, logger, requestId
 
     // Parse extractor response
     const extractorData = await bulletproofResponse.json();
-    
+
     logger.info('Extractor response received', {
       success: extractorData.success,
       hasUrl: !!extractorData.data?.url,

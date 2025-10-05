@@ -1,55 +1,42 @@
 # Flyx API Endpoints
 
-## Stream Extraction API (`/api/extract-stream`)
+## Stream Extraction API (`/api/extract-shadowlands`)
 
-Extracts stream URLs from embed.su and other streaming sources using Playwright automation.
+Extracts stream URLs from VidSrc.xyz using direct HTTP requests through the Shadowlands chain.
 
 ### Usage
 
-#### For Movies (embed.su default)
+#### For Movies
 ```javascript
-// Using embed.su with movie ID
-const response = await fetch('/api/extract-stream?mediaType=movie&movieId=12345');
-
-// Or with direct URL
-const response = await fetch('/api/extract-stream?url=https://embed.su/embed/movie/12345');
+const response = await fetch('/api/extract-shadowlands?tmdbId=12345');
 ```
 
-#### For TV Shows (embed.su default)
+#### For TV Shows
 ```javascript
-// Using embed.su with TV show parameters
-const response = await fetch('/api/extract-stream?mediaType=tv&movieId=12345&seasonId=1&episodeId=1');
-
-// Or with direct URL
-const response = await fetch('/api/extract-stream?url=https://embed.su/embed/tv/12345/1/1');
+const response = await fetch('/api/extract-shadowlands?tmdbId=12345&season=1&episode=1');
 ```
 
 ### Parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `url` | string | No* | Direct embed URL to extract from |
-| `mediaType` | string | No* | Type of media: `movie` or `tv` |
-| `movieId` | string | No* | TMDB movie/show ID |
-| `seasonId` | string | No** | Season number (required for TV shows) |
-| `episodeId` | string | No** | Episode number (required for TV shows) |
+| `tmdbId` | string | Yes | TMDB movie/show ID |
+| `season` | string | No* | Season number (required for TV shows) |
+| `episode` | string | No* | Episode number (required for TV shows) |
 
-*Either `url` OR (`mediaType` + `movieId`) is required
-**Required when `mediaType` is `tv`
+*Required when extracting TV show episodes
 
 ### Response
 
 ```json
 {
   "success": true,
-  "streamUrl": "https://example.com/stream.m3u8",
-  "type": "m3u8",
-  "totalFound": 3,
-  "requestId": "req_1234567890_abc123",
-  "timing": {
-    "totalDuration": 15000,
-    "timestamp": "2024-01-01T12:00:00.000Z"
-  }
+  "streamUrl": "https://tmstr2.shadowlandschronicles.com/stream.m3u8",
+  "streamType": "hls",
+  "server": "shadowlands",
+  "extractionMethod": "direct_http",
+  "requiresProxy": true,
+  "requestId": "shadowlands_1234567890_abc123"
 }
 ```
 
@@ -150,8 +137,8 @@ The MediaPlayer component automatically handles the complete pipeline:
 ```javascript
 async function playMovie(movieId) {
   try {
-    // Step 1: Extract stream URL from embed.su (now default)
-    const extractResponse = await fetch(`/api/extract-stream?mediaType=movie&movieId=${movieId}`);
+    // Step 1: Extract stream URL from Shadowlands
+    const extractResponse = await fetch(`/api/extract-shadowlands?tmdbId=${movieId}`);
     const extractData = await extractResponse.json();
     
     if (!extractData.success) {
@@ -160,13 +147,13 @@ async function playMovie(movieId) {
     
     console.log('Extraction successful:', {
       requestId: extractData.requestId,
-      streamType: extractData.type,
-      totalFound: extractData.totalFound
+      streamType: extractData.streamType,
+      server: extractData.server
     });
     
     // Step 2: Use the proxied stream URL (automatic CORS handling)
     const streamUrl = extractData.streamUrl;
-    const proxiedUrl = `/api/stream-proxy?url=${encodeURIComponent(streamUrl)}`;
+    const proxiedUrl = `/api/stream-proxy?url=${encodeURIComponent(streamUrl)}&source=shadowlands`;
     
     // Step 3: Play in video element
     const video = document.querySelector('video');
@@ -181,7 +168,7 @@ async function playMovie(movieId) {
 async function playTVEpisode(showId, season, episode) {
   try {
     const extractResponse = await fetch(
-      `/api/extract-stream?mediaType=tv&movieId=${showId}&seasonId=${season}&episodeId=${episode}`
+      `/api/extract-shadowlands?tmdbId=${showId}&season=${season}&episode=${episode}`
     );
     const extractData = await extractResponse.json();
     
@@ -189,7 +176,7 @@ async function playTVEpisode(showId, season, episode) {
       throw new Error(extractData.error);
     }
     
-    const proxiedUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}`;
+    const proxiedUrl = `/api/stream-proxy?url=${encodeURIComponent(extractData.streamUrl)}&source=shadowlands`;
     
     const video = document.querySelector('video');
     video.src = proxiedUrl;
@@ -203,33 +190,17 @@ async function playTVEpisode(showId, season, episode) {
 
 ### Frontend Features
 
-- **🎯 embed.su Default**: Automatically uses embed.su as the primary server
-- **🔄 Server Switching**: Users can switch between embed.su and Vidsrc.xyz
-- **⏳ Progressive Loading**: Shows detailed extraction progress with steps
-- **🛠️ Smart Error Handling**: Provides retry and server switching options
+- **🎯 Shadowlands Extraction**: Uses VidSrc.xyz → CloudNestra → ProRCP → Shadowlands chain
+- **⏳ Fast Loading**: Direct HTTP requests without browser automation
+- **🛠️ Smart Error Handling**: Provides retry options and detailed error messages
 - **📱 Responsive Design**: Works on desktop and mobile devices
 - **🔍 Debug Mode**: Shows technical details in development mode
 
 ---
 
-## Testing M3U8 Processing
+## M3U8 Processing
 
-You can test the M3U8 processing functionality using the test endpoint:
-
-```javascript
-// View original M3U8 playlist
-fetch('/api/test-m3u8?mode=original')
-
-// View processed M3U8 with proxied URLs
-fetch('/api/test-m3u8?mode=processed')
-
-// View detailed comparison
-fetch('/api/test-m3u8?mode=comparison')
-  .then(res => res.json())
-  .then(data => console.log(data))
-```
-
-The test uses your exact M3U8 example and shows how URLs are transformed to use the stream proxy.
+M3U8 playlist processing is handled automatically by the stream-proxy when it detects M3U8 content. URLs are rewritten to use the proxy for CORS compliance.
 
 ---
 
@@ -237,8 +208,8 @@ The test uses your exact M3U8 example and shows how URLs are transformed to use 
 
 Both APIs include comprehensive logging with unique request IDs for tracking:
 
-- **Extract Stream**: Logs with prefix `[req_timestamp_id]`
-- **Stream Proxy**: Logs with prefix `[PROXY-proxy_timestamp_id]`
+- **Extract Shadowlands**: Logs with prefix `[shadowlands_timestamp_id]`
+- **Stream Proxy**: Logs with prefix `[proxy_timestamp_id]`
 
 Enable debug logging by setting `NODE_ENV=development` for additional verbose output.
 

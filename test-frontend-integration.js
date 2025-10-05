@@ -8,7 +8,7 @@
 const fetch = require('node-fetch');
 
 // Configuration
-const FRONTEND_API_URL = 'http://localhost:3000/api/extract-stream';
+const FRONTEND_API_URL = 'http://localhost:3000/api/extract-shadowlands';
 const VM_SERVER_URL = 'http://localhost:3001';
 
 // Test parameters
@@ -88,9 +88,9 @@ async function testStreamingAPI() {
   return new Promise((resolve) => {
     try {
       const params = new URLSearchParams(TEST_PARAMS);
-      const streamingUrl = `http://localhost:3000/api/extract-stream-progress?${params}`;
+      const streamingUrl = `http://localhost:3000/api/extract-shadowlands?${params}`;
       
-      console.log('📡 Connecting to streaming endpoint...');
+      console.log('📡 Connecting to extraction endpoint...');
       
       // Note: This is a simplified test - in a real browser environment,
       // you would use EventSource. For Node.js testing, we'll just check
