@@ -226,6 +226,12 @@ const SimpleVideoPlayer = ({
 
   // CORE FUNCTIONALITY - Video setup (original working logic)
   useEffect(() => {
+    console.log('🔍 [DEBUG] Video setup effect triggered:', {
+      hasStreamUrl: !!streamUrl,
+      hasVideoRef: !!videoRef.current,
+      streamUrl: streamUrl ? streamUrl.substring(0, 100) + '...' : null
+    });
+
     if (!streamUrl || !videoRef.current) {
       console.log('⚠️ [DEBUG] Video setup skipped:', {
         hasStreamUrl: !!streamUrl,
@@ -235,7 +241,7 @@ const SimpleVideoPlayer = ({
     }
 
     const video = videoRef.current;
-    console.log('🎬 [DEBUG] Setting up video element with stream URL:', streamUrl);
+    console.log('🎬 [DEBUG] Setting up video element with stream URL:', streamUrl.substring(0, 100) + '...');
 
     const handleLoadedMetadata = () => {
       console.log('✅ [DEBUG] Video metadata loaded:', {
@@ -308,13 +314,32 @@ const SimpleVideoPlayer = ({
     video.addEventListener('volumechange', handleVolumeChange);
     video.addEventListener('error', handleError);
 
-    console.log('🔗 [DEBUG] Setting video src:', streamUrl);
+    console.log('🔗 [DEBUG] Setting video src:', streamUrl.substring(0, 100) + '...');
+    
+    // Set a timeout to clear loading state if video doesn't load within 30 seconds
+    const loadingTimeout = setTimeout(() => {
+      console.error('⏰ [DEBUG] Video loading timeout - forcing loading state to false');
+      setLoading(false);
+      setError('Video loading timeout. The stream may be unavailable.');
+    }, 30000);
+
+    // Clear timeout when video starts playing
+    const clearLoadingTimeout = () => {
+      clearTimeout(loadingTimeout);
+    };
+    video.addEventListener('playing', clearLoadingTimeout);
+    video.addEventListener('canplay', clearLoadingTimeout);
+
     video.src = streamUrl;
 
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       console.log('📱 [DEBUG] Using native HLS support');
       video.load();
-      return;
+      return () => {
+        clearTimeout(loadingTimeout);
+        video.removeEventListener('playing', clearLoadingTimeout);
+        video.removeEventListener('canplay', clearLoadingTimeout);
+      };
     }
 
     const loadHLS = async () => {
@@ -343,6 +368,8 @@ const SimpleVideoPlayer = ({
 
           hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
             console.log('📋 [DEBUG] HLS manifest parsed successfully');
+            // Clear loading state when manifest is parsed
+            setLoading(false);
           });
 
           hls.on(window.Hls.Events.ERROR, (event, data) => {
@@ -353,7 +380,8 @@ const SimpleVideoPlayer = ({
               error: data
             });
             if (data.fatal) {
-              setError('HLS playback error');
+              clearTimeout(loadingTimeout);
+              setError(`HLS playback error: ${data.details || data.type}`);
               setLoading(false);
             }
           });
@@ -373,7 +401,8 @@ const SimpleVideoPlayer = ({
     loadHLS();
 
     return () => {
-      console.log('🧹 [DEBUG] Cleaning up video event listeners');
+      console.log('🧹 [DEBUG] Cleaning up video event listeners and timeout');
+      clearTimeout(loadingTimeout);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('loadstart', handleLoadStart);
