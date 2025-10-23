@@ -790,7 +790,8 @@ const SimpleVideoPlayer = ({
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'contain'
+          objectFit: 'cover',
+          backgroundColor: '#000'
         }}
         controls={false}
         autoPlay
