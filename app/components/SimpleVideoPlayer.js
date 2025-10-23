@@ -790,7 +790,7 @@ const SimpleVideoPlayer = ({
         style={{
           width: '100%',
           height: '100%',
-          objectFit: 'cover',
+          objectFit: isFullscreen ? 'cover' : 'contain',
           backgroundColor: '#000'
         }}
         controls={false}
