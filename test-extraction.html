@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Shadowlands Extraction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 4px;
+            border: 1px solid #444;
+        }
+        input {
+            background: #333;
+            color: #fff;
+            width: 300px;
+        }
+        button {
+            background: #00f5ff;
+            color: #000;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #00d4e6;
+        }
+        .result {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .success {
+            border-left: 4px solid #00ff88;
+        }
+        .error {
+            border-left: 4px solid #ff006e;
+        }
+        .loading {
+            border-left: 4px solid #00f5ff;
+        }
+        video {
+            width: 100%;
+            max-width: 800px;
+            background: #000;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 Shadowlands Extraction Test</h1>
+    
+    <div class="container">
+        <h2>Test Extraction</h2>
+        <div>
+            <label>TMDB ID:</label>
+            <input type="text" id="tmdbId" value="94605" placeholder="e.g., 94605">
+        </div>
+        <div>
+            <label>Season (optional):</label>
+            <input type="text" id="season" value="1" placeholder="e.g., 1">
+        </div>
+        <div>
+            <label>Episode (optional):</label>
+            <input type="text" id="episode" value="1" placeholder="e.g., 1">
+        </div>
+        <button onclick="testExtraction()">🚀 Test Extraction</button>
+        <button onclick="clearResults()">🗑️ Clear</button>
+    </div>
+
+    <div class="container">
+        <h2>Extraction Result</h2>
+        <div id="result" class="result">Click "Test Extraction" to start...</div>
+    </div>
+
+    <div class="container">
+        <h2>Video Player Test</h2>
+        <div id="playerStatus">No stream loaded</div>
+        <video id="videoPlayer" controls></video>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.10/dist/hls.min.js"></script>
+    <script>
+        let currentHls = null;
+
+        async function testExtraction() {
+            const tmdbId = document.getElementById('tmdbId').value;
+            const season = document.getElementById('season').value;
+            const episode = document.getElementById('episode').value;
+            const resultDiv = document.getElementById('result');
+            const playerStatus = document.getElementById('playerStatus');
+
+            if (!tmdbId) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = 'Error: TMDB ID is required';
+                return;
+            }
+
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = 'Loading... Please wait...';
+            playerStatus.textContent = 'Extracting stream...';
+
+            try {
+                // Build URL
+                let url = `/api/extract-shadowlands?tmdbId=${tmdbId}`;
+                if (season && episode) {
+                    url += `&season=${season}&episode=${episode}`;
+                }
+
+                console.log('Fetching:', url);
+                const startTime = Date.now();
+
+                const response = await fetch(url);
+                const duration = Date.now() - startTime;
+                const data = await response.json();
+
+                console.log('Response:', data);
+
+                if (data.success && data.streamUrl) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                    
+                    // Try to load the stream
+                    loadStream(data.streamUrl);
+                    playerStatus.textContent = `✅ Stream extracted in ${duration}ms - Loading player...`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = JSON.stringify(data, null, 2);
+                    playerStatus.textContent = '❌ Extraction failed';
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `Error: ${error.message}\n\nStack: ${error.stack}`;
+                playerStatus.textContent = '❌ Request failed';
+                console.error('Extraction error:', error);
+            }
+        }
+
+        function loadStream(streamUrl) {
+            const video = document.getElementById('videoPlayer');
+            const playerStatus = document.getElementById('playerStatus');
+
+            console.log('Loading stream:', streamUrl);
+
+            // Clean up existing HLS instance
+            if (currentHls) {
+                currentHls.destroy();
+                currentHls = null;
+            }
+
+            // Check if it's a proxied URL
+            const isProxied = streamUrl.startsWith('/api/stream-proxy');
+            const finalUrl = isProxied ? streamUrl : `/api/stream-proxy?url=${encodeURIComponent(streamUrl)}&source=shadowlands`;
+
+            console.log('Final URL:', finalUrl);
+
+            // Check for native HLS support (Safari)
+            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                console.log('Using native HLS support');
+                video.src = finalUrl;
+                playerStatus.textContent = '🎬 Loading with native HLS...';
+                return;
+            }
+
+            // Use HLS.js
+            if (Hls.isSupported()) {
+                console.log('Using HLS.js');
+                const hls = new Hls({
+                    debug: true,
+                    enableWorker: true
+                });
+                currentHls = hls;
+
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    console.log('✅ Manifest parsed');
+                    playerStatus.textContent = '✅ Stream loaded - Ready to play';
+                    video.play().catch(e => {
+                        console.log('Autoplay prevented:', e);
+                        playerStatus.textContent = '✅ Stream loaded - Click play to start';
+                    });
+                });
+
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.error('HLS Error:', data);
+                    if (data.fatal) {
+                        playerStatus.textContent = `❌ HLS Error: ${data.type} - ${data.details}`;
+                        switch (data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                console.log('Network error, trying to recover...');
+                                hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                console.log('Media error, trying to recover...');
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                console.error('Fatal error, cannot recover');
+                                break;
+                        }
+                    }
+                });
+
+                hls.loadSource(finalUrl);
+                hls.attachMedia(video);
+                playerStatus.textContent = '🔄 Loading HLS stream...';
+            } else {
+                playerStatus.textContent = '❌ HLS.js not supported';
+                console.error('HLS.js not supported');
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('result').textContent = 'Click "Test Extraction" to start...';
+            document.getElementById('result').className = 'result';
+            document.getElementById('playerStatus').textContent = 'No stream loaded';
+            
+            const video = document.getElementById('videoPlayer');
+            video.pause();
+            video.src = '';
+            
+            if (currentHls) {
+                currentHls.destroy();
+                currentHls = null;
+            }
+        }
+    </script>
+</body>
+</html>

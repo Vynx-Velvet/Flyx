@@ -75,7 +75,7 @@ const FuturisticMediaPlayerCore = ({
   const lastSyncTimestamp = useRef(0);
   const syncDebounceRef = useRef(null);
   const playbackStartTimeRef = useRef(null);
-  
+
   // UI state
   const [isInitialized, setIsInitialized] = useState(false);
   const [uiVisible, setUiVisible] = useState(true);
@@ -84,7 +84,7 @@ const FuturisticMediaPlayerCore = ({
   const [fullscreenMode, setFullscreenMode] = useState('standard');
   const [episodeCarouselVisible, setEpisodeCarouselVisible] = useState(false); // NEW: Episode carousel visibility control
   const [resumeDialogVisible, setResumeDialogVisible] = useState(false); // NEW: Resume dialog visibility control
-  
+
   // Optimized player state - single source of truth
   const [playerState, setPlayerState] = useState({
     isPlaying: false,
@@ -158,10 +158,10 @@ const FuturisticMediaPlayerCore = ({
     const now = Date.now();
     const isPlaybackStart = playbackStartProtectionRef.current;
     const timeSincePlaybackStart = playbackStartTimeRef.current ? now - playbackStartTimeRef.current : 0;
-    
+
     // **CRITICAL FIX: Allow time updates to always pass through**
     const isTimeUpdate = eventType.includes('timeupdate') || eventType.includes('Time');
-    
+
     // During playback start (first 3 seconds), apply strict debouncing BUT ALLOW TIME UPDATES
     if (isPlaybackStart && timeSincePlaybackStart < 3000 && !isTimeUpdate) {
       // Only allow one sync every 100ms during playback start (except time updates)
@@ -169,13 +169,13 @@ const FuturisticMediaPlayerCore = ({
         console.log(`🛡️ PLAYBACK START PROTECTION: Sync blocked for ${eventType} - too frequent`);
         return false;
       }
-      
+
       // Clear any pending debounced sync
       if (syncDebounceRef.current) {
         clearTimeout(syncDebounceRef.current);
         syncDebounceRef.current = null;
       }
-      
+
       // Log critical playback start events
       if (eventType.includes('play') || eventType.includes('manifest') || eventType.includes('loadedmetadata')) {
         console.log(`🚀 CRITICAL PLAYBACK START EVENT: ${eventType} at T+${timeSincePlaybackStart}ms`);
@@ -281,7 +281,7 @@ const FuturisticMediaPlayerCore = ({
     playbackStartProtectionRef.current = true;
     playbackStartTimeRef.current = Date.now();
     console.log('🛡️ PLAYBACK START PROTECTION: ENABLED');
-    
+
     // Automatically disable protection after 5 seconds
     setTimeout(() => {
       playbackStartProtectionRef.current = false;
@@ -302,13 +302,13 @@ const FuturisticMediaPlayerCore = ({
         console.error('🚨 DEFENSIVE: play() called but video ref is null');
         return;
       }
-      
+
       // **DEFENSIVE FIX: Check video readiness**
       if (video.readyState < 2) {
         console.warn('🚨 DEFENSIVE: Video not ready for play, readyState:', video.readyState);
         return;
       }
-      
+
       try {
         console.log('🎬 PLAYER ACTION: play() called');
         startPlaybackProtection(); // Enable protection before play
@@ -327,14 +327,14 @@ const FuturisticMediaPlayerCore = ({
         forceStateSync('player-action-play-error', { error: err.message });
       }
     },
-    
+
     pause: () => {
       const video = videoRef.current;
       if (!video) {
         console.error('🚨 DEFENSIVE: pause() called but video ref is null');
         return;
       }
-      
+
       try {
         console.log('⏸️ PLAYER ACTION: pause() called');
         video.pause();
@@ -346,30 +346,30 @@ const FuturisticMediaPlayerCore = ({
         forceStateSync('player-action-pause-error', { error: err.message });
       }
     },
-    
+
     togglePlay: async () => {
       const video = videoRef.current;
       if (!video) {
         console.error('🚨 DEFENSIVE: togglePlay called but video ref is null!');
         return;
       }
-      
+
       // **DEFENSIVE FIX: Check video state validity**
       if (typeof video.paused !== 'boolean') {
         console.error('🚨 DEFENSIVE: Invalid video.paused state');
         return;
       }
-      
+
       const isCurrentlyPaused = video.paused;
       console.log('🎬 PLAYER ACTION: togglePlay called - video.paused:', isCurrentlyPaused);
-      
+
       try {
         if (isCurrentlyPaused) {
           if (video.readyState < 2) {
             console.warn('🚨 DEFENSIVE: Video not ready for play in togglePlay');
             return;
           }
-          
+
           console.log('🎬 PLAYER ACTION: Attempting to play video...');
           startPlaybackProtection(); // Enable protection before play
           await video.play();
@@ -387,31 +387,31 @@ const FuturisticMediaPlayerCore = ({
           errorMessage: 'Failed to toggle playback: ' + (err.message || 'Unknown error')
         }));
       }
-      
+
       // Protected sync after toggle action
       setTimeout(() => forceStateSync('player-action-toggle-play', { wasPlaying: !isCurrentlyPaused }), 100);
     },
-    
+
     seek: (time) => {
       const video = videoRef.current;
       if (!video) {
         console.error('🚨 DEFENSIVE: seek() called but video ref is null');
         return;
       }
-      
+
       // **DEFENSIVE FIX: Validate time parameter**
       if (!isFinite(time) || time < 0) {
         console.error('🚨 DEFENSIVE: Invalid seek time:', time);
         return;
       }
-      
+
       // **DEFENSIVE FIX: Check duration availability**
       const duration = isFinite(video.duration) ? video.duration : 0;
       if (duration === 0) {
         console.warn('🚨 DEFENSIVE: Cannot seek - video duration not available');
         return;
       }
-      
+
       try {
         const clampedTime = Math.max(0, Math.min(duration, time));
         console.log('⏩ PLAYER ACTION: seek() to', clampedTime);
@@ -423,7 +423,7 @@ const FuturisticMediaPlayerCore = ({
         forceStateSync('player-action-seek-error', { error: err.message });
       }
     },
-    
+
     setVolume: (volume) => {
       const video = videoRef.current;
       if (video && isFinite(volume)) {
@@ -435,7 +435,7 @@ const FuturisticMediaPlayerCore = ({
         setTimeout(() => forceStateSync('player-action-set-volume', { volume: clampedVolume }), 0);
       }
     },
-    
+
     adjustVolume: (delta) => {
       const video = videoRef.current;
       if (video && isFinite(delta)) {
@@ -447,7 +447,7 @@ const FuturisticMediaPlayerCore = ({
         setTimeout(() => forceStateSync('player-action-adjust-volume', { delta, newVolume }), 0);
       }
     },
-    
+
     toggleMute: () => {
       const video = videoRef.current;
       if (video) {
@@ -461,11 +461,11 @@ const FuturisticMediaPlayerCore = ({
         setTimeout(() => forceStateSync('player-action-toggle-mute', { wasMuted, newVolume: video.volume }), 0);
       }
     },
-    
+
     setFullscreen: (isFullscreen) => {
       setPlayerState(prev => ({ ...prev, isFullscreen }));
     },
-    
+
     setPlaybackRate: (rate) => {
       const video = videoRef.current;
       if (video && isFinite(rate)) {
@@ -477,12 +477,12 @@ const FuturisticMediaPlayerCore = ({
         setTimeout(() => forceStateSync('player-action-set-playback-rate', { rate: clampedRate }), 0);
       }
     },
-    
+
     setPipPosition: (position) => {
       console.log('🖼️ PLAYER ACTION: setPipPosition()', position);
       setAdvancedState(prev => ({ ...prev, pipPosition: position }));
     },
-    
+
     toggleEpisodeCarousel: () => {
       console.log('📺 PLAYER ACTION: toggleEpisodeCarousel()');
       setEpisodeCarouselVisible(prev => {
@@ -501,17 +501,17 @@ const FuturisticMediaPlayerCore = ({
   // Parse season/episode IDs utility function
   const parseIds = useCallback((sId, eId) => {
     if (!sId || !eId) return { seasonNumber: null, episodeNumber: null };
-    
+
     // Parse season ID (format: "season_1" or just "1")
     const seasonNumber = typeof sId === 'string' ?
       (sId.startsWith('season_') ? parseInt(sId.replace('season_', '')) : parseInt(sId)) :
       parseInt(sId);
-    
+
     // Parse episode ID (format: "ep_1_1" or just "1")
     const episodeNumber = typeof eId === 'string' ?
       (eId.includes('_') ? parseInt(eId.split('_').pop()) : parseInt(eId)) :
       parseInt(eId);
-      
+
     return { seasonNumber, episodeNumber };
   }, []);
 
@@ -520,7 +520,7 @@ const FuturisticMediaPlayerCore = ({
     enableSceneDetection: enableAdvancedFeatures,
     enableContentAnalysis: true
   });
-  
+
   // Stream extraction and management
   const shouldFetch = !!(movieId && (mediaType !== 'tv' || (seasonId && episodeId)));
 
@@ -551,10 +551,19 @@ const FuturisticMediaPlayerCore = ({
 
   // Add logging to track when stream data is available
   useEffect(() => {
+    console.log('🎯 STREAM STATE UPDATE:', {
+      streamUrl: streamUrl ? streamUrl.substring(0, 100) + '...' : null,
+      streamType,
+      streamLoading,
+      streamError,
+      loadingProgress,
+      loadingPhase
+    });
+
     if (streamUrl) {
-      console.log('🎯 Stream URL received in media player:', { streamUrl, streamType });
+      console.log('✅ Stream URL received in media player:', { streamUrl, streamType });
     }
-  }, [streamUrl, streamType]);
+  }, [streamUrl, streamType, streamLoading, streamError, loadingProgress, loadingPhase]);
 
   // Enhanced subtitle system
   const {
@@ -665,9 +674,33 @@ const FuturisticMediaPlayerCore = ({
 
   // Enhanced HLS.js loading with proper cleanup
   const loadHLS = useCallback(async (currentStreamUrl = streamUrl, currentStreamType = streamType) => {
+    console.log('🎬 loadHLS CALLED:', {
+      hasStreamUrl: !!currentStreamUrl,
+      streamType: currentStreamType,
+      hasVideoRef: !!videoRef.current,
+      videoReadyState: videoRef.current?.readyState,
+      streamUrl: currentStreamUrl ? currentStreamUrl.substring(0, 100) + '...' : null
+    });
+
     if (!currentStreamUrl || currentStreamType !== 'hls' || !videoRef.current) {
       console.log('🎬 HLS load skipped:', { currentStreamUrl: !!currentStreamUrl, currentStreamType, videoReady: !!videoRef.current });
       return;
+    }
+
+    // Wait for video element to be ready
+    if (videoRef.current.readyState === 0) {
+      console.log('⏳ Waiting for video element to be ready...');
+      await new Promise((resolve) => {
+        const checkReady = () => {
+          if (videoRef.current && videoRef.current.readyState > 0) {
+            console.log('✅ Video element is now ready');
+            resolve();
+          } else {
+            setTimeout(checkReady, 100);
+          }
+        };
+        checkReady();
+      });
     }
 
     console.log('🎬 Loading HLS stream:', { currentStreamUrl: currentStreamUrl.substring(0, 80) + '...', currentStreamType });
@@ -697,6 +730,7 @@ const FuturisticMediaPlayerCore = ({
           document.head.appendChild(script);
         });
         Hls = window.Hls;
+        console.log('✅ HLS.js loaded from CDN');
       }
 
       if (!Hls.isSupported()) {
@@ -705,6 +739,8 @@ const FuturisticMediaPlayerCore = ({
         return;
       }
 
+      console.log('✅ HLS.js is supported');
+
       // Clean up existing instance
       if (hlsRef.current) {
         console.log('🧹 Cleaning up existing HLS instance');
@@ -712,6 +748,7 @@ const FuturisticMediaPlayerCore = ({
         hlsRef.current = null;
       }
 
+      console.log('🎬 Creating new HLS instance...');
       // Create optimized HLS instance
       const hls = new Hls({
         debug: false,
@@ -809,19 +846,45 @@ const FuturisticMediaPlayerCore = ({
       hls.loadSource(currentStreamUrl);
       hls.attachMedia(videoRef.current);
 
+      // Set a timeout to detect if HLS is stuck
+      const hlsTimeout = setTimeout(() => {
+        if (!isInitialized) {
+          console.error('🚨 HLS TIMEOUT: Video failed to initialize within 30 seconds');
+          setPlayerState(prev => ({
+            ...prev,
+            hasError: true,
+            errorMessage: 'Video player initialization timeout. The stream may be unavailable or blocked.'
+          }));
+        }
+      }, 30000); // 30 second timeout
+
+      // Clear timeout when manifest is parsed
+      hls.once(Hls.Events.MANIFEST_PARSED, () => {
+        clearTimeout(hlsTimeout);
+      });
+
     } catch (error) {
       console.error('HLS.js loading error:', error);
+      setPlayerState(prev => ({
+        ...prev,
+        hasError: true,
+        errorMessage: 'Failed to initialize HLS player: ' + error.message
+      }));
       // Fallback to native playback
-      videoRef.current.src = currentStreamUrl;
+      try {
+        videoRef.current.src = currentStreamUrl;
+      } catch (fallbackError) {
+        console.error('Native playback fallback also failed:', fallbackError);
+      }
     }
-  }, [streamUrl, streamType, startPlaybackProtection, shouldShowResume, resumeDialogVisible, setAdvancedState, forceStateSync]);
+  }, [streamUrl, streamType, startPlaybackProtection, shouldShowResume, resumeDialogVisible, setAdvancedState, forceStateSync, isInitialized]);
 
   // Set quality handler
   const setQuality = useCallback((qualityId) => {
     if (!hlsRef.current) return;
-    
+
     setAdvancedState(prev => ({ ...prev, currentQuality: qualityId }));
-    
+
     if (qualityId === 'auto') {
       hlsRef.current.currentLevel = -1;
       console.log('✅ Auto quality enabled');
@@ -838,7 +901,7 @@ const FuturisticMediaPlayerCore = ({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    
+
     // ENHANCED EVENT HANDLERS WITH AGGRESSIVE FORCED SYNC
     const handleLoadedMetadata = () => {
       console.log('✅ VIDEO EVENT: loadedmetadata');
@@ -846,30 +909,30 @@ const FuturisticMediaPlayerCore = ({
       // Force immediate sync after metadata loaded
       setTimeout(() => forceStateSync('video-event-loadedmetadata'), 0);
     };
-    
+
     const handleTimeUpdate = () => {
       // Force sync on every time update - NO THROTTLING
       forceStateSync('video-event-timeupdate');
     };
-    
+
     const handlePlay = () => {
       console.log('🎬 VIDEO EVENT: play - CRITICAL PLAYBACK START');
-      
+
       // **CRITICAL FIX 7: Enable protection on any play event**
       if (!playbackStartProtectionRef.current) {
         startPlaybackProtection();
       }
-      
+
       // Protected sync with delay
       setTimeout(() => forceStateSync('video-event-play'), 50);
     };
-    
+
     const handlePause = () => {
       console.log('⏸️ VIDEO EVENT: pause');
       // Force immediate sync after pause event
       setTimeout(() => forceStateSync('video-event-pause'), 0);
     };
-    
+
     const handleError = async (e) => {
       console.error('❌ VIDEO EVENT: error', e);
       // Try to recover from the error
@@ -884,55 +947,55 @@ const FuturisticMediaPlayerCore = ({
       // Force sync after error
       setTimeout(() => forceStateSync('video-event-error', { error: e.message }), 0);
     };
-    
+
     const handleWaiting = () => {
       console.log('⏳ VIDEO EVENT: waiting');
       // Force sync after waiting event
       setTimeout(() => forceStateSync('video-event-waiting'), 0);
     };
-    
+
     const handleCanPlay = () => {
       console.log('✅ VIDEO EVENT: canplay');
       // Force sync after canplay event
       setTimeout(() => forceStateSync('video-event-canplay'), 0);
     };
-    
+
     const handleLoadStart = () => {
       console.log('🔄 VIDEO EVENT: loadstart');
       // Force sync after loadstart event
       setTimeout(() => forceStateSync('video-event-loadstart'), 0);
     };
-    
+
     const handleLoadedData = () => {
       console.log('📊 VIDEO EVENT: loadeddata');
       // Force sync after loadeddata event
       setTimeout(() => forceStateSync('video-event-loadeddata'), 0);
     };
-    
+
     const handleVolumeChange = () => {
       console.log('🔊 VIDEO EVENT: volumechange');
       // Force sync after volume change
       setTimeout(() => forceStateSync('video-event-volumechange'), 0);
     };
-    
+
     const handleSeeking = () => {
       console.log('⏩ VIDEO EVENT: seeking');
       // Force sync after seeking event
       setTimeout(() => forceStateSync('video-event-seeking'), 0);
     };
-    
+
     const handleSeeked = () => {
       console.log('✅ VIDEO EVENT: seeked');
       // Force sync after seeked event
       setTimeout(() => forceStateSync('video-event-seeked'), 0);
     };
-    
+
     const handleEnded = () => {
       console.log('🏁 VIDEO EVENT: ended');
       // Force sync after ended event
       setTimeout(() => forceStateSync('video-event-ended'), 0);
     };
-    
+
     // ENHANCED EVENT LISTENERS WITH AGGRESSIVE FORCED SYNC
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -947,51 +1010,51 @@ const FuturisticMediaPlayerCore = ({
     video.addEventListener('seeking', handleSeeking);
     video.addEventListener('seeked', handleSeeked);
     video.addEventListener('ended', handleEnded);
-    
+
     // Additional comprehensive event listeners for perfect sync
     video.addEventListener('durationchange', () => {
       console.log('⏱️ VIDEO EVENT: durationchange');
       setTimeout(() => forceStateSync('video-event-durationchange'), 0);
     });
-    
+
     video.addEventListener('ratechange', () => {
       console.log('⚡ VIDEO EVENT: ratechange');
       setTimeout(() => forceStateSync('video-event-ratechange'), 0);
     });
-    
+
     video.addEventListener('progress', () => {
       // Force sync on progress events (buffering updates)
       forceStateSync('video-event-progress');
     });
-    
+
     video.addEventListener('canplaythrough', () => {
       console.log('✅ VIDEO EVENT: canplaythrough');
       setTimeout(() => forceStateSync('video-event-canplaythrough'), 0);
     });
-    
+
     video.addEventListener('stalled', () => {
       console.log('🛑 VIDEO EVENT: stalled');
       setTimeout(() => forceStateSync('video-event-stalled'), 0);
     });
-    
+
     video.addEventListener('suspend', () => {
       console.log('⏸️ VIDEO EVENT: suspend');
       setTimeout(() => forceStateSync('video-event-suspend'), 0);
     });
-    
+
     video.addEventListener('abort', () => {
       console.log('❌ VIDEO EVENT: abort');
       setTimeout(() => forceStateSync('video-event-abort'), 0);
     });
-    
+
     video.addEventListener('emptied', () => {
       console.log('🚫 VIDEO EVENT: emptied');
       setTimeout(() => forceStateSync('video-event-emptied'), 0);
     });
-    
+
     // IMMEDIATE INITIAL FORCE SYNC
     setTimeout(() => forceStateSync('video-element-initialization'), 0);
-    
+
     return () => {
       // Remove all event listeners
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
@@ -1007,38 +1070,38 @@ const FuturisticMediaPlayerCore = ({
       video.removeEventListener('seeking', handleSeeking);
       video.removeEventListener('seeked', handleSeeked);
       video.removeEventListener('ended', handleEnded);
-      video.removeEventListener('durationchange', () => {});
-      video.removeEventListener('ratechange', () => {});
-      video.removeEventListener('progress', () => {});
-      video.removeEventListener('canplaythrough', () => {});
-      video.removeEventListener('stalled', () => {});
-      video.removeEventListener('suspend', () => {});
-      video.removeEventListener('abort', () => {});
-      video.removeEventListener('emptied', () => {});
+      video.removeEventListener('durationchange', () => { });
+      video.removeEventListener('ratechange', () => { });
+      video.removeEventListener('progress', () => { });
+      video.removeEventListener('canplaythrough', () => { });
+      video.removeEventListener('stalled', () => { });
+      video.removeEventListener('suspend', () => { });
+      video.removeEventListener('abort', () => { });
+      video.removeEventListener('emptied', () => { });
     };
   }, [forceStateSync]); // Include forceStateSync in dependencies
 
   // **CRITICAL FIX 8: INTELLIGENT ADAPTIVE SYNC (Not Aggressive)**
   useEffect(() => {
     if (!videoRef.current) return;
-    
+
     console.log('🧠 INTELLIGENT SYNC: Starting adaptive sync monitoring');
-    
+
     // **Adaptive sync frequency based on playback start protection**
     const adaptiveSyncInterval = setInterval(() => {
       if (videoRef.current) {
         const isPlaybackStart = playbackStartProtectionRef.current;
         const interval = isPlaybackStart ? 200 : 100; // Slower during playback start
-        
+
         // Skip sync if within protection window and recent sync occurred
         if (isPlaybackStart && Date.now() - lastSyncTimestamp.current < interval) {
           return;
         }
-        
+
         forceStateSync('continuous-intelligent-sync');
       }
     }, 100); // Base interval of 100ms
-    
+
     return () => {
       clearInterval(adaptiveSyncInterval);
       console.log('🛑 INTELLIGENT SYNC: Stopped adaptive sync monitoring');
@@ -1051,7 +1114,7 @@ const FuturisticMediaPlayerCore = ({
     if (playbackStartProtectionRef.current) {
       console.log('🔍 PROTECTED STATE WATCHER: isPlaying changed to', playerState.isPlaying);
     }
-    
+
     // Debounce state change syncs during playback start
     if (playbackStartProtectionRef.current) {
       if (syncDebounceRef.current) {
@@ -1065,7 +1128,7 @@ const FuturisticMediaPlayerCore = ({
       setTimeout(() => forceStateSync('playerstate-change-isPlaying', { newValue: playerState.isPlaying }), 50);
     }
   }, [playerState.isPlaying, forceStateSync]);
-  
+
   useEffect(() => {
     // **CRITICAL FIX: Don't skip currentTime watchers - they're essential for timeline updates**
     // Only sync if there's a significant difference AND video element exists
@@ -1074,26 +1137,26 @@ const FuturisticMediaPlayerCore = ({
       setTimeout(() => forceStateSync('playerstate-change-currentTime', { newValue: playerState.currentTime }), 50);
     }
   }, [playerState.currentTime, forceStateSync]);
-  
+
   useEffect(() => {
     // Debounce volume changes during playback start
     if (playbackStartProtectionRef.current) return;
-    
+
     setTimeout(() => forceStateSync('playerstate-change-volume', { newValue: playerState.volume }), 50);
   }, [playerState.volume, forceStateSync]);
-  
+
   useEffect(() => {
     // Debounce mute changes during playback start
     if (playbackStartProtectionRef.current) return;
-    
+
     setTimeout(() => forceStateSync('playerstate-change-isMuted', { newValue: playerState.isMuted }), 50);
   }, [playerState.isMuted, forceStateSync]);
-  
+
   useEffect(() => {
     // Duration changes are critical - always sync with minimal delay
     setTimeout(() => forceStateSync('playerstate-change-duration', { newValue: playerState.duration }), 25);
   }, [playerState.duration, forceStateSync]);
-  
+
   useEffect(() => {
     // Loading state changes during playback start are expected
     const delay = playbackStartProtectionRef.current ? 100 : 50;
@@ -1102,9 +1165,22 @@ const FuturisticMediaPlayerCore = ({
 
   // Load video source when stream URL is ready - RESILIENT TO COMPONENT UNMOUNTING
   useEffect(() => {
-    if (!streamUrl || !videoRef.current) return;
+    console.log('🎬 STREAM LOADING EFFECT TRIGGERED:', {
+      hasStreamUrl: !!streamUrl,
+      hasVideoRef: !!videoRef.current,
+      streamType,
+      streamLoading
+    });
 
-    console.log('🎬 Loading stream:', { streamType, streamUrl });
+    if (!streamUrl || !videoRef.current) {
+      console.warn('⚠️ STREAM LOADING SKIPPED:', {
+        streamUrl: !!streamUrl,
+        videoRef: !!videoRef.current
+      });
+      return;
+    }
+
+    console.log('🎬 Loading stream:', { streamType, streamUrl: streamUrl.substring(0, 100) + '...' });
 
     // Store stream data in refs to survive component unmounting
     const currentStreamUrl = streamUrl;
@@ -1113,6 +1189,8 @@ const FuturisticMediaPlayerCore = ({
 
     const loadStream = async () => {
       try {
+        console.log('🎬 LOAD STREAM FUNCTION CALLED:', { currentStreamType });
+
         if (currentStreamType === 'hls') {
           // For HLS, we need to be more careful about cleanup
           if (hlsRef.current) {
@@ -1124,6 +1202,7 @@ const FuturisticMediaPlayerCore = ({
           // Load HLS with current stream parameters
           console.log('🎬 Calling loadHLS with current parameters');
           await loadHLS(currentStreamUrl, currentStreamType);
+          console.log('✅ loadHLS completed');
         } else {
           // For direct streams, set src and load
           console.log('🎬 Loading direct stream:', currentStreamUrl.substring(0, 80) + '...');
@@ -1141,14 +1220,20 @@ const FuturisticMediaPlayerCore = ({
         }
       } catch (error) {
         console.error('❌ Stream loading error:', error);
-        // Don't set error state here as component might be unmounting
+        setPlayerState(prev => ({
+          ...prev,
+          hasError: true,
+          errorMessage: 'Failed to load stream: ' + error.message
+        }));
       }
     };
 
     // Load the stream
+    console.log('🎬 Starting loadStream...');
     loadStream();
 
     return () => {
+      console.log('🧹 Stream loading effect cleanup');
       // Only cleanup HLS if we're actually unmounting (not just re-rendering)
       if (currentStreamType === 'hls' && hlsRef.current) {
         try {
@@ -1164,7 +1249,7 @@ const FuturisticMediaPlayerCore = ({
   // Enhanced fullscreen functionality
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
-    
+
     try {
       if (!document.fullscreenElement) {
         await containerRef.current.requestFullscreen();
@@ -1183,7 +1268,7 @@ const FuturisticMediaPlayerCore = ({
   // Gesture action handler
   const handleGestureAction = useCallback((gesture) => {
     if (!videoRef.current) return;
-    
+
     switch (gesture.type) {
       case 'swipeUp':
         playerActions.adjustVolume(0.1);
@@ -1211,7 +1296,7 @@ const FuturisticMediaPlayerCore = ({
   // Voice command handler
   const handleVoiceCommand = useCallback((command) => {
     const { action, value } = command;
-    
+
     switch (action) {
       case 'play':
         playerActions.play();
@@ -1239,12 +1324,12 @@ const FuturisticMediaPlayerCore = ({
   // UI visibility management
   const showUI = useCallback(() => {
     setUiVisible(true);
-    
+
     // Clear existing timeout
     if (uiTimeoutRef.current) {
       clearTimeout(uiTimeoutRef.current);
     }
-    
+
     // Hide after 3 seconds of inactivity
     uiTimeoutRef.current = setTimeout(() => {
       if (playerState.isPlaying && fullscreenMode === 'immersive') {
@@ -1289,7 +1374,7 @@ const FuturisticMediaPlayerCore = ({
         }
         console.log('📺 Auto-showing resume dialog on initialization (once only)');
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [isInitialized, shouldShowResume, resumeDialogVisible, streamUrl, progressData]);
@@ -1298,7 +1383,7 @@ const FuturisticMediaPlayerCore = ({
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.target.tagName === 'INPUT' || !videoRef.current) return;
-      
+
       switch (e.key) {
         case ' ':
           e.preventDefault();
@@ -1344,7 +1429,7 @@ const FuturisticMediaPlayerCore = ({
           break;
       }
     };
-    
+
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
   }, [playerActions, toggleFullscreen, advancedState.playbackRate, mediaType]);
@@ -1352,11 +1437,11 @@ const FuturisticMediaPlayerCore = ({
   // Performance monitoring
   useEffect(() => {
     if (!enableAdvancedFeatures || !videoRef.current) return;
-    
+
     const monitorPerformance = () => {
       const video = videoRef.current;
       if (!video || !video.getVideoPlaybackQuality) return;
-      
+
       const quality = video.getVideoPlaybackQuality();
       setPerformanceMetrics(prev => ({
         ...prev,
@@ -1366,7 +1451,7 @@ const FuturisticMediaPlayerCore = ({
           : 60
       }));
     };
-    
+
     const interval = setInterval(monitorPerformance, 2000);
     return () => clearInterval(interval);
   }, [enableAdvancedFeatures]);
@@ -1380,7 +1465,7 @@ const FuturisticMediaPlayerCore = ({
       healthEndpoint: '/api/health',
       onStatusChange: (status, oldStatus) => {
         console.log(`Network status changed: ${oldStatus} → ${status}`);
-        
+
         if (status === 'offline' || status === 'error') {
           setPlayerState(prev => ({
             ...prev,
@@ -1408,22 +1493,22 @@ const FuturisticMediaPlayerCore = ({
   useEffect(() => {
     return () => {
       console.log('🧹 CLEANUP: Starting component cleanup');
-      
+
       try {
         // **DEFENSIVE CLEANUP: Clear all timeouts and intervals**
         if (uiTimeoutRef.current) {
           clearTimeout(uiTimeoutRef.current);
           uiTimeoutRef.current = null;
         }
-        
+
         if (syncDebounceRef.current) {
           clearTimeout(syncDebounceRef.current);
           syncDebounceRef.current = null;
         }
-        
+
         // **DEFENSIVE CLEANUP: Disable playback protection**
         playbackStartProtectionRef.current = false;
-        
+
         // **DEFENSIVE CLEANUP: HLS with error handling**
         if (hlsRef.current) {
           try {
@@ -1433,7 +1518,7 @@ const FuturisticMediaPlayerCore = ({
           }
           hlsRef.current = null;
         }
-        
+
         // **DEFENSIVE CLEANUP: Video element with error handling**
         if (videoRef.current) {
           try {
@@ -1446,7 +1531,7 @@ const FuturisticMediaPlayerCore = ({
             console.warn('🚨 Video cleanup error:', error);
           }
         }
-        
+
         // **DEFENSIVE CLEANUP: Network monitoring**
         if (networkMonitorRef.current) {
           try {
@@ -1456,7 +1541,7 @@ const FuturisticMediaPlayerCore = ({
           }
           networkMonitorRef.current = null;
         }
-        
+
         console.log('✅ CLEANUP: Component cleanup completed');
       } catch (error) {
         console.error('🚨 CRITICAL CLEANUP ERROR:', error);
@@ -1470,10 +1555,10 @@ const FuturisticMediaPlayerCore = ({
     const MONITORING_WINDOW = 1000; // 1 second window
     let syncCounter = 0;
     let windowStart = Date.now();
-    
+
     const circuitBreakerCheck = () => {
       const now = Date.now();
-      
+
       // Reset counter if window expired
       if (now - windowStart > MONITORING_WINDOW) {
         if (syncCounter > 50) { // Log if high activity
@@ -1482,17 +1567,17 @@ const FuturisticMediaPlayerCore = ({
         syncCounter = 0;
         windowStart = now;
       }
-      
+
       syncCounter++;
-      
+
       // Circuit breaker: Block excessive sync calls
       if (syncCounter > SYNC_THRESHOLD) {
         console.error(`🚨 CIRCUIT BREAKER: ACTIVATED - Blocking excessive sync calls (${syncCounter} in ${MONITORING_WINDOW}ms)`);
         console.error(`🚨 POTENTIAL INFINITE LOOP DETECTED - Forcing emergency protection mode`);
-        
+
         // Emergency actions
         playbackStartProtectionRef.current = true;
-        
+
         // Emergency reset after 5 seconds
         setTimeout(() => {
           syncCounter = 0;
@@ -1500,16 +1585,16 @@ const FuturisticMediaPlayerCore = ({
           playbackStartProtectionRef.current = false;
           console.log('🔄 CIRCUIT BREAKER: Emergency reset completed');
         }, 5000);
-        
+
         return false; // Block the sync
       }
-      
+
       return true; // Allow the sync
     };
-    
+
     // Monitor forceStateSync calls by wrapping them
     const originalForceSync = forceStateSync;
-    
+
     return () => {
       // Cleanup circuit breaker
       syncCounter = 0;
@@ -1517,7 +1602,16 @@ const FuturisticMediaPlayerCore = ({
   }, [forceStateSync]);
 
   // Render loading state
+  console.log('🎬 RENDER CHECK:', {
+    streamLoading,
+    hasStreamUrl: !!streamUrl,
+    shouldShowLoading: streamLoading && !streamUrl,
+    streamError,
+    hasPlayerError: playerState.hasError
+  });
+
   if (streamLoading && !streamUrl) {
+    console.log('🔄 RENDERING LOADING SCREEN');
     return (
       <div className={styles.playerContainer}>
         <AdaptiveLoading
@@ -1560,9 +1654,8 @@ const FuturisticMediaPlayerCore = ({
   return (
     <div
       ref={containerRef}
-      className={`${styles.futuristicPlayer} ${styles[`theme-${theme}`]} ${
-        fullscreenMode === 'immersive' ? styles.immersiveMode : ''
-      }`}
+      className={`${styles.futuristicPlayer} ${styles[`theme-${theme}`]} ${fullscreenMode === 'immersive' ? styles.immersiveMode : ''
+        }`}
       onMouseMove={showUI}
       onMouseLeave={hideUI}
     >
@@ -1589,6 +1682,47 @@ const FuturisticMediaPlayerCore = ({
         controls={false}
         data-testid="futuristic-video-player"
       />
+
+      {/* Video Loading Overlay - Shows while video is initializing */}
+      <AnimatePresence>
+        {streamUrl && !isInitialized && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className={styles.videoLoadingOverlay}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0, 0, 0, 0.9)',
+              zIndex: 100
+            }}
+          >
+            <div style={{ textAlign: 'center', color: 'white' }}>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  border: '4px solid rgba(255, 255, 255, 0.1)',
+                  borderTop: '4px solid #00f5ff',
+                  borderRadius: '50%',
+                  margin: '0 auto 20px'
+                }}
+              />
+              <div style={{ fontSize: '18px', marginBottom: '10px' }}>Initializing Video Player...</div>
+              <div style={{ fontSize: '14px', opacity: 0.7 }}>Loading HLS stream</div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Hidden canvas for advanced features */}
       <canvas
@@ -1630,7 +1764,7 @@ const FuturisticMediaPlayerCore = ({
             state={{}}
             commands={{}}
             onCommand={handleVoiceCommand}
-            onStop={() => {}}
+            onStop={() => { }}
           />
         )}
       </AnimatePresence>
@@ -1825,7 +1959,7 @@ const FuturisticMediaPlayerCore = ({
         }
         animate={true}
       />
-      
+
     </div>
   );
 };
@@ -1833,23 +1967,23 @@ const FuturisticMediaPlayerCore = ({
 // Wrapped component with error boundary
 const FuturisticMediaPlayer = (props) => {
   const [resetKey, setResetKey] = useState(0);
-  
+
   const handleError = useCallback((errorReport) => {
     console.error('Media Player Error Report:', errorReport);
     // You can send this to an error tracking service
   }, []);
-  
+
   const handleReset = useCallback(() => {
     console.log('Error boundary reset');
     setResetKey(prev => prev + 1);
   }, []);
-  
+
   const handleStreamError = useCallback(() => {
     console.log('Stream error detected, triggering retry...');
     // Force component remount to retry stream
     setResetKey(prev => prev + 1);
   }, []);
-  
+
   return (
     <MediaPlayerErrorBoundary
       resetKey={resetKey}
