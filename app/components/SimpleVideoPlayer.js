@@ -611,8 +611,8 @@ const SimpleVideoPlayer = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Loading state
-  if (loading) {
+  // Loading state - Only show loading screen if we don't have a stream URL yet
+  if (loading && !streamUrl) {
     return (
       <div className="video-player-container loading">
         <motion.div
@@ -779,6 +779,48 @@ const SimpleVideoPlayer = ({
         playsInline
         onError={() => setError('Video playback failed')}
       />
+
+      {/* Video Loading Overlay - Shows while video is initializing */}
+      <AnimatePresence>
+        {loading && streamUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0, 0, 0, 0.95)',
+              zIndex: 100
+            }}
+          >
+            <div style={{ textAlign: 'center', color: 'white' }}>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  border: '4px solid rgba(255, 255, 255, 0.1)',
+                  borderTop: '4px solid #00f5ff',
+                  borderRadius: '50%',
+                  margin: '0 auto 20px'
+                }}
+              />
+              <div style={{ fontSize: '18px', marginBottom: '10px', color: '#00f5ff' }}>
+                Initializing Video Player...
+              </div>
+              <div style={{ fontSize: '14px', opacity: 0.7 }}>Loading HLS stream</div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Auto-Queue Prompt */}
       <AnimatePresence>
