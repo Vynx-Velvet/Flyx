@@ -1,73 +1,105 @@
-# SimpleVideoPlayer Loading Fix
+# Simple Video Player - Infinite Loop Fix
 
-## Problem
-The video player was stuck in loading state even after the stream URL was successfully extracted. The console showed:
-- ✅ Stream extraction successful
-- ✅ Proxy URL set correctly
-- ❌ "Loading state still TRUE - waiting for video ready..."
-- ❌ "Video setup skipped" (repeated twice)
+## Problem Identified
+The SimpleVideoPlayer component was experiencing an infinite render loop where:
+- Video setup effect triggered hundreds of times per second
+- HLS instance constantly destroyed and recreated
+- Eventually the video ref became `false`, causing playback to fail
+- Console flooded with "Video setup effect triggered" messages
 
 ## Root Causes
-1. **Video Element Not Rendered**: The loading screen was shown when `loading === true`, which prevented the video element from being rendered. The video setup effect would run but couldn't find `videoRef.current`.
 
-2. **Loading State Not Cleared**: The loading state was only cleared when specific video events fired (`canplay`, `playing`), but these events never fired because the video element didn't exist.
+### 1. **No Guard Against Re-running Setup**
+The video setup effect would run every time the component re-rendered, even if the video was already set up with the same stream URL.
 
-## Fixes Applied
+### 2. **Aggressive Cleanup on Every Render**
+The cleanup function was destroying the HLS instance on every re-render, not just on unmount, causing the effect to run again.
 
-### 1. **CRITICAL FIX: Changed Loading Condition**
+### 3. **Missing Video Element Check**
+The cleanup tried to remove event listeners even if the video element no longer existed.
+
+## Solutions Applied
+
+### 1. **Added Setup Guard**
 ```javascript
-// Before: if (loading) { return <LoadingScreen /> }
-// After:
-if (loading && !streamUrl) {
-  return <LoadingScreen />
+// BEFORE: Effect ran on every render
+if (!streamUrl || !videoRef.current) {
+  return;
+}
+
+// AFTER: Check if already set up
+if (!streamUrl || !videoRef.current) {
+  return;
+}
+
+if (videoRef.current.src === streamUrl) {
+  console.log('✅ Video already set up, skipping');
+  return;
 }
 ```
-This ensures the video element is rendered as soon as we have a stream URL, even if loading is still true.
 
-### 2. Added Video Loading Overlay
-Shows a loading overlay on top of the video player while HLS is initializing:
-```javascript
-{loading && streamUrl && (
-  <motion.div>Initializing Video Player...</motion.div>
-)}
-```
+**Rationale**: Prevents re-running the entire setup if the video is already configured with the same stream URL.
 
-### 3. Added Loading Timeout (30 seconds)
+### 2. **Defensive Cleanup**
 ```javascript
-const loadingTimeout = setTimeout(() => {
-  console.error('⏰ [DEBUG] Video loading timeout - forcing loading state to false');
-  setLoading(false);
-  setError('Video loading timeout. The stream may be unavailable.');
-}, 30000);
-```
+// BEFORE: Destroyed HLS on every cleanup
+if (hlsInstance) {
+  hlsInstance.destroy();
+  setHlsInstance(null);
+}
 
-### 4. Clear Loading on HLS Manifest Parsed
-```javascript
-hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-  console.log('📋 [DEBUG] HLS manifest parsed successfully');
-  setLoading(false); // ← Added this
-});
-```
-
-### 5. Enhanced Error Handling
-```javascript
-hls.on(window.Hls.Events.ERROR, (event, data) => {
-  if (data.fatal) {
-    clearTimeout(loadingTimeout); // ← Clear timeout on error
-    setError(`HLS playback error: ${data.details || data.type}`);
-    setLoading(false);
+// AFTER: Only destroy if actually unmounting
+if (hlsInstance && !videoRef.current) {
+  try {
+    hlsInstance.destroy();
+  } catch (err) {
+    console.warn('Error destroying HLS:', err);
   }
-});
+  setHlsInstance(null);
+}
 ```
 
-### 6. Better Logging
-Added comprehensive logging to track the video setup flow.
+**Rationale**: Only destroy HLS when the component is actually unmounting (videoRef.current is null), not on every re-render.
 
-## Expected Behavior
-- Loading spinner shows while extracting stream
-- Loading spinner clears when HLS manifest is parsed OR video can play
-- If loading takes >30 seconds, timeout error is shown
-- User can retry or go back
+### 3. **Safe Event Listener Removal**
+```javascript
+// BEFORE: Assumed video element exists
+video.removeEventListener('play', handlePlay);
 
-## Files Modified
-- `app/components/SimpleVideoPlayer.js`
+// AFTER: Check if video exists first
+if (video) {
+  video.removeEventListener('play', handlePlay);
+}
+```
+
+**Rationale**: Prevents errors when trying to remove event listeners from a non-existent element.
+
+## Expected Results
+
+After these fixes:
+1. ✅ Video setup effect runs only once per stream URL
+2. ✅ HLS instance created once and reused
+3. ✅ No infinite render loops
+4. ✅ Video ref remains stable
+5. ✅ Smooth playback without interruptions
+6. ✅ Controls work properly
+7. ✅ Episode switching works without issues
+
+## Testing Recommendations
+
+1. Load a video and check console - should see minimal "Video setup effect triggered" messages
+2. Verify video plays smoothly without re-initialization
+3. Test controls (play/pause, seek, volume)
+4. Test episode switching for TV shows
+5. Monitor CPU usage - should be normal
+6. Check that HLS instance is not constantly destroyed/recreated
+
+## Additional Notes
+
+The 403 Forbidden error from the stream proxy is a separate issue related to:
+- CORS configuration
+- Stream URL expiration
+- Rate limiting
+- Referrer policy
+
+This should be investigated separately from the render loop issue.

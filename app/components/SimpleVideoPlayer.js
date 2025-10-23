@@ -240,6 +240,12 @@ const SimpleVideoPlayer = ({
       return;
     }
 
+    // **CRITICAL FIX: Prevent re-running if already set up**
+    if (videoRef.current.src === streamUrl) {
+      console.log('✅ [DEBUG] Video already set up with this stream URL, skipping');
+      return;
+    }
+
     const video = videoRef.current;
     console.log('🎬 [DEBUG] Setting up video element with stream URL:', streamUrl.substring(0, 100) + '...');
 
@@ -403,24 +409,36 @@ const SimpleVideoPlayer = ({
     return () => {
       console.log('🧹 [DEBUG] Cleaning up video event listeners and timeout');
       clearTimeout(loadingTimeout);
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      video.removeEventListener('canplay', handleCanPlay);
-      video.removeEventListener('loadstart', handleLoadStart);
-      video.removeEventListener('waiting', handleWaiting);
-      video.removeEventListener('playing', handlePlaying);
-      video.removeEventListener('timeupdate', handleTimeUpdate);
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-      video.removeEventListener('volumechange', handleVolumeChange);
-      video.removeEventListener('error', handleError);
+      
+      // **CRITICAL FIX: Only remove event listeners if video element still exists**
+      if (video) {
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('loadstart', handleLoadStart);
+        video.removeEventListener('waiting', handleWaiting);
+        video.removeEventListener('playing', handlePlaying);
+        video.removeEventListener('timeupdate', handleTimeUpdate);
+        video.removeEventListener('play', handlePlay);
+        video.removeEventListener('pause', handlePause);
+        video.removeEventListener('volumechange', handleVolumeChange);
+        video.removeEventListener('error', handleError);
+        video.removeEventListener('playing', clearLoadingTimeout);
+        video.removeEventListener('canplay', clearLoadingTimeout);
+      }
 
-      if (hlsInstance) {
-        console.log('🧹 [DEBUG] Destroying HLS instance');
-        hlsInstance.destroy();
+      // **CRITICAL FIX: Only destroy HLS if it exists AND we're actually unmounting**
+      // Don't destroy on every re-render
+      if (hlsInstance && !videoRef.current) {
+        console.log('🧹 [DEBUG] Destroying HLS instance (component unmounting)');
+        try {
+          hlsInstance.destroy();
+        } catch (err) {
+          console.warn('⚠️ [DEBUG] Error destroying HLS:', err);
+        }
         setHlsInstance(null);
       }
     };
-  }, [streamUrl, hlsInstance]);
+  }, [streamUrl]); // Keep streamUrl as only dependency
 
   // NEW: Auto-queue next episode functionality
   useEffect(() => {

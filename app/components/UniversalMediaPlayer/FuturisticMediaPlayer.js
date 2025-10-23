@@ -911,7 +911,11 @@ const FuturisticMediaPlayerCore = ({
     };
 
     const handleTimeUpdate = () => {
-      // Force sync on every time update - NO THROTTLING
+      // Throttle time updates to every 250ms to reduce render cycles
+      const now = Date.now();
+      if (now - lastSyncTimestamp.current < 250) {
+        return;
+      }
       forceStateSync('video-event-timeupdate');
     };
 
@@ -1023,7 +1027,11 @@ const FuturisticMediaPlayerCore = ({
     });
 
     video.addEventListener('progress', () => {
-      // Force sync on progress events (buffering updates)
+      // Throttle progress events to reduce render cycles
+      const now = Date.now();
+      if (now - lastSyncTimestamp.current < 500) {
+        return;
+      }
       forceStateSync('video-event-progress');
     });
 
@@ -1081,26 +1089,25 @@ const FuturisticMediaPlayerCore = ({
     };
   }, [forceStateSync]); // Include forceStateSync in dependencies
 
-  // **CRITICAL FIX 8: INTELLIGENT ADAPTIVE SYNC (Not Aggressive)**
+  // **CRITICAL FIX 8: REDUCED CONTINUOUS SYNC FREQUENCY**
+  // Only sync every 500ms instead of 100ms to reduce render cycles
   useEffect(() => {
     if (!videoRef.current) return;
 
-    console.log('🧠 INTELLIGENT SYNC: Starting adaptive sync monitoring');
+    console.log('🧠 INTELLIGENT SYNC: Starting adaptive sync monitoring (500ms interval)');
 
-    // **Adaptive sync frequency based on playback start protection**
     const adaptiveSyncInterval = setInterval(() => {
       if (videoRef.current) {
         const isPlaybackStart = playbackStartProtectionRef.current;
-        const interval = isPlaybackStart ? 200 : 100; // Slower during playback start
 
-        // Skip sync if within protection window and recent sync occurred
-        if (isPlaybackStart && Date.now() - lastSyncTimestamp.current < interval) {
+        // Skip sync during playback start protection
+        if (isPlaybackStart) {
           return;
         }
 
         forceStateSync('continuous-intelligent-sync');
       }
-    }, 100); // Base interval of 100ms
+    }, 500); // Reduced from 100ms to 500ms
 
     return () => {
       clearInterval(adaptiveSyncInterval);
@@ -1108,60 +1115,9 @@ const FuturisticMediaPlayerCore = ({
     };
   }, [forceStateSync]);
 
-  // **CRITICAL FIX 9: PROTECTED STATE CHANGE WATCHERS - No infinite loops**
-  useEffect(() => {
-    // Only log major state changes during playback start protection
-    if (playbackStartProtectionRef.current) {
-      console.log('🔍 PROTECTED STATE WATCHER: isPlaying changed to', playerState.isPlaying);
-    }
-
-    // Debounce state change syncs during playback start
-    if (playbackStartProtectionRef.current) {
-      if (syncDebounceRef.current) {
-        clearTimeout(syncDebounceRef.current);
-      }
-      syncDebounceRef.current = setTimeout(() => {
-        forceStateSync('playerstate-change-isPlaying-debounced', { newValue: playerState.isPlaying });
-      }, 150);
-    } else {
-      // Normal sync when not in playback start mode
-      setTimeout(() => forceStateSync('playerstate-change-isPlaying', { newValue: playerState.isPlaying }), 50);
-    }
-  }, [playerState.isPlaying, forceStateSync]);
-
-  useEffect(() => {
-    // **CRITICAL FIX: Don't skip currentTime watchers - they're essential for timeline updates**
-    // Only sync if there's a significant difference AND video element exists
-    if (videoRef.current && Math.abs(videoRef.current.currentTime - playerState.currentTime) > 0.5) {
-      // Reduce delay for better responsiveness
-      setTimeout(() => forceStateSync('playerstate-change-currentTime', { newValue: playerState.currentTime }), 50);
-    }
-  }, [playerState.currentTime, forceStateSync]);
-
-  useEffect(() => {
-    // Debounce volume changes during playback start
-    if (playbackStartProtectionRef.current) return;
-
-    setTimeout(() => forceStateSync('playerstate-change-volume', { newValue: playerState.volume }), 50);
-  }, [playerState.volume, forceStateSync]);
-
-  useEffect(() => {
-    // Debounce mute changes during playback start
-    if (playbackStartProtectionRef.current) return;
-
-    setTimeout(() => forceStateSync('playerstate-change-isMuted', { newValue: playerState.isMuted }), 50);
-  }, [playerState.isMuted, forceStateSync]);
-
-  useEffect(() => {
-    // Duration changes are critical - always sync with minimal delay
-    setTimeout(() => forceStateSync('playerstate-change-duration', { newValue: playerState.duration }), 25);
-  }, [playerState.duration, forceStateSync]);
-
-  useEffect(() => {
-    // Loading state changes during playback start are expected
-    const delay = playbackStartProtectionRef.current ? 100 : 50;
-    setTimeout(() => forceStateSync('playerstate-change-isLoading', { newValue: playerState.isLoading }), delay);
-  }, [playerState.isLoading, forceStateSync]);
+  // **CRITICAL FIX 9: REMOVED STATE CHANGE WATCHERS - They cause infinite loops**
+  // State changes are already handled by video events and the continuous sync
+  // No need to watch playerState changes and trigger more syncs
 
   // Load video source when stream URL is ready - RESILIENT TO COMPONENT UNMOUNTING
   useEffect(() => {
